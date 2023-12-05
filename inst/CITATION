@@ -1,0 +1,13 @@
+citHeader("Please cite this material in publications as:")
+
+citEntry(
+  entry="Manual",
+  title = "pnd: Parallel Numerical Derivatives of Arbitrary Order, Gradients, Hessians, and Jacobians",
+  author = as.person("Andreï V. Kostyrka"),
+  year = "2023",
+  note = "R package version 0.1.0",
+  organization = "University of Luxembourg",
+  address = "Luxembourg",
+  textVersion = "Kostyrka, Andreï V. (2023). pnd: Parallel Numerical Derivatives of Arbitrary Order, Gradients, Hessians, and Jacobians. R package version 0.1.0. https://github.com/Fifis/pnd",
+  url = "https://github.com/Fifis/pnd"
+)

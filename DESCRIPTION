@@ -1,0 +1,29 @@
+Package: pnd
+Type: Package
+Title: Parallel Numerical Differences
+Version: 0.0.2
+Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
+        role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
+Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>
+Description: This package provides facilities for fast parallel calculation
+    of numerical derivatives based on finite-difference approximation. The main
+    functions allow fast computation of approximate gradients of any order,
+    Jacobians, and Hessians. Its behaviour is intended to mimic that of
+    the numDeriv package that has not received updates in years and is missing
+    many useful features such as computing derivatives of arbitrary order or
+    reducing the Hessian approximation error by averaging cross-derivatives.
+License: GPL (>= 3)
+Encoding: UTF-8
+URL: https://github.com/Fifis/
+Depends: R (>= 3.4.0)
+Imports:
+    parallel,
+    Rdpack
+Suggests:
+    microbenchmark,
+    knitr,
+    rmarkdown
+RdMacros: Rdpack
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
+VignetteBuilder: knitr
