@@ -1,7 +1,6 @@
 #' @importFrom Rdpack reprompt
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Parallel numerical gradient v. 0.0.2 (2023-12-06).")
+  packageStartupMessage("Parallel numerical derivatives v. 0.0.3 (2023-06-01).")
   packageStartupMessage("This is *NOT* a stable version. Core functions subject to change.")
 }
-

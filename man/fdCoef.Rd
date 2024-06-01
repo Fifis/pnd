@@ -5,104 +5,99 @@
 \title{Finite-difference coefficients for arbitrary grids}
 \usage{
 fdCoef(
-  deriv.order = 1,
-  side = c("central", "forward", "backward"),
-  acc.order = 2,
+  deriv.order = 1L,
+  side = c(0L, 1L, -1L),
+  acc.order = 2L,
   stencil = NULL,
   zero.action = c("drop", "round", "none"),
-  zero.tol = (10^deriv.order) * .Machine$double.eps
+  zero.tol = NULL
 )
 }
 \arguments{
-\item{deriv.order}{Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})}
+\item{deriv.order}{Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
+for which a numerical approximation is needed.}
 
-\item{side}{Character: \code{"central"} (symmetrical two-sided, default), \code{"forward"}, or \code{"backward"} differences.
-Unless the function is computationally prohibitively expensive, two-sided differences are strongly recommended.}
+\item{side}{Integer that determines the type of finite-difference scheme:
+\code{0} for central (AKA symmetrical or two-sided; the default),
+\code{1} for forward, and \code{-1} for backward.
+Unless the function is computationally prohibitively,
+central differences are strongly recommended for their accuracy.}
 
-\item{acc.order}{Order of accuracy in terms of the step size: for accuracy order \eqn{a}{a},
-the approximation error is \eqn{O(f^{(a+1)}(c))}{O(d^o/dx^o f(c))}, where \eqn{x -h \le c \le x+h}{x-h <= c <= x+h} (depends on the higher-order derivatives).}
+\item{acc.order}{Order of accuracy: defines how the approximation error scales
+with the step size \eqn{h}{h}, specifically \eqn{O(h^{a+1})}{O(h^(a+1))}, where
+\eqn{a}{a} is the accuracy order and depends on the higher-order derivatives
+of the function.}
 
-\item{stencil}{In case the user desires a non-uniform grid or a custom grid,
-a vector of points at which the function is to be evaluated. For derivative
-order \code{m}, must contain at least \code{m+1} points.}
+\item{stencil}{Optional custom vector of points for function evaluation.
+Must include at least \code{m+1} points for the \code{m}-th order derivative.}
 
-\item{zero.action}{Character: if \code{"drop"}, stencil points corresponding to
-weights less in absolute value than \code{zero.tol} will be omitted. If \code{"round"},
-all stencil points are preserved, and small weights (less in absolute
-value than \code{zero.tol}) are replaced with zeros. Otherwise, do nothing.
-E.g. the stencil for d/dx f(x) is (-1, 0, 1) with weights (-0.5, 0, 0.5).
-Re-computing f(x + 0*h) = f(x) can be wasteful.}
+\item{zero.action}{Character string specifying how to handle near-zero weights:
+\code{"drop"} to omit small (less in absolute value than \code{zero.tol} times
+the median weight) weights and corresponding stencil points, \code{"round"}
+to round small weights to zero, and \code{"none"} to leave
+all weights as calculated.
+E.g. the stencil for \eqn{f'(x)}{f'(x)} is \code{(-1, 0, 1)} with weights
+\code{(-0.5, 0, 0.5)}; using \code{"drop"} eliminates the zero weight,
+and the redundant \code{f(x)} is not computed.}
 
-\item{zero.tol}{Non-negative positive scalar that determines near-zero
-weights.}
+\item{zero.tol}{Non-negative scalar defining the threshold: weights below
+\code{zero.tol} times the median weight are considered near-zero.}
+}
+\value{
+A list containing the \code{stencil} used and the corresponding
+\code{weights} for each point.
 }
 \description{
-This function computes the coefficients that yield an numerical approximation
-or arbitrary order to the true \eqn{m^{\textrm{th}}}{m-th} derivative of the
-given function. Given the derivative order and desired accuracy order,
-returns a grid (stencil) of equally spaced points and the weights for
-combining the function values obtained on that stencil. Alternatively, for a
-given arbitrary stencil \eqn{\{b_i\}_{i=1}^n}{{s[i]}, i = 1, ..., n}, it computes
-the optimal weights \eqn{\{w_i\}}{{w[i]}} yielding
+This function computes the coefficients for a numerical approximation to derivatives
+of any specified order. It provides the minimally sufficient stencil
+for the chosen derivative order and desired accuracy order.
+It can also use any user-supplied stencil (uniform or non-uniform).
+For that stencil \eqn{\{b_i\}_{i=1}^n}{{b[i]}, i = 1, ..., n}, it computes
+the optimal weights \eqn{\{w_i\}}{{w[i]}} that yield
 the numerical approximation of the derivative:
 \deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ sum_i w[i] f(x + b[i]*h)}
 }
 \details{
-The finite-difference coefficients for any given stencil are given as a solution of a linear equation
-system. There derivation of the system is due to \insertCite{taylor2016finite}{pnd}, although a similar
-approach is described in \insertCite{fornberg1988generation}{pnd}. This function reproduces the tables
-from the latter paper exactly.
+This function relies on the approach of approximating numerical derivarives
+by weghted sums of function values described in \insertCite{fornberg1988generation}{pnd}.
+It reproduces all tables from this paper exactly; see the example below to
+create Table 1.
+
+The finite-difference coefficients for any given stencil are given as a solution of a linear
+system. The capabilities of this function are similar to those of \insertCite{taylor2016finite}{pnd},
+but instead of matrix inversion, the \insertCite{bjorck1970solution}{pnd} algorithm is used because
+the left-hand-side matrix is a Vandermonde matrix, and its inverse may be
+very inaccurate, especially for long one-sided stencils.
+
+The weights computed for the stencil via this algorithm are very reliable; numerical
+simulations in \insertCite{higham1987error}{pnd} show that the relative error is
+low even for ill-conditioned systems. \insertCite{kostyrka2024what}{pnd}
+computes the exact relative error of the weights on the stencils returned by
+this function; the zero tolerance is based on these calculations.
 }
 \examples{
 fdCoef()  # Simple two-sided derivative
 fdCoef(2) # Simple two-sided second derivative
 fdCoef(acc.order = 4)$weights * 12  # Should be (1, -8, 8, -1)
-# Replicating Table 1 from Fornberg (1988) (cited above)
-pad9 <- function(x) {l <- length(x); c(a <- rep(0, (9-l)/2), x, a)}
-f <- function(d, a) pad9(fdCoef(deriv.order = d, acc.order = a,
-                                zero.action = "round")$weights)
-t1.1 <- t(sapply((1:4)*2, \(a) f(d = 1, a)))
-t1.2 <- t(sapply((1:4)*2, \(a) f(d = 2, a)))
-t1.3 <- t(sapply((1:3)*2, \(a) f(d = 3, a)))
-t1.4 <- t(sapply((1:3)*2, \(a) f(d = 4, a)))
-t1 <- data.frame(OrdDer = rep(1:4, times = c(4, 4, 3, 3)),
-                 OrdAcc = c((1:4)*2, (1:4)*2, (1:3)*2, (1:3)*2),
-                 rbind(t1.1, t1.2, t1.3, t1.4))
-colnames(t1)[3:11] <- as.character(-4:4)
-print(t1, digits = 4)
-
-# Replicating Table 2 (ibid) for a halfway stencil (without 0th derivatives)
-s <- c(-7, -5, -3, -1, 1, 3, 5, 7)/2
-pad8 <- function(x) {l <- length(x); c(a <- rep(0, (8-l)/2), x, a)}
-g <- function(d, a) {
-  k <- a/2 + max(floor(d/2), 0)
-  pad8(fdCoef(deriv.order = d, stencil = s[(5-k):(4+k)])$weights)
-}
-t2.1 <- t(sapply((1:4)*2, \(a) g(d = 1, a)))
-t2.2 <- t(sapply((1:3)*2, \(a) g(d = 2, a)))
-t2.3 <- t(sapply((1:3)*2, \(a) g(d = 3, a)))
-t2.4 <- t(sapply((1:2)*2, \(a) g(d = 4, a)))
-t2 <- data.frame(OrdDer = rep(1:4, times = c(4, 3, 3, 2)),
-                 OrdAcc = c((1:4)*2, (1:3)*2, (1:3)*2, (1:2)*2),
-                 rbind(t2.1, t2.2, t2.3, t2.4))
-colnames(t2)[3:10] <- as.character(s)
-print(t2, digits = 4)
-
-# Replicating Table 3 (ibid)
-pad9r <- function(x) c(x, rep(0, 9-length(x)))
-h <- function(d, a) pad9r(fdCoef(deriv.order = d, stencil = 0:(d+a-1))$weights)
-t3.1 <- t(sapply(1:8, \(a) h(d = 1, a)))
-t3.2 <- t(sapply(1:7, \(a) h(d = 2, a)))
-t3.3 <- t(sapply(1:6, \(a) h(d = 3, a)))
-t3.4 <- t(sapply(1:5, \(a) h(d = 4, a)))
-t3 <- data.frame(OrdDer = rep(1:4, times = 8:5),
-                 OrdAcc = c(1:8, 1:7, 1:6, 1:5),
-                 rbind(t3.1, t3.2, t3.3, t3.4))
-colnames(t3)[3:11] <- as.character(0:8)
-print(t3, digits = 4)
 
 # Using an custom stencil for the first derivative: x-2h and x+h
 fdCoef(stencil = c(-2, 1))
+
+# Reproducing Table 1 from Fornberg (1988) (cited above)
+pad9 <- function(x) {l <- length(x); c(a <- rep(0, (9-l)/2), x, a)}
+f <- function(d, a) pad9(fdCoef(deriv.order = d, acc.order = a,
+                                zero.action = "round")$weights)
+t11 <- t(sapply((1:4)*2, function(a) f(d = 1, a)))
+t12 <- t(sapply((1:4)*2, function(a) f(d = 2, a)))
+t13 <- t(sapply((1:3)*2, function(a) f(d = 3, a)))
+t14 <- t(sapply((1:3)*2, function(a) f(d = 4, a)))
+t11 <- cbind(t11[, 1:4], 0, t11[, 5:8])
+t13 <- cbind(t13[, 1:4], 0, t13[, 5:8])
+t1 <- data.frame(OrdDer = rep(1:4, times = c(4, 4, 3, 3)),
+                 OrdAcc = c((1:4)*2, (1:4)*2, (1:3)*2, (1:3)*2),
+                 rbind(t11, t12, t13, t14))
+colnames(t1)[3:11] <- as.character(-4:4)
+print(t1, digits = 4)
 }
 \references{
 \insertAllCited{}

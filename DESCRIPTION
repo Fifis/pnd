@@ -1,17 +1,19 @@
 Package: pnd
 Type: Package
-Title: Parallel Numerical Differences
-Version: 0.0.2
+Title: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order
+Version: 0.0.3
+Date: 2023-06-01
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>
-Description: This package provides facilities for fast parallel calculation
-    of numerical derivatives based on finite-difference approximation. The main
-    functions allow fast computation of approximate gradients of any order,
-    Jacobians, and Hessians. Its behaviour is intended to mimic that of
-    the numDeriv package that has not received updates in years and is missing
-    many useful features such as computing derivatives of arbitrary order or
-    reducing the Hessian approximation error by averaging cross-derivatives.
+Description: This package offers tools for fast, parallel calculation
+    of numerical derivatives through finite-difference approximations. It facilitates
+    efficient computation of derivatives, gradients, Jacobians, and Hessians.
+    Designed for compatibility with the numDeriv package,
+    which has not received updates in several years, it introduces advanced features
+    such as computing derivatives of arbitrary order, improving
+    the accuracy of Hessian approximations by avoiding repeated differencing,
+    and parallelising slow functions on Windows, Mac, an Linux.
 License: GPL (>= 3)
 Encoding: UTF-8
 URL: https://github.com/Fifis/
@@ -22,8 +24,10 @@ Imports:
 Suggests:
     microbenchmark,
     knitr,
-    rmarkdown
+    rmarkdown,
+    testthat (>= 3.0.0)
 RdMacros: Rdpack
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 Roxygen: list(markdown = TRUE)
 VignetteBuilder: knitr
+Config/testthat/edition: 3
