@@ -1,10 +1,9 @@
 ---
 title: "Fast and accurate parallel numerical derivatives in R"
 output:
-  rmarkdown::pdf_document:
-#   html_document:
+  rmarkdown::html_document:
     toc: true
-#    highlight: zenburn
+    highlight: zenburn
     toc_depth: 2
     number_sections: true
 fontsize: 12pt

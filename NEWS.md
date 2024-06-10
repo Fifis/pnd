@@ -27,4 +27,4 @@
 - Computing finite-difference coefficients on arbitrary stencils
 - Computing numerical gradients with reasonable default step sizes
 - Numerical Jacobians
-- Support for `mclapply` on *nix systems only
+- Support for `mclapply()` on *nix systems only
