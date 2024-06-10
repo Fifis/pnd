@@ -75,7 +75,8 @@ solveVandermonde <- function(s, b) {
 #' @param side Integer that determines the type of finite-difference scheme:
 #'   \code{0} for central (AKA symmetrical or two-sided; the default),
 #'   \code{1} for forward, and \code{-1} for backward.
-#'   Unless the function is computationally prohibitively,
+#'   Using \code{2} (for 'two-sided') triggers a warning and is treated as \code{0}.
+#'   with a warning. Unless the function is computationally prohibitively,
 #'   central differences are strongly recommended for their accuracy.
 #' @param stencil Optional custom vector of points for function evaluation.
 #'   Must include at least \code{m+1} points for the \code{m}-th order derivative.
@@ -121,7 +122,7 @@ solveVandermonde <- function(s, b) {
 #' fdCoef(acc.order = 4)$weights * 12  # Should be (1, -8, 8, -1)
 #'
 #' # Using an custom stencil for the first derivative: x-2h and x+h
-#' fdCoef(stencil = c(-2, 1))
+#' fdCoef(stencil = c(-2, 1), acc.order = 1)
 #'
 #' # Reproducing Table 1 from Fornberg (1988) (cited above)
 #' pad9 <- function(x) {l <- length(x); c(a <- rep(0, (9-l)/2), x, a)}
@@ -142,19 +143,27 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
                    acc.order = 2L, stencil = NULL,
                    zero.action = c("drop", "round", "none"),
                    zero.tol = NULL) {
-  if (length(deriv.order) != 1) stop("The 'acc.order' argument must have length 1.")
-  if (length(acc.order) != 1) stop("The 'acc.order' argument must have length 1.")
+  if (length(deriv.order) != 1L) stop("The 'deriv.order' argument must be an integer of length 1.")
+  if (length(acc.order) != 1L) stop("The 'acc.order' argument must must be an integer of length 1.")
+  if (!is.numeric(deriv.order) || deriv.order != round(deriv.order) || deriv.order < 0)
+    stop("'deriv.order' must be a non-negative integer of length 1.")
+  if (!is.numeric(acc.order) || acc.order != round(acc.order) || acc.order <= 0)
+    stop("'acc.order' must be a positive integer of length 1.")
   side <- side[1]
-  if (!(side %in% -1:1)) stop("The 'side' argument must be -1, 0, 1 for backward, central, and forward differences.")
+  if (side == 2) {
+    side <- 0 # Interpreting '2' as two-sided = central
+    warning("Interpreting 'side = 2' as 'two-sided central differences'; please use side = 0.")
+  }
+  if (!(side %in% -1:1))
+    stop("The 'side' argument must be -1, 0, or 1 for backward, central, and forward differences.")
   zero.action <- zero.action[1]
   if (!(zero.action %in% c("drop", "round", "none")))
     stop("The 'zero.action' argument must be 'drop', 'round', or 'none'.")
+  # TODO: implement interpolation
   if (deriv.order == 0) stop("Derivative order 0 (interpolation) not implemented yet.")
 
-  if (acc.order < 1 || (acc.order != round(acc.order)))
-    stop("The order of accuracy must be a positive integer.")
-
   if (is.null(stencil)) { # Miminally sufficient stencil to prevent zero weights
+    acc.requested <- acc.order
     if (side == -1L) {    # and exponential growth of the Vandermonde matrix elements
       stencil <- (-acc.order - deriv.order + 1):0L
     } else if (side == 1L) {
@@ -172,6 +181,8 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
       stencil <- (-l.end):l.end
       if (deriv.order %% 2 == 1) stencil <- setdiff(stencil, 0)
     }
+  } else {
+    acc.requested <- NA
   }
 
   stencil <- sort(stencil)
@@ -183,10 +194,10 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   }
   l <- length(stencil)
   is.symm <- all(stencil + rev(stencil) == 0)
+  a <- l - deriv.order + is.symm # Effective accuracy (preliminary guess because 0 may be redundant)
   if (l < deriv.order + 1)
     stop("To compute the m-th derivative, at least m+1 unique stencil points are required.")
   if (l < deriv.order + acc.order - is.symm) {
-    a <- l - deriv.order + is.symm
     prefix <- switch(a, "st", "nd", "rd")
     if (is.null(prefix)) prefix <- "th"
     warning(paste0("The user-supplied stencil needs ", acc.order - a,
@@ -196,16 +207,14 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
 
   b <- numeric(l)
   b[1 + deriv.order] <- factorial(deriv.order)
-  # A <- t(sapply(1:l, function(i) stencil^(i-1)))
-  # weights <- solve(A, b, tol = 0) # Numerically ill-conditioned and unstable
   weights <- solveVandermonde(s = stencil, b = b)
 
+  if (is.null(zero.tol)) {
+    rel.tol <- 1024 * .Machine$double.eps
+    if (a > 6) rel.tol <- rel.tol * 10^((min(a, 16)-6)/2)
+    zero.tol <- max(stats::median(abs(weights)), 1) * rel.tol
+  }
   if (zero.action != "none") {
-    if (is.null(zero.tol)) {
-      rel.tol <- 100 * .Machine$double.eps
-      if (acc.order > 6) rel.tol <- rel.tol * 10^((min(acc.order, 16)-6)/2)
-      zero.tol <- stats::median(abs(weights)) * rel.tol
-    }
     zw <- abs(weights) < zero.tol
     if (zero.action == "drop") {
       stencil <- stencil[!zw]
@@ -214,8 +223,35 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
       weights[zw] <- 0
     }
   }
-  rs <- round(stencil, 2) # For names
-  names(weights) <- paste0("x", ifelse(rs < 0, "-", "+"), abs(rs), "h")
-  names(weights)[rs == 0] <- "x"
-  return(list(stencil = stencil, weights = weights))
+  rs <- round(stencil, 2) # Suitable names for reasonable integer stencils
+  if (any(duplicated(rs))) {
+    rs <- sprintf("%1.2e", stencil)
+    names(weights) <- paste0("x", ifelse(stencil < 0, "", "+"), rs, "h")
+    warning(paste("Stencils should contain large entries like '-0.5, 1, 3', but this one has",
+                  "two very close points. Wildly uneven gaps may result in numerical instability."))
+  } else {
+    names(weights) <- paste0("x", ifelse(stencil < 0, "-", "+"), abs(rs), "h")
+  }
+  names(weights)[stencil == 0] <- "x"
+
+  # Computing the coefficient on the remainder term in the output
+  oseq <- 0:(deriv.order+a)
+  B <- outer(stencil, oseq, "^")
+  resulting.terms <- colSums(B * weights) / factorial(oseq)
+  resulting.terms[abs(resulting.terms) < zero.tol] <- 0
+  flabs <- sapply(oseq, function(i) if (i == 0) " f" else if (i <= 4)
+    paste0(" f", paste0(rep("'", i), collapse = "")) else paste0(" f^(", i, ")"))
+  frac <- paste0(sprintf("%.4e", resulting.terms), flabs)
+  frac <- paste0(frac[which(resulting.terms != 0)[1:2]], collapse = " + ")
+  frac <- gsub("*1\\.0000e\\+00", "", frac)
+  frac <- paste0(gsub("\\+ -", "- ", gsub("^ +", "", frac)), " + ...")
+  # Updating the effective accuracy order in case of zero stencil elements
+  ea <- diff(which(abs(resulting.terms) > 1024*zero.tol)[1:2])
+
+  ret <- list(stencil = stencil, weights = weights)
+  attr(ret, "remainder.coef") <- resulting.terms[which(resulting.terms != 0)[2]]
+  attr(ret, "accuracy.order") <- c(requested = acc.requested, effective = ea)
+  attr(ret, "expansion") <- frac
+
+  return(ret)
 }

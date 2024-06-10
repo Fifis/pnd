@@ -1,22 +1,25 @@
 Package: pnd
 Type: Package
 Title: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order
-Version: 0.0.3
-Date: 2023-06-01
-Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
-        role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
-Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>
-Description: This package offers tools for fast, parallel calculation
-    of numerical derivatives through finite-difference approximations. It facilitates
-    efficient computation of derivatives, gradients, Jacobians, and Hessians.
+Version: 0.0.4
+Date: 2024-06-10
+Authors@R: person(given = c("Andreï", "Victorovitch"), family = "Kostyrka",
+        role = c("aut", "cre"), email="andrei.kostyrka@gmail.com")
+Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
+Description: Tools for calculation of numerical derivatives through
+    finite-difference approximations with parallel capabilities and optimal
+    step-size selection to improve accuracy. These functions facilitate
+    efficient computation of derivatives, gradients, Jacobians, and Hessians,
+    allowing for more evaluations to reduce the mathematical and machine errors.
     Designed for compatibility with the numDeriv package,
     which has not received updates in several years, it introduces advanced features
     such as computing derivatives of arbitrary order, improving
     the accuracy of Hessian approximations by avoiding repeated differencing,
-    and parallelising slow functions on Windows, Mac, an Linux.
-License: GPL (>= 3)
+    and parallelising slow functions on Windows, Mac, and Linux.
+License: EUPL (>= 1.1)
 Encoding: UTF-8
-URL: https://github.com/Fifis/
+URL: https://github.com/Fifis/pnd
+BugReports: https://github.com/Fifis/pnd/issues
 Depends: R (>= 3.4.0)
 Imports:
     parallel,

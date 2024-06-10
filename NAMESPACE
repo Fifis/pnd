@@ -2,7 +2,9 @@
 
 export(Grad)
 export(fdCoef)
+export(gradstep)
 export(solveVandermonde)
 export(step.CR)
 export(step.DV)
+export(step.SW)
 importFrom(Rdpack,reprompt)

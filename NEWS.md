@@ -1,8 +1,15 @@
-# pnd 0.0.4 (next)
+# pnd next
 - Detailed vignette explaining the mathematics behind the functions with full transparency about the choice of parameters
 - Evaluating the accuracy of numerical approximations
 - Functions for fast and reliable Hessian computation based on parallel gradient evaluation
 - Feature: auto-detecting the number of cores available on multi-core machines to speed up computations
+
+# pnd 0.0.4 (2023-06-10)
+- Feature: Stepleman--Winarsky algorithm for step size selection `step.SW()`
+- Feature: automated wrapper for step size selection `gradstep()`
+- Improvement: Safe handling of function errors and non-finite returns in step-size selection procedures.
+- Improvement: Finite-difference coefficients gained attributes: Taylor expansion, coefficient on the largest truncated term, and effective accuracy (useful for custom stencils).
+- Improvement: added unit tests for core features
 
 # pnd 0.0.3 (2023-06-01)
 - Feature: `solveVandermonde()` to solve ill-conditioned problems that arise in weight calculation

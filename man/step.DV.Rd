@@ -7,8 +7,8 @@
 step.DV(
   x,
   FUN,
-  h0 = 6e-06 * (abs(x) + (x == 0)),
-  range = NULL,
+  h0 = 1e-05 * (abs(x) + (x == 0)),
+  range = h0/c(1e+06, 1e-06),
   alpha = 4/3,
   ratio.limits = c(1/15, 1/2, 2, 15),
   maxit = 40L,
@@ -21,8 +21,8 @@ step.DV(
 
 \item{FUN}{Function for which the optimal numerical derivative step size is needed.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of .Machine$double.eps^(1/3)
-(or absolute step if \code{x} is zero).}
+\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
+slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
@@ -52,8 +52,9 @@ Note: the history tracks the third derivative, not the first.}
 A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
 step size found, \code{value} -- the estimated numerical first derivative (central
 differences), \code{counts} -- the number of iterations (each iteration includes
-four function evaluations), \code{exitcode} -- an integer code indicating the
-termination status:
+four function evaluations), \code{abs.error} -- an estimate of the total
+approximation error (sum of truncation and rounding errors),
+\code{exitcode} -- an integer code indicating the termination status:
 \code{0} indicates optimal termination within tolerance,
 \code{1} means that the third derivative is zero (large step size preferred),
 \code{3} indicates a solution at the boundary of the allowed value range,

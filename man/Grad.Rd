@@ -10,13 +10,14 @@ Grad(
   deriv.order = 1L,
   side = 0,
   acc.order = ifelse(abs(side) == 1, 1L, 2L),
-  h = .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h = (abs(x) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h0 = NULL,
+  method.args = list(),
   f0 = NULL,
-  parallel = c("auto", "fork", "PSOCK", "none"),
   cores = 2,
-  cluster = NULL,
   load.balance = TRUE,
   func = NULL,
+  report = 1L,
   ...
 )
 }
@@ -34,41 +35,35 @@ it will be reassigned to \code{FUN} with a warning.}
 
 \item{side}{Integer scalar or vector indicating difference type:
 \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
-Using \code{2} (for 'two-sided') triggers a warning and is treated as \code{0}.
-with a warning.
 Central differences are recommended unless computational cost is prohibitive.}
 
 \item{acc.order}{Integer specifying the desired accuracy order.
 The error typically scales as \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
-\item{h}{Numeric scalar or vector specifying the step size for the numerical
-difference. Must be length 1 or match \code{length(x)}.
-If too large, the slope of the secant poorly estimates the derivative;
-if too small, it leads to numerical instability due to the function value rounding.}
+\item{h}{Numeric scalar, vector, or character specifying the step size for the numerical
+difference. If character (\code{"CR"}, \code{"CRm"}, \code{"DV"}, or \code{"SW"}),
+calls \code{gradstep()} with the appropriate step-selection method.
+Must be length 1 or match \code{length(x)}.}
+
+\item{h0}{Numeric scalar of vector: initial step size for automatic search with
+\code{gradstep()}.}
+
+\item{method.args}{A named list of tuning parameters passed to \code{gradstep()}.}
 
 \item{f0}{Optional numeric scalar or vector: if provided and applicable, used
 where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
 to save time. Currently ignored.}
 
-\item{parallel}{String indicating the parallel execution mode.
-This argument is ignored if a valid \code{cluster} is provided,
-as the cluster settings take precedence.
-On Mac and Linux, use \code{"fork"} to invoke \code{mclapply} or \code{"PSOCK"}
-to create a PSOCK cluster dynamically.
-On Windows, use \code{"PSOCK"} if you have not created the cluster yet, although
-using a dedicated cluster via \code{cluster} is highly recommended to reduce overhead.
-\code{"auto"} switches to \code{"PSOCK"} on Windows (with a warning)
-and to \code{"fork"} on everything else.}
-
 \item{cores}{Integer specifying the number of parallel processes to use.}
-
-\item{cluster}{An optional cluster object. Ensure that necessary objects and packages
-are available in the cluster environment with \code{clusterExport()} and \code{clusterEvalQ()}.}
 
 \item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}.}
 
 \item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
+
+\item{report}{Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
+attaches the step size and its selection method: \code{2} or higher, attaches the full
+diagnostic output (overrides \code{diagnostics = FALSE} in \code{method.args}).}
 
 \item{...}{Additional arguments passed to \code{FUN}.}
 }
@@ -83,9 +78,14 @@ this output preserves the names of \code{x} and \code{FUN(x)}.
 Computes numerical derivatives, gradients and Jacobians. Supports both two-sided
 (central) and one-sided (forward or backward) derivatives. Calculations can be
 executed on multiple cores to cut down execution time for slow functions or
-to attain higher accuracy faster.
+to attain higher accuracy faster. Currently for Mac & Linux only because
+Windows cannot handle \code{parallel::mclapply()}. A \code{parallel::parLapply}
+version is in development.
 }
 \details{
+If the step size is too large, the slope of the secant poorly estimates the derivative;
+if it is too small, it leads to numerical instability due to the function value rounding.
+
 The optimal step size for one-sided differences typically approaches Mach.eps^(1/2)
 to balance the Taylor series truncation error with the rounding error due to storing
 function values with limited precision. For two-sided differences, it is proportional
@@ -97,6 +97,15 @@ The use of \code{f0} can reduce computation time similar to the use of \code{f.l
 and \code{f.upper} in \code{uniroot()}.
 }
 \examples{
+
+f <- function(x) sum(sin(x))
+g1 <- Grad(x = 1:4, FUN = f)
+g2 <- Grad(x = 1:4, FUN = f, h = 7e-6)
+g2 - g1 # Tiny differences due to different step sizes
+g3 <- Grad(x = 1:4, FUN = f, h = "SW")
+g3.full <- Grad(x = 1:4, FUN = f, h = "SW", report = 2)
+attr(g3.full, "step.search")$exitcode  # Success
+
 \dontrun{
 slowFun <- function(x) {Sys.sleep(0.05); print(x, digits = 12); sum(sin(x))}
 slowFunVec <- function(x) {Sys.sleep(0.05); print(x, digits = 12)
@@ -122,4 +131,7 @@ print(rbind(numDeriv.grad = g.slow, pnd.Grad = g.fast, j.slow, j.fast, j.fast4),
 # with non-zero third and higher derivatives -- look at pnd.jac.order.4
 }
 
+}
+\seealso{
+\code{\link[=gradstep]{gradstep()}} for automatic step-size selection.
 }

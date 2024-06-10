@@ -20,7 +20,8 @@ for which a numerical approximation is needed.}
 \item{side}{Integer that determines the type of finite-difference scheme:
 \code{0} for central (AKA symmetrical or two-sided; the default),
 \code{1} for forward, and \code{-1} for backward.
-Unless the function is computationally prohibitively,
+Using \code{2} (for 'two-sided') triggers a warning and is treated as \code{0}.
+with a warning. Unless the function is computationally prohibitively,
 central differences are strongly recommended for their accuracy.}
 
 \item{acc.order}{Order of accuracy: defines how the approximation error scales
@@ -81,7 +82,7 @@ fdCoef(2) # Simple two-sided second derivative
 fdCoef(acc.order = 4)$weights * 12  # Should be (1, -8, 8, -1)
 
 # Using an custom stencil for the first derivative: x-2h and x+h
-fdCoef(stencil = c(-2, 1))
+fdCoef(stencil = c(-2, 1), acc.order = 1)
 
 # Reproducing Table 1 from Fornberg (1988) (cited above)
 pad9 <- function(x) {l <- length(x); c(a <- rep(0, (9-l)/2), x, a)}

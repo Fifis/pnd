@@ -1,13 +1,23 @@
 citHeader("Please cite this material in publications as:")
 
-citEntry(
-  entry="Manual",
+bibentry(
+  bibtype="Manual",
   title = "pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order",
-  author = as.person("Andreï V. Kostyrka"),
+  author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2024",
-  note = "R package version 0.0.3",
+  note = "R package version 0.0.4",
   organization = "University of Luxembourg",
-  address = "Luxembourg",
-  textVersion = "Kostyrka, Andreï V. (2024). pnd: Parallel Numerical Derivatives of Arbitrary Order, Gradients, Hessians, and Jacobians. R package version 0.0.3. https://github.com/Fifis/pnd",
+  textVersion = "Kostyrka, Andreï V. (2024). pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order. R package version 0.0.4. https://github.com/Fifis/pnd",
   url = "https://github.com/Fifis/pnd"
+)
+
+bibentry(
+  bibtype="Misc",
+  title = "Fast and accurate parallel numerical derivatives in R",
+  author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
+  year = "2024",
+  organization = "University of Luxembourg",
+  note = "Vignette for the R package pnd 0.0.4.",
+  textVersion = "Kostyrka, Andreï V. (2024). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.4.",
+  url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )

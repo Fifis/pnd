@@ -7,14 +7,14 @@
 step.CR(
   x,
   FUN,
-  h0 = 6e-06 * (abs(x) + (x == 0)),
+  h0 = 1e-05 * (abs(x) + (x == 0)),
   version = c("original", "modified"),
   aim = if (version[1] == "original") 100 else 1,
   acc.order = c(2L, 4L),
   tol = if (version[1] == "original") 10 else 4,
-  range = NULL,
+  range = h0/c(1e+05, 1e-05),
   maxit = 20L,
-  seq.tol = 1e-08,
+  seq.tol = 1e-04,
   diagnostics = FALSE,
   ...
 )
@@ -24,8 +24,8 @@ step.CR(
 
 \item{FUN}{Function for which the optimal numerical derivative step size is needed.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of .Machine$double.eps^(1/3)
-(or absolute step if \code{x} is zero).}
+\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
+slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
 \item{version}{Character scalar: \code{"original"} for the original 1974 version by
 Curtis and Reid; \code{"modified"} for Kostyrka’s 2024 modification, which adds an
@@ -35,9 +35,9 @@ extra evaluation for a more accurate estimate of the truncation error.}
 version over-estimates the truncation error, hence a higher \code{aim} is recommended.
 For the \code{"modified"} version, aim should be close to 1.}
 
-\item{acc.order}{Numeric scalar: in the modified version, allows returning a 4th-order accurate
-central difference using a 4-point stencil from the last iteration with
-half the optimal step size.}
+\item{acc.order}{Numeric scalar: in the modified version, allows searching for a
+step size that would be optimal for a 4th-order-accurate central difference
+See the Details section below.}
 
 \item{tol}{Numeric scalar greater than 1: tolerance multiplier for determining when to stop
 the algorithm based on the current estimate being between \code{aim/tol} and \code{aim*tol}.}
@@ -59,8 +59,9 @@ including all function evaluations.}
 A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
 step size found, \code{value} -- the estimated numerical first derivative (central differences;
 very useful for computationally expensive functions), \code{counts} -- the number of
-iterations (each iteration includes three function evaluations), \code{exitcode} --
-an integer code indicating the termination status:
+iterations (each iteration includes three function evaluations), \code{abs.error} --
+an estimate of the total approximation error (sum of truncation and rounding errors),
+\code{exitcode} -- an integer code indicating the termination status:
 \code{0} indicates optimal termination within tolerance,
 \code{1} means that the third derivative is zero (large step size preferred),
 \code{2} is returned if there is no change in step size within tolerance,
@@ -78,7 +79,15 @@ Curtis--Reid automatic step selection
 This function computes the optimal step size for central differences using the
 \insertCite{curtis1974choice}{pnd} algorithm.
 If the estimated third derivative is exactly zero, then, the initial step size
-is multipled by 2 and returned.
+is multiplied by 4 and returned.
+
+If 4th-order accuracy (4OA) is requested, then, two things happen. Firstly,
+since 4OA differences requires a larger step size and the truncation error for
+the 2OA differences grows if the step size is larger than the optimal one,
+a higher ratio of truncation-to-rounding errors should be targeted. Secondly,
+a 4OA numerical derivative is returned, but the truncation and rounding errors
+are still estimated for the 2OA differences. Therefore, the estimating truncation
+error is higher and the real truncation error of 4OA differences is lower.
 
 TODO: mention that f must be one-dimensional
 }
@@ -87,6 +96,7 @@ f <- function(x) x^4
 step.CR(x = 2, f)
 step.CR(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
 step.CR(x = 2, f, version = "modified")
+step.CR(x = 2, f, version = "modified", acc.order = 4)
 }
 \references{
 \insertAllCited{}
