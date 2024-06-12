@@ -29,7 +29,7 @@
 #'   to save time. Currently ignored.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
-#' @param method.args A named list of tuning parameters passed to \code{gradstep()}.
+#' @param control A named list of tuning parameters passed to \code{gradstep()}.
 #' @param cores Integer specifying the number of parallel processes to use. Recommended
 #'   value: the number of physical cores on the machine minus one.
 #' @param load.balance Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
@@ -37,7 +37,7 @@
 #' @param func Deprecated; for \code{numDeriv::grad()} compatibility only.
 #' @param report Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
 #'   attaches the step size and its selection method: \code{2} or higher, attaches the full
-#'   diagnostic output (overrides \code{diagnostics = FALSE} in \code{method.args}).
+#'   diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
@@ -103,54 +103,61 @@ Grad <- function(FUN, x,
                  deriv.order = 1L, side = 0,
                  acc.order = ifelse(abs(side) == 1, 1L, 2L),
                  h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
-                 h0 = NULL, method.args = list(), f0 = NULL,
+                 h0 = NULL, control = list(), f0 = NULL,
                  cores = 2, load.balance = TRUE, func = NULL,
                  report = 1L,
                  ...) {
   n <- length(x)
-  if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or same length as x.")
   #########################################
   # BEGIN compatibility with numDeriv::grad
+  # Detecting numDeriv named arguments (e.g. method.args) in ... first, and handling them
+
+  ell <- list(...)
+  if (!is.null(m <- ell[["method"]])) {
+    if (length(m) == 1 && m %in% c("simple", "complex", "Richardson")) {
+      if (m == "simple") {
+        acc.order <- ifelse(side == 0, 2, 1)
+      } else if (m == "complex") {
+        stop("Complex derivatives not implemented yet.")
+      } else if (identical(m, "Richardson")) { # More arguments to grab
+        if (!is.null(ma <- ell$method.arguments)) {
+          if (is.numeric(ma$r)) acc.order <- ma$r
+          # TODO: finish grabbing all the arguments
+        }
+      }
+      ell[["method"]] <- NULL
+    }
+  }
+
   if (missing(FUN)) {
     if (is.function(func)) {
       FUN <- func
       warning("Use the argument 'FUN' to pass the function for differencing to Grad instead of 'func'.")
     } else {
-      stop("Pass the function for differencing as the named argument 'FUN' or as the first unnamed argument.")
-    }
-  }
-
-  # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
-  if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
-  if (length(side) == 1) side <- rep(side, n)
-  side[!is.finite(side)] <- 0 # NA --> default 'central
-  if (!all(side %in% -1:1)) stop("The 'side' argument must contain values 0 for central, 1 for forward and 2 for backward difference.")
-
-  ell <- list(...)
-  if (!is.null(m <- ell$method)) {
-    if (identical(m, "simple")) {
-      acc.order <- ifelse(side == 0, 2, 1)
-    }
-    if (identical(m, "Richardson")) {
-      if (!is.null(ma <- ell$method.arguments)) {
-        if (is.numeric(ma$r)) acc.order <- ma$r
-        # TODO: finish grabbing all the arguments
-      }
+      stop("Pass the function for differencing as the named argument 'FUN'.")
     }
   }
   # END compatibility with numDeriv::grad
   #######################################
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
+
+  # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
+  if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
+  if (length(side) == 1) side <- rep(side, n)
+  if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or same length as x.")
+  side[!is.finite(side)] <- 0 # NA --> default 'central -- numDeriv COMPATIBILITY
+  if (!all(side %in% -1:1)) stop("The 'side' argument must contain values 0 for central, 1 for forward, and -1 for backward difference.")
+
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
-  # side is already a vector
+
   # TODO: the part where step is compared to step.CR, step.DV etc.
   autostep <- FALSE
   if (is.character(h)) {
     method <- h
-    if (report == 2) method.args$diagnostics <- TRUE
-    h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = method, method.args = method.args, ...)
+    if (report == 2) control$diagnostics <- TRUE
+    h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = method, control = control, ...)
     h <- h.auto$par
     autostep <- TRUE
     # TODO: use this gradient already
@@ -181,10 +188,12 @@ Grad <- function(FUN, x,
   xvals <- lapply(seq_len(nrow(xdf)), function(i) xm[i, ])
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
+  # The rubbish in the ellipsis (...) should have been sanitised by now
+  FUN1 <- function(x) do.call(FUN, c(list(x = x), ell))
   fvals <- if (cores > 1) {
-    parallel::mclapply(X = xvals, FUN = function(x) FUN(x, ...), mc.cores = cores, mc.preschedule = !load.balance)
+    parallel::mclapply(X = xvals, FUN = FUN1, mc.cores = cores, mc.preschedule = !load.balance)
   } else {
-    lapply(xvals, function(x) FUN(x, ...))
+    lapply(xvals, FUN1)
   }
   if (any(!sapply(fvals, function(x) is.numeric(x) | is.na(x))))
     stop("'FUN' must output numeric values only, but non-numeric values were returned.")
@@ -213,9 +222,8 @@ Grad <- function(FUN, x,
     } else {
       attr(jac, "step.size.method") <- "user-supplied"
     }
-    if (autostep & report > 1) attr(jac, "step.search") <- h.auto
+    if (autostep && report > 1) attr(jac, "step.search") <- h.auto
   }
 
   return(jac)
 }
-
