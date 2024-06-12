@@ -137,8 +137,8 @@ step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
     }
 
     ulist[[i]] <- getRatio(FUN = FUN, x = x, h = hnew, vanilla = vanilla, ...)
-    if (any(bad <- !is.finite(ulist[[i]]$fgrid))) {
-      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$xgrid[bad]),
+    if (any(bad <- !is.finite(ulist[[i]]$f))) {
+      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
                   ". Change the range, which is currently [", .pasteAnd(range),
                   "], and/or try a different starting h0, which is currently ", h0, "."))
     }
@@ -271,8 +271,8 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
   while (i <= maxit) {
     if (i == 1) k <- k0
     ulist[[i]] <- getRatio(FUN = FUN, x = x, k = k, P = P, ...)
-    if (any(bad <- !is.finite(ulist[[i]]$fgrid))) {
-      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$xgrid[bad]),
+    if (any(bad <- !is.finite(ulist[[i]]$f))) {
+      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
                   ". Change the range, which is currently [", .pasteAnd(range),
                   "], and/or try a different starting h0, which is currently ", h0, "."))
     }
@@ -391,7 +391,7 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' f <- function(x) x^4  # The derivative at 1 is 4
 #' step.SW(x = 1, f)
 #' step.SW(x = 1, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
-#' # Starting somewhat high leads to too many preliminatry iterations
+#' # Starting somewhat high leads to too many preliminary iterations
 #' step.SW(x = 1, f, h0 = 10, diagnostics = TRUE)
 #' step.SW(x = 1, f, h0 = 1000, diagnostics = TRUE) # Starting absurdly high
 #'
@@ -580,9 +580,9 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param method Character to choose between \insertCite{curtis1974choice}{pnd},
 #' modified Curtis--Reid,
 #'   \insertCite{dumontet1977determination}{pnd}, and \insertCite{stepleman1979adaptive}{pnd}.
-#' @param method.args A named list of tuning parameters for the method. If \code{NULL},
+#' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
-#'   if \code{method.args$diagnostics} is \code{TRUE}, full iteration history
+#'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
 #'   including all function evaluations is returned; different methods have
 #'   slightly different diagnostic outputs.
 #' @param cores Integer specifying the number of parallel processes to use. Recommended
@@ -625,10 +625,13 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 gradstep <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                      method = c("SW", "CR", "CRm", "DV"),
-                     method.args = NULL, cores = 2, ...) {
+                     control = NULL, cores = 2, ...) {
   # TODO: implement "all"
   method <- method[1]
-  dot.args <- list(...)
+  ell <- list(...)
+  if (any(names(ell) == "method.args"))
+    stop(paste0("'method.args' is an argument to control numDeriv::grad(). ",
+                "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'."))
   if (is.null(h0)) h0 <- 1e-5 * (abs(x) + (x == 0))
   f0 <- .safeF(FUN, x, ...)
   if (length(f0) > 1) stop("The function FUN must return a scalar.")
@@ -647,18 +650,18 @@ gradstep <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                                  seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
                                  maxit = 40L, diagnostics = FALSE))
   margs <- default.args[[method]]
-  if (!is.null(method.args)) {
-    bad.args <- setdiff(names(method.args), names(margs))
+  if (!is.null(control)) {
+    bad.args <- setdiff(names(control), names(margs))
     if (length(bad.args) > 0) {
       stop(paste0("The following arguments are not supported by the ", method, " method: ",
                   .pasteAnd(bad.args)))
     }
-    margs[names(method.args)] <- method.args
+    margs[names(control)] <- control
   }
-  conflicting.args <- intersect(names(margs), names(dot.args))
+  conflicting.args <- intersect(names(margs), names(ell))
   if (length(conflicting.args) > 0)
     stop(paste0("The arguments ", .pasteAnd(conflicting.args), " of your function coincide with ",
-           " the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
+           "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
            "incorporate the '...' explicitly."))
   autofun <- switch(method, CR = step.CR, CRm = step.CR, DV = step.DV, SW = step.SW)
   if (length(x) == 1) {
@@ -673,7 +676,7 @@ gradstep <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
       }
       margs1 <- margs
       margs1$h0 <- h0[i]
-      margs1$range <- if (!is.null(method.args$range)) method.args$range else
+      margs1$range <- if (!is.null(control$range)) control$range else
         h0[i] / switch(method, CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
                        DV = c(1e6, 1e-6), SW = c(1e12, 1e-8))
       return(c(margs1, x = unname(x[i]), FUN = FUN1))
@@ -687,7 +690,7 @@ gradstep <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                 abs.err = do.call(c, lapply(ret.list, "[[", "abs.error")),
                 iterations = lapply(ret.list, "[[", "iterations"))
     ret[names(ret) != "counts"] <- lapply(ret[names(ret) != "counts"],
-                                          function(z) {names(z) <- names(x); z})
+                                          function(z) structure(z, names = names(x)))
     if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
   }
   return(ret)

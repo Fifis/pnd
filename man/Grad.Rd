@@ -12,7 +12,7 @@ Grad(
   acc.order = ifelse(abs(side) == 1, 1L, 2L),
   h = (abs(x) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
   h0 = NULL,
-  method.args = list(),
+  control = list(),
   f0 = NULL,
   cores = 2,
   load.balance = TRUE,
@@ -48,13 +48,14 @@ Must be length 1 or match \code{length(x)}.}
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}
 
-\item{method.args}{A named list of tuning parameters passed to \code{gradstep()}.}
+\item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
 \item{f0}{Optional numeric scalar or vector: if provided and applicable, used
 where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
 to save time. Currently ignored.}
 
-\item{cores}{Integer specifying the number of parallel processes to use.}
+\item{cores}{Integer specifying the number of parallel processes to use. Recommended
+value: the number of physical cores on the machine minus one.}
 
 \item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}.}
@@ -63,7 +64,7 @@ or enables load balancing with \code{parLapplyLB()}.}
 
 \item{report}{Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher, attaches the full
-diagnostic output (overrides \code{diagnostics = FALSE} in \code{method.args}).}
+diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).}
 
 \item{...}{Additional arguments passed to \code{FUN}.}
 }

@@ -76,7 +76,7 @@ This function computes the optimal step size for central differences using the
 f <- function(x) x^4  # The derivative at 1 is 4
 step.SW(x = 1, f)
 step.SW(x = 1, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
-# Starting somewhat high leads to too many preliminatry iterations
+# Starting somewhat high leads to too many preliminary iterations
 step.SW(x = 1, f, h0 = 10, diagnostics = TRUE)
 step.SW(x = 1, f, h0 = 1000, diagnostics = TRUE) # Starting absurdly high
 

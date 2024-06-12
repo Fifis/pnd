@@ -9,7 +9,7 @@ gradstep(
   FUN,
   h0 = 1e-05 * (abs(x) + (x == 0)),
   method = c("SW", "CR", "CRm", "DV"),
-  method.args = NULL,
+  control = NULL,
   cores = 2,
   ...
 )
@@ -27,11 +27,14 @@ slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 
 modified Curtis--Reid,
 \insertCite{dumontet1977determination}{pnd}, and \insertCite{stepleman1979adaptive}{pnd}.}
 
-\item{method.args}{A named list of tuning parameters for the method. If \code{NULL},
+\item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
-if \code{method.args$diagnostics} is \code{TRUE}, full iteration history
+if \code{control$diagnostics} is \code{TRUE}, full iteration history
 including all function evaluations is returned; different methods have
 slightly different diagnostic outputs.}
+
+\item{cores}{Integer specifying the number of parallel processes to use. Recommended
+value: the number of physical cores on the machine minus one.}
 
 \item{...}{Passed to FUN.}
 }
