@@ -2,7 +2,6 @@ Package: pnd
 Type: Package
 Title: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order
 Version: 0.0.4
-Date: 2024-06-10
 Authors@R: person(given = c("Andreï", "Victorovitch"), family = "Kostyrka",
         role = c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
@@ -16,7 +15,7 @@ Description: Tools for calculation of numerical derivatives through
     such as computing derivatives of arbitrary order, improving
     the accuracy of Hessian approximations by avoiding repeated differencing,
     and parallelising slow functions on Windows, Mac, and Linux.
-License: EUPL (>= 1.1)
+License: EUPL
 Encoding: UTF-8
 URL: https://github.com/Fifis/pnd
 BugReports: https://github.com/Fifis/pnd/issues

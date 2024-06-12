@@ -3,10 +3,8 @@ title: "Fast and accurate parallel numerical derivatives in R"
 output:
   rmarkdown::html_document:
     toc: true
-    highlight: zenburn
     toc_depth: 2
     number_sections: true
-fontsize: 12pt
 header-includes:
   - \usepackage{mathtools}
 bibliography: "../inst/REFERENCES.bib"
@@ -26,8 +24,8 @@ knitr::knit_hooks$set(pngquant = knitr::hook_pngquant)
 knitr::opts_chunk$set(
   dev = "png",
   dev.args = list(type = "cairo-png"),
-  fig.width = 640 / 72,
-  fig.height = 480 / 72,
+  fig.width = 512 / 72,
+  fig.height = 320 / 72,
   out.width="10cm",
   dpi = 72,
   fig.retina = 1,
