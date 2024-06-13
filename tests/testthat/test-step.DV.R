@@ -35,11 +35,11 @@ test_that("Tweaking the DV algorithm for noisiser functions", {
 })
 
 test_that("DV for functions with near-zero f''' stops immediately", {
-  s1 <- step.DV(1, function(x) x^2)
+  s1 <- step.DV(function(x) x^2, 1)
   expect_equal(s1$counts, 1)
   expect_equal(s1$exitcode, 1)
 
-  s2 <- step.DV(1, function(x) pi*x + exp(1))
+  s2 <- step.DV(function(x) pi*x + exp(1), 1)
   expect_equal(s2$counts, 1)
   expect_equal(s2$exitcode, 1)
 })

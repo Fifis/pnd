@@ -5,8 +5,8 @@
 \title{Automatic step selection for numerical derivatives}
 \usage{
 gradstep(
-  x,
   FUN,
+  x,
   h0 = 1e-05 * (abs(x) + (x == 0)),
   method = c("SW", "CR", "CRm", "DV"),
   control = NULL,
@@ -15,17 +15,17 @@ gradstep(
 )
 }
 \arguments{
+\item{FUN}{Function for which the optimal numerical derivative step size is needed.}
+
 \item{x}{Numeric vector or scalar: the point at which the derivative is computed
 and the optimal step size is estimated.}
-
-\item{FUN}{Function for which the optimal numerical derivative step size is needed.}
 
 \item{h0}{Numeric vector or scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
-\item{method}{Character to choose between \insertCite{curtis1974choice}{pnd},
-modified Curtis--Reid,
-\insertCite{dumontet1977determination}{pnd}, and \insertCite{stepleman1979adaptive}{pnd}.}
+\item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
+\code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
+and \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}.}
 
 \item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
@@ -60,6 +60,12 @@ each coordinate.
 }
 \description{
 Automatic step selection for numerical derivatives
+}
+\details{
+We recommend using the Stepleman--Winarsky algorithm because it does not suffer
+from over-estimation of the truncation error in the Curtis--Reid approach
+and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
+approach.
 }
 \examples{
 gradstep(x = 1, FUN = sin, method = "CR")

@@ -5,8 +5,8 @@
 \title{Dumontet--Vignes automatic step selection}
 \usage{
 step.DV(
-  x,
   FUN,
+  x,
   h0 = 1e-05 * (abs(x) + (x == 0)),
   range = h0/c(1e+06, 1e-06),
   alpha = 4/3,
@@ -17,9 +17,9 @@ step.DV(
 )
 }
 \arguments{
-\item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
-
 \item{FUN}{Function for which the optimal numerical derivative step size is needed.}
+
+\item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}

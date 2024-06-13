@@ -1,10 +1,10 @@
 test_that("Curtis-Reid step selection handles inputs well", {
   f <- function(x) return(NA)
   expect_error(step.CR(x = 2, f), "Could not compute the function value")
-  expect_error(step.CR(1, sin, version = "orig"), "must be either")
-  expect_error(step.CR(1, sin, tol = 1e-4), "must be a positive number greater than 1")
-  expect_warning(step.CR(1, sin, acc.order = 4), "Setting acc.order")
-  expect_equal(step.CR(1, sin, range = c(0, 1))$exitcode, 0)
+  expect_error(step.CR(sin, 1, version = "orig"), "must be either")
+  expect_error(step.CR(sin, 1, tol = 1e-4), "must be a positive number greater than 1")
+  expect_warning(step.CR(sin, 1, acc.order = 4), "Setting acc.order")
+  expect_equal(step.CR(sin, 1, range = c(0, 1))$exitcode, 0)
 })
 
 
@@ -39,13 +39,9 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
   f <- function(x) x^4
   expect_equal(step.CR(x = 2, f, h0 = 1000)$exitcode, 3)
   expect_equal(step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))$exitcode, 0)
-
   expect_equal(step.CR(x = 2, f, h0 = 1e-12)$exitcode, 1)  # In theory, it should be 3,
   # but the truncation error estimate is really zero...
-
   expect_equal(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3)
-
   expect_equal(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 4, range = c(1e-12, 1))$exitcode, 4)
-
 })
 

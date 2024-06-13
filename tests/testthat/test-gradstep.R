@@ -3,8 +3,8 @@ test_that("step size length h0 must be 1 or length(x)", {
   expect_error(gradstep(x = 1:2,
                       FUN = function(z) {if (length(z)>1) stop("Non-vectorised"); z^2}),
                "must be finite")
-  expect_equal(gradstep(1, sin, h0 = 1)$exitcode, 0)
-  expect_equal(gradstep(1:3, function(x) sum(sin(x)), h0 = 0.01)$exitcode, rep(0, 3))
+  expect_equal(gradstep(sin, 1, h0 = 1)$exitcode, 0)
+  expect_equal(gradstep(function(x) sum(sin(x)), 1:3, h0 = 0.01)$exitcode, rep(0, 3))
 })
 
 test_that("step selection supports only scalar-values functions", {
@@ -20,12 +20,12 @@ test_that("unsupported arguments withcause an error", {
 })
 
 test_that("the range is correctly reversed", {
-  expect_equal(gradstep(1, sin, method = "CR", control = list(range = c(1e-6, 1e-8))),
-               gradstep(1, sin, method = "CR", control = list(range = c(1e-8, 1e-6))))
-  expect_equal(gradstep(1, sin, method = "DV", control = list(range = c(1e-6, 1e-8))),
-               gradstep(1, sin, method = "DV", control = list(range = c(1e-8, 1e-6))))
-  expect_equal(gradstep(1, sin, method = "SW", control = list(range = c(1e-6, 1e-8))),
-               gradstep(1, sin, method = "SW", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(sin, 1, method = "CR", control = list(range = c(1e-6, 1e-8))),
+               gradstep(sin, 1, method = "CR", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(sin, 1, method = "DV", control = list(range = c(1e-6, 1e-8))),
+               gradstep(sin, 1, method = "DV", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(sin, 1, method = "SW", control = list(range = c(1e-6, 1e-8))),
+               gradstep(sin, 1, method = "SW", control = list(range = c(1e-8, 1e-6))))
 })
 
 test_that("for unfortunate inputs, the search may hit the boundary", {
@@ -44,7 +44,7 @@ test_that("gradstep correctly handles vector inputs", {
   expect_equal(s.grad$exitcode, rep(0, 4))
 
   f1 <- function(x) sin(x) + sum(sin(2:4))
-  s1 <- step.SW(1, f1, diagnostics = TRUE)
+  s1 <- step.SW(f1, 1, diagnostics = TRUE)
   r <- s.grad$par[1] / s1$par
   r <- max(r, 1/r)
   expect_lte(r, 4)
@@ -58,7 +58,7 @@ test_that("the error in vector inputs does not propagate too strongly", {
   expect_equal(s.grad$exitcode, rep(0, 4))
 
   f1 <- function(x) sin(x) + sum(sin(2:4))
-  s1 <- step.SW(1, f1, diagnostics = TRUE)
+  s1 <- step.SW(f1, 1, diagnostics = TRUE)
   # Due to numerical errors, the number of steps can be different
   r <- s.grad$par[1] / s1$par
   r <- max(r, 1/r)
@@ -79,5 +79,5 @@ test_that("gradstep correctly handles other inputs", {
 test_that("gradstep checks for conflicting arguments of FUN and methods", {
   # Root solver for sin(x) = a
   f <- function(x, tol) uniroot(function(y) sin(y) - x, c(0, 2), tol = tol)$root
-  expect_error(gradstep(0.5, f, tol = 1e-4, method = "CR"), "coincide with the arguments")
+  expect_error(gradstep(f, 0.5, tol = 1e-4, method = "CR"), "coincide with the arguments")
 })

@@ -73,7 +73,7 @@
 #' # A bad start: too far away
 #' step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
 #' step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
-step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
+step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     version = c("original", "modified"),
                     aim = if (version[1] == "original") 100 else 1,
                     acc.order = c(2L, 4L),
@@ -247,7 +247,7 @@ step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' f <- function(x) x^4
 #' step.DV(x = 2, f)
 #' step.DV(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
-step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
+step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     range = h0 / c(1e6, 1e-6), alpha = 4/3,
                     ratio.limits = c(1/15, 1/2, 2, 15),
                     maxit = 40L, diagnostics = FALSE, ...) {
@@ -432,7 +432,7 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' # The following two example fail because the truncation error estimate is invalid
 #' step.SW(x = pi/4, f, h0 = 10, diagnostics = TRUE)   # Warning
 #' step.SW(x = pi/4, f, h0 = 1000, diagnostics = TRUE) # Warning
-step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
+step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 2, range = h0 / c(1e12, 1e-8),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
                     maxit = 40L, diagnostics = FALSE, ...) {
@@ -630,9 +630,9 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric vector or scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
-#' @param method Character to choose between \insertCite{curtis1974choice}{pnd},
-#' modified Curtis--Reid,
-#'   \insertCite{dumontet1977determination}{pnd}, and \insertCite{stepleman1979adaptive}{pnd}.
+#' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
+#'   \code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
+#'   and \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}.
 #' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
 #'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
@@ -641,6 +641,12 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param cores Integer specifying the number of parallel processes to use. Recommended
 #'   value: the number of physical cores on the machine minus one.
 #' @param ... Passed to FUN.
+#'
+#' @details
+#' We recommend using the Stepleman--Winarsky algorithm because it does not suffer
+#' from over-estimation of the truncation error in the Curtis--Reid approach
+#' and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
+#' approach.
 #'
 #' @return A list similar to the one returned by \code{optim()} and made of
 #'   concatenated individual elements coordinate-wise lists: \code{par} -- the optimal
@@ -676,7 +682,7 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' gradstep(x = 1, FUN = sin, method = "SW")
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
-gradstep <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
+gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                      method = c("SW", "CR", "CRm", "DV"),
                      control = NULL, cores = 2, ...) {
   # TODO: implement "all"
