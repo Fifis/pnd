@@ -8,8 +8,8 @@ output:
 bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
 date: "Created: 2024-06-13, last modified: 2024-06-13, compiled: `r Sys.Date()`"
-abstract: "We ... and illustrate how to invoke them using the novel **pnd** package for **R**. Finally, we discuss the real-world limitations of numerical derivatives and offer empirically backed advice for common situations where finite-difference approximations are unreliable."
-keywords: "numerical differentiation, approximation error, finite differences"
+abstract: "We illustrate how to use the novel **pnd** package for **R** to obtain numerical derivatives, gradients, and Hessians and offer empirically backed advice for common situations where finite-difference approximations are unreliable."
+keywords: "numerical differentiation, approximation error, finite differences, parallel computing"
 vignette: >
   %\VignetteIndexEntry{Fast and accurate parallel numerical derivatives in R}
   %\VignetteEngine{knitr::rmarkdown}
@@ -44,9 +44,11 @@ The `pnd` package addresses this lacuna by providing functions that:
 4. Report an estimated measure of numerical inaccuracy.
 
 The first feature alone can significantly expedite optimisation in applied research by harnessing the full power of multi-core machines.
+
 Some R packages offer finite-difference-based derivatives with either hard-coded or suboptimal step sizes (e.g. `optim()` in the core \texttt{stats} @rcore for gradient-based methods), potentially leading to misleading results with quasi-Newton optimisers and lacking error diagnostic tools.
 Technical research articles and book chapters on numerical methods provide optimality results and explicit step-size formulæ, but user guides and package vignettes often lack practical insights into the principles underlying the selection of tuning parameters.
-This article provides algebraic derivations of the optimal step size for numerical differentiation routines, simplified recommendations, and illustrated simulations for common functions.
+
+This vignette showcases the core functionality of the `pnd` package.
 
 Despite the proliferation of parallelism-supporting R packages (e.g. `psqn`, `DEoptim`, `hydroPSO`), few implementations address gradient-related numerical optimisation issues.
 The `optimParallel` package by @optimParallel offers an internally parallelised L-BFGS-B method for the `optim()` optimiser.^[The problem with the L-BFGS-B method in R is its reliance on finite function values; the BFGS method admits infinite function values during the linear improvement search, but its limited-memory counterpart with box constraints throws an error upon encountering \texttt{NaN}, \texttt{NA}, or $\pm$\texttt{Inf}. This limits the scope of the `optimParallel` solution to a narrow family of well-behaved functions or functions modified by the user to replace non-finite values with an arbitrary large number.]
@@ -104,9 +106,7 @@ The nature of this discrepancy is investigated in what follows.
 
 The first-order-accurate backward difference and the second-order-accurate central difference are defined similarly:
 \[
-f'_{\mathrm{BD}_1} := \frac{f(x)-f(x-h)}{h}
-\]
-\[
+f'_{\mathrm{BD}_1} := \frac{f(x)-f(x-h)}{h}, \qquad
 f'_{\mathrm{CD}_2} := \frac{0.5 f(x+h) - 0.5f(x-h)}{h}
 \]
 Finite-difference-based approximations of derivatives receive the subscripts ‘FD’, ‘BD’, or ‘CD’, and are labelled ‘first-order-accurate’ and ‘second-order-accurate’, denoted by a digit in the subscript, based on the approximation error arising from truncating the Taylor expansion of $f$ at $x$:
@@ -139,11 +139,7 @@ f(x+h) - f(x-h) = (f(x) - f(x)) + (h - (-h)) f'(x)+ (h^2/2 - h^2/2) f''(x)  \\
 where $\alpha_1, \alpha_2 \in [0, 1]$.
 To simplify this expression, we use the Generalsed Intermediate Value Theorem (GIVT).
 
-**Generalised intermediate value theorem.**
-If $f(x)$ is continuous on $[\underline{x}, \overline{x}]$, $(x_1,\ldots, x_n)$ are points belonging to $[\underline{x}, \overline{x}]$, and $p_1, \ldots, p_n > 0$ is a vector of positive numbers, then, $\exists x^* \in [\underline{x}, \overline{x}]$ such that $f(x^*) \cdot \sum_i p_i = \sum_i p_i f(x_i)$.
-(@sauer2017numerical provides a proof on p. 256.)
-
-By the GIVT,
+By the generalised intermediate value theorem,
 \[
 \frac{h^3}{6} f'''(x+\alpha_1 h) + \frac{h^3}{6} f'''(x - \alpha_2 h) 
 = (h^3/6 + h^3/6) f'''(x+\alpha h) = \frac{h^3}{3} f'''(x+\alpha h),
@@ -159,10 +155,6 @@ and
  f'_{\mathrm{CD}_2}(x) = \frac{0.5(2hf'(x) + \frac{h^3}{3} \cdot f'''(x+\alpha h) )}{h} = f'(x) + \frac{h^2}{6} f'''(x + \alpha h).
 \]
 The respective truncation error is $f'(x) -  f'_{\mathrm{CD}_2}(x) = -\frac{f'''(x + \alpha h)}{6} h^2 = O(h^2)$.
-
-\textcolor{red}{!!! TODO: Check notation in the document: should subtract $b_i$? Homogenise}
-
-\textcolor{red}{!!! Check the definition of the machine epsilon everywhere -- ensure that the error bound is macheps/2}
 
 ## Derivatives on arbitrary stencils
 
@@ -189,7 +181,8 @@ The intuition behind this derivative approximation via weighted sums is twofold.
 2. **More evaluations, higher derivative order.** Given a stencil of length $n$ and the values of $f$ at the corresponding grid, one can construct Taylor expansions of $f$ at those points and find such coefficients for their linear combination that all derivatives of order 0 through $(n-2)$ should cancel out and the sum of coefficients on the $(n-1)$\textsuperscript{th} derivative should become one.
 
 This implies that stencils with more points should allow the researcher to compute linear combinations of functions whose Taylor expansion terms cancel out in the positions before and after the derivative of interest.
-The solution for the optimal weights $(w_1, \ldots, w_n)$ in Equation~\eqref{eq:wsum} are due to @taylor2016finite: for a stencil $(b_1, \ldots, b_{n})$, and for derivative order $m$, the weights that zero out the sums of derivatives of orders other than $m$ and result in a unit coefficient on the $m$\textsuperscript{th} derivative must satisfy
+
+For a stencil $(b_1, \ldots, b_{n})$, and for derivative order $m$, the weights that zero out the sums of derivatives of orders other than $m$ and result in a unit coefficient on the $m$\textsuperscript{th} derivative must satisfy
 \[
 \begin{pmatrix}
 b_1^0  & \cdots  & b_n^0 \\
@@ -213,16 +206,12 @@ Another condition follows from the definition of $\vec m$: for the element $m!$ 
 The optimal weights $\vec w$ do not depend on $h$ because the weighted sum in Eq.~\eqref{eq:wsum} is already normalised by factor $h^{-m}$.
 The weights for stencils $(-2, -1, 1, 2)$ and $(-10, -5, 5, 10)$ are therefore identical.
 
-\textcolor{red}{!!! Write an example: computing $f''(-3)$ if there are values $f(1, 2, 4, 5)$. Stencil: $(4, 5, 7, 8)$}
-
-\textcolor{red}{!!! Check the notation: $f_{CD}(x, h)$ must contain h everywhere!}
-
-The function `fdCoef(...)` from `pnd` replicates the functionality of the popular online calculator by @taylor2016finite, equivalent to the iterative algorithm in @fornberg1988generation.
 The idea is to find such coefficients $\{w_i\}_{i=1}^n$ that the derivatives of order less than $m$ cancel out and the coefficients on the $m$^th^ derivative add up to unity.
-Our implementation solves the corresponding system of linear equations via the LAPACK routine invokable through `base::solve()`.
-By default, `fdCoef()` assumes central differences for second-order-accurate first derivatives, but every aspect of numerical differencing can be customised.
+Our implementation uses the @bjorck1970solution algorithm to avoid inverting the matrix the numerically ill-conditioned Vandermonde matrix $B$.
+Using numerical routines relying on matrix inversion (such as LAPACK) invokable through `base::solve()` is not recommended due to the rapid deterioration of the solution accuracy.
+See Appendix A in @kostyrka2024what for an investigation of this numerical instability.
 
-\textcolor{red}{TODO: return the actual order, i.e. the first non-zero term}
+By default, `fdCoef()` assumes central differences for second-order-accurate first derivatives, but every aspect of numerical differencing can be customised.
 
 * `fdCoef()` without any arguments returns a list with stencil $(-1, 1)$ and weights $(-0.5, 0.5)$, translating to the approximation $f'_{\mathrm{CD_2}}(x, h) = (-0.5 f(x-h) + 0.5 f(x+h))/h$.
 * Requesting higher-order accuracy via `fdCoef(acc.order = 4)` yields a larger stencil for the default derivative order ($m=1$) via central differences because more evaluations are needed to make $a-1$ terms cancel out.
@@ -230,7 +219,6 @@ By default, `fdCoef()` assumes central differences for second-order-accurate fir
 * Requesting forward differences yields a stencil starting at zero: `fdCoef(deriv.order = 2, side = "forward")` yields the minimally sufficient non-negative stencil for $m=2$, $a=2$.
 * The user may request a custom stencil: `fdCoef(deriv.order = 3, stencil = c(-3, -1, 1, 3))` calculates the weights for second-order-accurate $f'''_\Delta (x)$ obtained by evaluating $f$ at $x+(-3, -1, 1, 3)\cdot h$.
 
-\textcolor{red}{!!! Move the details to a different section (one-sided), keep the idea and refer to that section}
 
 Central differences (or, more generally, stencils with both positive and negative points) yield *higher accuracy* for the same number of evaluations or require *fewer evaluations* to attain the desired accuracy order.
 Computing fourth-order-accurate second derivatives (e.g. for a very accurate Hessian diagonal) can be done on stencils $\{0, \pm 1, \pm 2\}$ (5 evaluations) or $\{0, 1, \ldots, 6\}$ (7 evaluations).
@@ -238,8 +226,6 @@ The practical reason to prefer forward differences can be the extreme computatio
 If $f(x)$ has not yet been computed, both $f_{\mathrm{FD}_1}$ and $f_{\mathrm{CD}_2}$ require 2 evaluations, so  the latter is preferable for accuracy reasons.
 
 The output of `fdCoef()` for 5-point stencils matches formulæ 5.1--5.4 from @li2005general.
-
-\textcolor{red}{!!! Describe how using the argument `precomputed` and `f0` can save time}
 
 ## Precision loss on computers
 
@@ -397,8 +383,6 @@ plot(hseq2, e(hseq2), xlab = "Step size", ylab = "Total error", bty = "n",
 abline(v = hopt, lty = 2)
 ```
 
-\textcolor{red}{!!! Hide the code}
-
 With this optimal step size, the total error function attains its minimum value of order $O(\epsilon_{\mathrm{m}}^{2/3})$, translating to 10--11 accurate decimal significant digits.
 
 \textcolor{red}{!!! Give values for the error at the optimum in all subsequent sections}
@@ -423,8 +407,6 @@ Intuitively, a smaller rounding-error component allows the user to gain accuracy
 The opposite occurs if $f(x+h)$ and $f(x-h)$ come from a numerical routine with limited accuracy.
 In such cases, the relative error of each evaluation is much higher, and the bound on the difference $|\varepsilon_{f,2} - \varepsilon_{f,1}|$ must be adjusted accordingly.
 See Section~\ref{sec:noisy} for examples of such adjustments.
-
-\textcolor{red}{!!! Beyond this point, the material was typed up once and not proof-read / simplified}
 
 ## One-sided derivatives
 
@@ -605,13 +587,6 @@ f''''(x) - [f''''_\mathrm{CD}(x)] \le \varepsilon_4(h) := \frac{17 f^{(VI)}(x)}{
 \]
 
 Finding the minimum of the total error functions:
-\[
-\varepsilon'_3(h) = \frac{17|f^{(V)}(x)|}{30}h - 4.5|f(x)|\epsilon_{\mathrm{m}} h^{-4} = 0,
-\]
-\[
-\varepsilon'_4(h) = \frac{17|f^{(VI)}(x)|}{45}h - 32|f(x)|\epsilon_{\mathrm{m}} h^{-5} = 0,
-\]
-
 \[
 \frac{17|f^{(V)}(x)|}{30}h = 4.5|f(x)|\epsilon_{\mathrm{m}}\frac{1}{h^4} \quad \Rightarrow \quad h^*_3 = \sqrt[5]{\frac{135 |f(x)| \epsilon_{\mathrm{m}}}{17|f^{(V)}(x)|}}
 \]
@@ -807,42 +782,6 @@ Therefore, the optimal step size for Hessian computation may be safely assumed t
 
 The main diagonal of the Hessian, $H_{ii}$, contains second derivatives of $f$, and the result above for functions of scalar arguments applies: $h^{**}_{\mathrm{CD}_2} \propto \sqrt[4]{\epsilon_{\mathrm{m}}}$.
 
-Gauging the truncation error of the off-diagonal elements, $H_{ij}$ for $i\ne j$, requires the multi-variate Taylor expansion:
-\[
-f(x\pm h) = f(x) \pm \frac{h}{1!} f'(x) + \frac{h^2}{2!} f''(x) \pm  \frac{h^3}{3!} f'''(x) + O(h^4)
-\]
-becomes
-\[
-f(x\pm h) = f(x) \pm \frac{1}{1!} h' \nabla f(x) + \frac{1}{2!} h' H_f (x) h \pm  \frac{1}{3!} \sum_{k_1=1}^p \sum_{k_2=1}^p \sum_{k_3=1}^p  \frac{\partial^3 f(x)}{\partial x_{k_1} \partial x_{k_2} \partial x_{k_3} }  h^{(k_1)} h^{(k_2)} h^{(k_3)} + O(h^4)
-\]
-
-Denote the bivariate step vector $h_{ij} := (h_i + h_j)$.
-The first numerator term of the Hessian finite-difference approximation becomes
-\[
-f(x + h_{ij}) = f(x) + h[ \nabla_i f(x) + \nabla_j f(x)] + \frac{1}{2} h^2 (H_{ii} + H_{ij} + H_{ji} + H_{jj}) \\
-+  \frac{1}{6} \sum_{k_1=1}^p \sum_{k_2=1}^p \sum_{k_3=1}^p  \frac{\partial^3 f(x)}{\partial x_{k_1} \partial x_{k_2} \partial x_{k_3} }  h_{ij}^{(k_1)} h_{ij}^{(k_2)} h_{ij}^{(k_3)} + O(h^4)
-\]
-
-Since only 2 elements of $h_{ij}$  are non-zero, most elements of the triple sum are zero:
-\[
-\sum_{k_1 \ne k_2 \ne k_3}  \frac{\partial^3 f(x)}{\partial x_{k_1} \partial x_{k_2} \partial x_{k_3} }  \underbrace{h_{ij}^{({k_1})} h_{ij}^{(k_2)} h_{ij}^{(k_3)}}_{=0} = 0.
-\]
-The only non-zero terms affecting the error are the elements with indices $k_1, k_2, k_3 \in \{i, j\}^3$.
-There are 8~such combinations: $(i,i,i), (i,i,j), \ldots, (j,j,i), (j,j,j)$.
-In all these combinations, $h_{ij}^{({k_1})} h_{ij}^{(k_2)} h_{ij}^{(k_3)} = h^3$ because the only non-zero elements of $h_{ij}$ in positions $i$ and $j$ are equal to $h$.
-Denote third derivatives by  $f'''_{ijk} := \frac{\partial^3 f}{\partial x_i \partial x_j \partial x_k}$ -- then the triple sum becomes $h^3 \sum_{k_1, k_2, k_3 \in \{i,j\}^3}(f'''_{k_1 k_2 k_3})$.
-
-Expansions of $f(x - h_i + h_j)$, $f(x + h_i - h_j)$,  and $f(x - h_i - h_j)$ are similar, with the only difference in signs of $(f'_i, f'_j)$, $(f''_{ii}, f''_{ij}, f''_{ji}, f''_{jj})$, and $(f'''_{iii}, f'''_{iij}, \ldots, f'''_{jjj})$: if $h_i$ is subtracted, then, wherever the derivative w.r.t. the $i$^th^ coordinate is taken an odd number of times, the sign of the coefficient on the term flips.
-The same argument applies to the sign change due to subtracting $h_j$.
-
-|           | $f$  | $f'$: $i,j$ | $f''$: $ii,ij,ji,jj$ | $f'''$: $iii,iij,iji,ijj,jii,jij,jji,jjj$ |
-|:---|:-:|:--:|:----:|:----------:|
-|$+h_i+h_j$ | + | ++ | ++++ | ++++++++ |
-|$-h_i+h_j$ | + | $-+$ | $+--+$ | $-++-+--+$ |
-|$+h_i-h_j$ | + | $+-$ | $+--+$ | $+--+-++-$ |
-|$-h_i-h_j$ | + | $--$ | $++++$ | $--------$ |
-
-Computing the expression for the numerator of $H_{ij}$ requires adding up the Taylor expansion terms with the signs from each row of this table; in rows 2 and 3 all the signs should be flipped because these terms of $\hat H_{ij}$ have a negative sign on them.
 
 The $f''$ column contributes non-zero off-diagonal elements, and all the terms containing $f'''$ cancel out, which can be verified numerically:
 \textcolor{red}{!!! Check for mistakes}
@@ -898,7 +837,6 @@ The rounding error $[f([x \pm h_i \pm h_j])] - f(x \pm h_i \pm h_j)$ from 4 func
 \varepsilon(h) = 0 \quad \Rightarrow \quad \frac{|f''''_{ijjj}(x) + f''''_{iiij}(x)|}{12} h = \frac{|f(x)| \epsilon_{\mathrm{m}}}{h^3} \quad \Rightarrow \quad h = \sqrt[4]{\frac{12 |f(x)| \epsilon_{\mathrm{m}}}{ |f''''_{ijjj}(x) + f''''_{iiij}(x)|}} \propto \sqrt[4]{\epsilon_{\mathrm{m}}}
 \]
 
-
 We recommend that the main diagonal of the Hessian be computed separately using $h^{**}_{\mathrm{CD}_2}$ (or, even better, $h^{**}_{\mathrm{CD}_4}$) estimated for each coordinate, and each off-diagonal element $H_{ij}$ using data-driven procedures described in the section below (e.g. ‘AutoDX’).
 
 \textcolor{red}{!!! TODO: write a paragraph about the general case with different step sizes  $h_i$ and $h_j$; mentione that is mostly of theoretical, not practical interest}
@@ -930,7 +868,7 @@ H_{ij} \approx \bigl[ J_j([\nabla_i f(x)]) \bigr]
 \textcolor{red}{!!! TODO: derive the total error with the rounding component from an earlier formula}
 
 From the computational point of view, approximating the Hessian by applying first differences to some coordinates of the numerical gradient is suboptimal in terms of numerical accuracy: pairs of values $\{ f(x + h_i + h_j), f(x - h_i + h_j)\}$ and $\{ f(x + h_i - h_j), f(x - h_i - h_j)\}$ are collapsed into single values $[\nabla_i f(x + h_j)]$ and $[\nabla_i f(x - h_j)]$.
-If the Hessian is evaluated in a time-saving loop for the upper triangular matrix (as it is, e.g, in `numDeriv:::genD.default` by @numDeriv), then, the rounding error from $[\nabla_i f(x + h_j)]$ is copied over to $H_{ji}$.
+If the Hessian is evaluated in a time-saving loop for the upper triangular matrix (as it is, e.g, in `numDeriv:::genD.default()` by @numDeriv), then, the rounding error from $[\nabla_i f(x + h_j)]$ is copied over to $H_{ji}$.
 Not collapsing the evaluated values $f(x + h_i + h_j)$ and $f(x - h_i + h_j)$ into the numerical gradient and storing them separately eliminates the problem $[H_{ij}] = \bigl[ J_j([\nabla_i f(x)]) \bigr] \ne \bigl[ J_i([\nabla_j f(x)]) \bigr] = [H_{ji}]$ because the numerators in the non-simplified expressions of the first differences of the first differences are the same.
 
 The current version of the package contains no implementation of the implicit symmetrisation by direct calculation without omission.
@@ -1056,343 +994,6 @@ Therefore, rounding errors accumulate in the two-step differencing procedure to 
 
 \textcolor{red}{!!! TODO}
 
-# Data-driven step-size selection procedures
-
-We showed that the optimal step size depends on the higher-order derivatives, which, at the surface level, could be interpreted as the chicken-and-egg problem.
-However, there is no paradox of recursion because it is not strictly necessary to know every term in the optimal analytical expressions derived above.
-Multiple data-driven algorithms have been proposed since the 1960s that exploit the general shape of the total-error function (‘the truth is in the middle’).
-
-There is a similar problem in non-parametric econometrics: to choose the bandwidth for kernel smoothing, e.g. the Parzen--Rosenblatt density estimator, one needs to evaluate the second derivative of the true density, which is unknown and that the researcher is estimating in the first place.
-The data-driven cross-validation approach involves minimising the root-mean-square error of the kernel density estimator without knowing the higher-order derivatives of the unknown density.
-In kernel density estimation, the cross-validation function can be calculated via convolutions and minimised numerically.
-In kernel smoothing, the cross-validation function can be an aggregate penalty of all leave-one-out prediction errors.
-The shape of the cross-validation function is similar to the shape of the total-error function: it shoots off for very small or very large inputs.
-Therefore, the fact that for small $h$, $\varepsilon(h)$ is dominated by $\varepsilon_{\mathrm{r}}$ and for large $h$, by $\varepsilon_{\mathrm{t}}$, can be used to find a satisfactory solution on a reasonable interval without testing for sufficient optimality conditions.
-
-
-
-## Curtis--Reid (1974) bounded ratio approach
-\label{sec:cr}
-
-\textcolor{red}{!!! Chech typos: truncation to the round-off}
-
-@curtis1974choice propose a solution to choose such a step size for *central differences* that the ratio of the truncation error to the rounding error be confined to a chosen reasonable interval:
-\[
-\left| \frac{\varepsilon_{\mathrm{t}}}{\varepsilon_{\mathrm{r}}} \right| \in [10, 1000]
-\]
-
-The following simplified estimates are proposed for the unknowns:
-
-* The modulus of the true truncation error, $\varepsilon_{\mathrm{t}}(h) := f'(x) - \frac{f(x+h)-f(x-h)}{2h}$, is estimated as the absolute value of the difference between the CD and FD-based approximations: $|\hat \varepsilon_{\mathrm{t}}(h)| := |\hat f_{\mathrm{CD}}'(x) - \hat f'_{\mathrm{FD}}(x)|$.
-This estimate is quite conservative (since $|\varepsilon_{\mathrm{t}}(h)| \propto h^2$, but $|\hat \varepsilon_{\mathrm{t}}(h)| \propto h$ unless $f''(x) \approx 0$), but getting the correct order would require one more evaluation.
-* The modulus of the rounding error, $\varepsilon_{\mathrm{r}}(h)$, is proportional to $|f(x)|$ (at most $0.5|f(x)| \epsilon_{\mathrm{m}}$).
-(The authors also consider the argument-rounding error due to storing $[x+h]$ and the change of $f$ due to an extra change of the argument, but choosing $h$ as a power of 2 mitigates this problem.)
-
-The algorithm is as follows.
-
-1. Iteration $i=0$: choose the target ratio $u_{\mathrm{aim}} = \varepsilon_{\mathrm{t}}(h^*) / \varepsilon_{\mathrm{r}}(h^*)= 100$, define the search range $[h_{\min}, h_{\max}] = x \sqrt[3]{\epsilon_{\mathrm{m}}}  [0.001,\ 1000]$ and the initial step size $h_0 = x \sqrt[3]{\epsilon_{\mathrm{m}}}$.
-2. Compute the ratio $u_i = u(h_i) = |\hat\varepsilon_{\mathrm{t}}(h_i) / \hat\varepsilon_{\mathrm{r}}(h_i)|$
-3. If $u_i \in [u_{\mathrm{aim}}/10, u_{\mathrm{aim}}\cdot 10]$, stop.
-4. If $u_i \not\in [u_{\mathrm{aim}}/10, u_{\mathrm{aim}}\cdot 10]$, take $h_{i+1} = h_i \sqrt{u_{\mathrm{aim}} / \max(u_i, 1)}$. If $h_{i+1} = h_i$, set $h^* = h_i$ and terminate. Otherwise, check:
-    1. If $h_{i+1} \ge  h_{\max}$, set $h_{i+1} = h_{\max}$. If $h_{i+1} = h_{i} = h_{\max}$, set $h^* = h_{\max}$ and terminate. Otherwise, go to 2.
-    2. If $h_{i+1} \le  h_{\min}$, set $h_{i+1} = h_{\min}$. If $h_{i+1} = h_{i} = h_{\min}$, set $h^* = h_{\min}$ and terminate. Otherwise, go to 2.
-
-The range $[h_{\min}, h_{\max}]$ is necessary to avoid looping.
-If $f(x)$ is exactly linear, then, the truncation error is close to zero, and the optimal step size can be very large (to minimise the rounding error).
-To the contrary, if $f(x)$ is even around $x$ but not constant, then, the higher-order terms of the Taylor expansion dominate in the total error, and the optimal step size is small.
-@curtis1974choice do not provide any values $[h_{\min}, h_{\max}]$, but we rely on the fact that the optimal step size is exactly $c \cdot \sqrt[3]{\epsilon_{\mathrm{m}}}$, where $c=\sqrt[3]{1.5|f(x) / f'''(x)|}$, and operate under the reasonable assumption that the difference between $f(x)$ and $f'''(x)$ rarely exceeds 9 orders of magnitude: $\left| \log_{10} \left|\frac{f(x)}{f'''(x)} \right| \right| \le 9$ yields  $[h_{\min}, h_{\max}] \approx [7x\cdot 10^{-9}, 7x\cdot 10^{-3}]$.
-
-This algorithm is clever because the over-estimation of the truncation error is addressed by setting the desired ratio $\varepsilon_{\mathrm{t}}(h^*) / \varepsilon_{\mathrm{r}}(h^*)= 100$.
-Having $\hat \varepsilon_{\mathrm{t}}(h) = O(h)$ instead of $O(h^2)$ implies that the solution is of the optimal order for one-sided differences.
-The ratio of the optimal step sized for one- and two-sided differences is 
-\[
-h^*_{\mathrm{CD}_2} / h^*_{\mathrm{FD}_1} = \frac{\sqrt[3]{1.5 |f| \epsilon_{\mathrm{m}} / |f'''|}}{\sqrt{2|f|\epsilon_{\mathrm{m}} / |f''|}}
-= \frac{2^{-5/6} 3^{1/3} \sqrt[3]{|f'''|}}{\sqrt[6]{|f|} \sqrt[6]{\epsilon_{\mathrm{m}}} \sqrt{|f''|}} 
-\]
-Since square, cubic etc.\ roots tend to shrink values towards unity, it is reasonable to assume that powers of absolute values of $f$ and its derivatives gravitate towards unity, the numeric constant in the multiplier is $0.81$, therefore, the ratio is approximately equal to $0.81 / \sqrt[6]{\epsilon_{\mathrm{m}}} \approx 329$.
-Subsequent approximations can be done for $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{FD}_2})$ and $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{CD}_2})$ and their ratio, but the general idea of this algorithm -- find a reasonable first-order-accurate step size and inflate it by 1--3 orders of magnitude -- cannot be made more rigorous without further exact calculations, which undermines the point of this quick procedure with as few function evaluations as possible.
-
-**Example 1.** $f(x) = \sin(x)$ at $x = 1$ with $h_0 = 10^{-4}$.
-We ignore the argument-rounding error and consider only the function-rounding error.
-
-```{r}
-h0 <- 1e-4
-x0 <- 1
-fun <- function(x) sin(x)
-getRatio <- function(FUN, x, h) {
-  f  <- FUN(x)
-  fplus  <- FUN(x + h)
-  fminus <- FUN(x - h)
-  fd <- (fplus - f) / h
-  bd <- (f - fminus) / h
-  cd <- (fplus - fminus) / h / 2
-  et <- abs(cd - fd)
-  er <- 0.5 * abs(f) * .Machine$double.eps / h
-  ret <- et / er
-  attr(ret, "vals") <- c(`h` = h,
-                         bd = bd, cd = cd, fd = fd,
-                         e_trunc = et, e_round = er)
-  return(ret)
-}
-print(u0 <- getRatio(FUN = fun, x = x0, h = h0))  # 45035996, too high
-```
-
-The estimated truncation error exceeds the estimated rounding error, therefore, $h_0$ is too large.
-Compute the new step length:
-```{r}
-h1 <- h0 * sqrt(100 / max(u0, 1))
-print(u1 <- getRatio(FUN = fun, x = x0, h = h1))
-```
-
-This is almost equal to the desired ratio.
-Therefore, the search may stop here, at $h_1 \approx 1.5\cdot 10^{-7}$.
-The true optimal value is $\sqrt[3]{1.5 \epsilon_{\mathrm{m}} \tan (1)} \approx 8 \cdot 10^{-6}$.
-```{r}
-uopt <- getRatio(FUN = fun, x = x0, h = (1.5 * tan(1) * .Machine$double.eps)^(1/3))
-nd <- c(step0 = attr(u0, "vals")["cd"], step1 = attr(u1, "vals")["cd"],
-        optimal = attr(uopt, "vals")["cd"])
-print(total.err <- cos(x0) - nd)
-```
-One iteration roughly halved the total error, but it is still 414 times higher than the minimum one at the optimal step size because the procedure shrank $h_0$ too aggressively.
-
-**Example 2.** Linear function $f(x) = \pi x + \mathrm{e}$ at $x = 0.1$ with $h_0 = 10^{-5}$. The truncation error in $f_{\text{CD}_2}$ is zero due to linearity of $f$.
-
-The Curtis--Reid procedure increases the step size at each iteration:
-```{r}
-h0 <- 1e-5
-x0 <- 0.1
-fun <- function(x) pi*x + exp(1)
-print(u0 <- getRatio(FUN = fun, x = x0, h = h0))
-h1 <- h0 * sqrt(100 / max(u0, 1))
-print(u1 <- getRatio(FUN = fun, x = x0, h = h1))
-h2 <- h1 * sqrt(100 / max(u0, 1))
-print(u2 <- getRatio(FUN = fun, x = x0, h = h2))
-```
-
-Here, $h_1 = 10 h_0 = 0.0001$ and $h_2 = 10h_1 = 0.001$ because $\hat \varepsilon_{\mathrm{t}} (h_1) \approx 0$ while $\varepsilon_{\mathrm{t}} (h_1) = 0$, which is why the algorithm is trying to increase the step size.
-Therefore, termination should occur after the second step because subsequent $h_2 > h_{\max} = 0.1 \cdot \sqrt[3]{\epsilon_{\mathrm{m}}} \cdot 1000 \approx 0.0006$, and $h_{\max}$ is declared the optimal bandwidth.
-
-**Example 3.** Polynomial function $f(x) = x^6 - 2x^4 - 4x^2$ at $x_0 = \sqrt{2}$ with $h_0 = 2^{-16} \approx 1.5\cdot 10^{-5}$: $f'(x_0) = 0$, but $|f''|, \ldots, |f^{(V)}| > 0$.
-
-```{r}
-h0 <- 2^-16
-x0 <- sqrt(2)
-fun  <- function(x) x^6 - 2*x^4 - 4*x^2
-fun1 <- function(x) 6*x^5 - 8*x^3 - 8*x  # f'
-fun3 <- function(x) 120*x^3 - 48*x       # f'''
-print(u0 <- getRatio(FUN = fun, x = x0, h = h0))
-h1 <- h0 * sqrt(100 / max(u0, 1))
-print(u1 <- getRatio(FUN = fun, x = x0, h = h1))
-hopt <- abs(1.5 * fun(x0) / fun3(x0) * .Machine$double.eps)^(1/3)
-uopt <- getRatio(FUN = fun, x = x0, h = hopt)
-fp.est <- c(step0 = attr(u0, "vals")["cd"], step1 = attr(u1, "vals")["cd"],
-            optimal = attr(uopt, "vals")["cd"])
-print(total.err <- fun1(x0) - fp.est)
-```
-
-Note that $f'(\sqrt{2}) = 0$, but $[\sqrt{2}] - \sqrt{2} \approx 10^{-17}$, and $f'([\sqrt{2}]) \approx 5\cdot 10^{-15}$.
-Remarkably, the optimal step size, being 40 times larger than $h_1$, yields the same total error.
-
-## Dumontet--Vignes (1977) plug-in approach
-
-@dumontet1977determination replace $f'''(x)$ in the expression for the optimal $h_{\mathrm{CD}_2}$ by its rough guess.
-First, they suggest that the step size $h$ in $f(x \pm h)$ should belong to $[x\cdot 2^{-n}, x\cdot 2^{n}]$, where $n$ is the number of bits in the mantissa, and the step size in $f'''_{\mathrm{FD}}$ should belong to $[x\cdot 2^{-n+1}, x\cdot 2^{n-1}]$.
-Estimate the dominating error (truncation or rounding) and, depending on the ratio, bisect the interval for the step size so that neither of the errors in the third derivative is disproportionately large.
-Then, approximation errors can be calculated using various quantities obtained at the steps of this procedure.
-
-These authors also assume that the relative rounding error $[f(x)]/f(x)$ is uniformly distributed between $[-\epsilon_{\mathrm{m}}/2, +\epsilon_{\mathrm{m}}/2]$, but instead of bounding
-\[
-\varepsilon_{\mathrm{trunc}} + \varepsilon_{\mathrm{round}} \le \frac{|f'''(x)|}{6}h^2  + \frac{0.5|f(x)| \epsilon_{\mathrm{m}}}{h},
-\]
-they estimate the *expected* absolute sum $|\varepsilon_{\mathrm{trunc}} + \varepsilon_{\mathrm{round}}|$.
-If $\xi$ has a triangular distribution on $[-\varepsilon_{\text{mach}}, \varepsilon_{\text{mach}}]$, then, the variance of $\xi$ is $\varepsilon_{\text{mach}}/6$ and the expected value of $|\xi|$ is $\varepsilon_{\text{mach}}/3$.
-However, the distribution of $|\varepsilon_{\text{trunc}} + \varepsilon_{\text{round}}|$ is more complicated, and the authors refer to the result that its expected absolute value is equal to $c_1 /h + c_2 h^5 - c_3 h^8$, where the constants $c_1, c_2, c_3$ depend on $\varepsilon_{\text{mach}}$, $f(x)$, and $f'''(x)$.
-Their optimal step size is
-\[
-h^* = \sqrt[3]{\frac{0.835 \epsilon_{\mathrm{m}} |f(x)|}{|f'''(x)|}}
-\]
-
-Then
-
-\textcolor{red}{!!! TODO}
-
-
-## Stepleman--Winarsky (1979) accurate-digit count estimation
-
-This work suggests starting with a large enough step to ensure that the accurate digits lost at the early steps are due only to the truncation error and shrinking the reduce the truncation error until the change in the number of accurate digits is no longer monotone due to the substantial rounding-error contribution.
-The number of digits lost is proportional to the value of the error function, and a change in this number due to a step reduction is the slope of the error curve.
-
-## Mathur (2012) AutoDX algorithm
-
-A more elaborate numerical method with an in-depth theoretical derivation and multiple graphic examples is proposed in @mathur2012analytical and summarised under the name ‘AutoDX’ in @mathur2013algorithm.
-AutoDX is conceptually similar to the algorithm by @stepleman1979adaptive.
-It addresses the shortcomings of the latter, namely failure due to the inappropriately large initial step size and false optima.
-AutoDX works with all functions analytic in the neighbourhood of the point of interest.
-
-
-The general idea of the algorithm is based on the fact that the total first-difference-based approximation error is dominated by the truncation error for step sizes larger than the optimal size.
-Moreover, the relationship between the two on the log-log scale is approximately linear with slope $a$.
-Therefore, for some initial guess $h_0 > h^*$ and a reduction ratio $t$ (preferably an inverse power of 2), the sequence of truncation error estimates (in logarithms) evaluated at $h_0, t h_0, t^2 h_0, \ldots$ forms a line with slope $a$ on the logarithmic grid.
-Subsequent reduction of the step size by a factor $t$ in the valid truncation error range goes on until a substantial deviation of the truncation error estimate from the straight line, indicating that the rounding error has taken over.
-The algorithm is stopped, and the last valid step size $h_i$ is corrected -- divided by the factor $\sqrt[m+a]{t^*}$, where $t^* := (1+t^{-m})/(1-t^a) > 1$ -- to adjust for the fact that the estimated total error is slightly larger than the true error for small step sizes.
-
-
-
-The AutoDX algorithm addresses the problem that the truncation error for large step sizes might cease to be a monotonic function of $h$.
-Using the notation from above, for accuracy order $a$ and derivative order $m$, the discrepancy between the true $m$^th^ derivative and its finite-difference approximation is equal to $c_1 f^{(m+a)} (x+c_2) h^a$, where $c_1$ is the factorial fraction and $c_2$ is the intermediate point in the Lagrange form of the remainder.
-Therefore, if in any of the iterative algorithms above, a wrong guess is made for the initial step size, the estimated truncation error may *decrease* w.r.t. $h$, not increase.
-E.g. if $f(x) = \sin(x)$ and $x=\pi/4$, if $h > 1$, the estimate of the truncation error becomes erratic.
-One may argue that $h_0 = 1$ is a contrived initial guess (not in the vicinity of $\sqrt[3]{\varepsilon_{\text{mach}}} \approx 6\cdot 10^{-6}$).
-However, in applied work, many functions take vector arguments with coordinates spanning multiple orders of magnitude, and for some functions, even $h=6\cdot 10^{-6}$ may be too high.
-This is common in applied econometrics and numerical optimisation where the optimal parameter lies close to the boundary space, e.g. the constant in the dynamic conditional variance specification (GARCH-like models) may be equal to $10^{-6}$; in this case, $x-h \approx -5x$, causing the log-likelihood function based on near-zero dynamic variances to exhibit wildly unstable behaviour (on the brink of returning `NA` values due to undefined operations with invalid inputs).
-A concrete example of such a function is $f(x) = \sin(x^2 + 10^6 x)$, where the abnormal behaviour of the estimated truncation error starts at $3\cdot 10^{-6}$, i.e. the rule-of-thumb initial value leads to the wrong direction of step-size search.
-
-Another source of error in iterative algorithms is the presence of ‘stray minima’ of the total error function arising from identical successive approximations $[f([x+h])] = [f([x-h])]$.
-This is possible for small $h$.
-
-This phenomenon can be illustrated with a simple plot: compute the numerical derivative of $f(x) = \sin(x)$ at $x = \pi/4$.
-Let `dsin()` represent the 2^nd^-order-accurate central-difference approximation, and let `totErr()` be the estimated approximation error of $f'(x)$ obtained as if one were to compute the Richardson extrapolation with two different step sizes -- but with the formula transformed to explicitly solve for the unknown 2^nd^-order error.
-```{r}
-dsin <- function(x, h) (sin(x+h) - sin(x-h)) / h / 2
-totErr <- function(x, h, t = 0.5) (dsin(x, t*h) - dsin(x, h)) / (1 - t^2)
-hgrid <- 2^seq(-52, 12, 0.5)
-suppressWarnings(plot(hgrid, totErr(x = pi/4, hgrid), log = "xy",
-     main = "Truncation + round-off error of d/dx sin(x) at x = pi/4",
-     bty = "n", xlab = "Step size", ylab = "Sum of errors"))
-```
-
-For large step sizes, the total error behaves erratically, and for step sizes $h > h^*$ and $h < 1$, the logarithmic slope is equal to the accuracy order -- in this case, $a=2$:
-```{r}
-h   <- c(2^-8, 2^-9)
-te  <- totErr(x = pi/4, h = h)
-print(diff(log(te)) / diff(log(h)))
-```
-
-Recommendations:
-
-1. For the initial step size $h_0$, choose a power of 2 to avoid representation errors (step sizes other than $2^j$ are not presentable in binary). This ensures that $[x+h]$ and $[x-h]$ have full precision and both are exactly centred at $x$. The default value in the implementation uses a power of two.
-2. For the step-size reduction ratio, choose a power of 2 (e.g. 0.5).
-
-\textcolor{red}{!!! TODO: crude analytical approximations for step sizes are reliable, see the simulation}
-
-## Robust grid search
-
-\textcolor{red}{!!! Original idea: try a grid of steps 1e-12, 1e3}
-
-\textcolor{red}{!!! Combine the ideas of a valid range check (parallel!) of Mathur with the speed of Stepleman \& Winarsky}
-
-@mathur2012analytical mentions that the @stepleman1979adaptive algorithms performs reliably when the initial step size $h_0$ is chosen well.
-The requirements imposed on $h_0$ are the following: it should be large enough for the truncation error to be dominant, but not too large that the estimated truncated error decreases with the step size growth and ceases to be a valid approximation of the true truncation error.
-
-None of the previous algorithms explicitly make use of the parallel capabilities of modern processors.
-The following improvements can be made for speed gains:
-* In the Curtis--Reid approach, the function values at $(x-h, x, x+h)$ can be computed im parallel for forward and central differences at each step, which speeds it up by a factor of 3;
-* In the Dumontet--Vignes approach, the first and third derivatives can be computed in parallel on the symmetric 2-point and 4-point stencils, respectively, which is 2--3 times faster;
-* The Stepleman--Winarsky algorithm is a sequence of condition checks; the authors remark that the central differences should be computed for at least 3 step sizes, which provides the opportunity for a 6-fold time decrease.
-* Mathur does not specify the limits for the step-size sequence length to determine the range validity; nevertheless, it is trivial to pre-emptively compute the central differences for multiple sizes because this approach is not slower than the serial version even if the algorithm has to terminate immediately.
-
-\textcolor{red}{!!! TODO}
-
-Replace Mathur's counter incrementing with one parallel grid search and find the range where the estimated truncation slope is closest to $a$ -- should be faster without any side effects
-
-## Not letting intermediate values go to waste
-
-\textcolor{red}{!!! TODO: add memoisation (memoise)}
-
-All aforementioned procedures perform an iterative numeric search by evaluating $f(x)$ multiple times, gauging the estimation, truncation, and total errors, and suggesting a new step size at the next iteration that is supposed to reduce the overall error.
-In Section~\ref{sec:basic}, we established that more evaluations of a function allow a high accuracy degree because $a \le n - m$, and raising $n$ increases the highest potential accuracy order $a$.
-
-On one hand, when multiple step sizes are attempted in numerical search procedures, function values at the extra evaluation grid points are basically free bread descending from heaven.
-One can collect all intermediate evaluations and calculate the optimal weights for this empirically driven stencil.
-On the other hand, step-size search iterations usually result in changes of the candidate values of $h$ by orders of magnitude.
-Example 1 in Section~\ref{sec:cr} show two iteration of the search: $h_0 = 10^{-4}$, $h_1 \approx 1.5 \cdot 10^{-7}$.
-Since central differences are evaluated with both step sizes, the researcher has the grid $x + (-h_0, -h_1, 0, h_1, h_0)$ and respective function values.
-Rewriting the grid as a stencil with a human-readable normalisation of the smallest distance between its elements to one yields $b_n \approx \{-671, -1, 0, 1, 671\}$.
-
-```{r}
-h <- c(1e-4, 1.490116e-07)
-b <- c(-h, 0, rev(h)) / min(h)
-fc <- fdCoef(deriv.order = 1, stencil = b)
-print(fc, 3)
-```
-
-The optimal weights for the outermost elements of this stencil are tiny ($\approx 1.65\cdot 10^{-9}$).
-In addition, the `best' step size is the minimiser of the quantity that depends on the coefficients in the Taylor expansion.
-The further the evaluation points are away from the Taylor polynomial centre, the higher the coefficients on its terms, which are a power function of $(b_i h)$.
-Eliminating the terms not related to the derivative on interest requires, as described above as the intuition of the method, solving a system of linear equations, and numerical solvers can be unstable when the input numbers are huge.
-As a consequence, the suggested weights $w_i$ may suffer from ill conditioning of the matrix of the Taylor polynomial coefficients that take large values far away from the centre.
-
-This raises the question: how accurate is this four-term weighted sum where two weights are tiny?
-
-```{r}
-cos(1) - sum(sin(1 + fc$stencil * h[2]) * fc$weights) / h[2]
-```
-
-This error value is slightly less than the error of $f'_{\mathrm{CD}_2}(1, h_1)$, $4.3\cdot 10^{-1}$.
-
-Nevertheless, this error reduction could be a pure coincidence that would not hold for the majority of representable floating-point numbers.
-Therefore, we run a small simulation to determine the potential benefits and dangers owing to the presence of far-away points on the stencil that were recorded at the previous search steps.
-
-Consider a sample of 10\,000 random uniform values on $[0, 2\pi]$ and $f(x) = sin(x)$. For each of these values, compute four numerical derivatives:
-1. $f'_{\mathrm{CD}_2}(x, h_{\mathrm{opt}})$ with analytical theoretical $h_{\mathrm{opt}}$ (oracle, infeasible in practice);
-2. $f'_{\mathrm{CD}_2}(x, \sqrt[3]{\epsilon_{\mathrm{m}}})$ (naïve rule of thumb);
-3. $f'_{\mathrm{CD}_2}(x, h^*_{\mathrm{CR}})$ with $h^*_{\mathrm{CR}}$ provided by the Curtis--Reid procedure;
-4. $f'$ with $h_{\mathrm{opt}}$ and the stencil $b = (-500, -1, 1, 500)$.
-
-\textcolor{red}{!!! TODO: add the true oracle -- stemming from a derivative-free grid search on [1e-12, 1e-2] as f' - f'CD}
-
-This simulation aims to determine the behaviour of the absolute approximation error under difference step-size selection rules and weigh the pros and cons of extra grid points that are far away.
-
-!!! TODO: add fast functions like sin(1000*x) or slow like log(x) at x = 13 -- and check the convergence radius
-
-```{r}
-hOpt <- function(x) (1.5 * abs(tan(x)) * .Machine$double.eps)^(1/3)
-
-set.seed(1)
-xgrid <- sort(runif(10000, max = 2*pi))
-hgrid <- hOpt(xgrid)
-df1 <- (sin(xgrid + hgrid) - sin(xgrid - hgrid)) / hgrid / 2
-df2 <- (sin(xgrid + 7e-6) - sin(xgrid - 7e-6)) / 7e-6 / 2
-fc  <- fdCoef(deriv.order = 1, stencil = c(-500, -1, 1, 500))
-h4grid <- outer(hgrid, c(-500, -1, 1, 500))
-df4 <- rowSums(sweep(sin(xgrid + h4grid), 2, fc$weights, "*")) / hgrid
-df.true <- cos(xgrid)
-err <- df.true - data.frame(df1, df2, df4)
-abserr <- abs(err)
-
-print(summary(err))
-print(summary(abserr))
-
-xnice <- seq(0, 2*pi, length.out = 401)
-plot(xnice, hOpt(xnice), type = "l", log = "y", main = "Optimal step size for sin(x)", bty = "n")
-
-squish <- function(x, pow = 1/6, shift = 1e-12) ((abs(x) + shift)^pow - shift^pow) * sign(x)
-par(mar = c(2, 4, 0, 0) + .1)
-matplot(xgrid, squish(abserr[, 2:3] - abserr[, 1]), type = "p", bty = "n",
-        xlab = "", ylab = "", ylim = squish(c(-5e-10, 5e-11)), yaxt = "n",
-        col = c("#0000AA88", "#AA000088"), pch = 16, cex = 0.3)
-abline(h = 0, lwd = 3, col = "white")
-abline(h = 0, lty = 2)
-legend("bottomleft", c("Fixed vs. optimal", "4th-order vs. optimal"), bty = "n", pch = 16, col = c("#00008888", "#88000088"))
-yax.vals <- c(-3e-10, -1e-10, -3e-11, -1e-11, -1e-12, 0, 1e-12, 1e-11, 3e-11)
-axis(2, squish(yax.vals), yax.vals, las = 1)
-```
-
-From the summary table and the plot, we conclude:
-
-1. The oracle step-size $h_{\mathrm{opt}}$ does not guarantee that the numerical derivative using it has the smallest absolute error across all step sizes. There are at least four reasons: (1)~the total error function might have multiple local minima in the vicinity of the global optimum,  (2)~the oracle step size needs to be computed with limited precision ($[h_{\mathrm{opt}}] \ne h_{\mathrm{opt}}$), (3)~the third derivative in the denominator might be arbitrarily close to zero, resulting in unbounded step sizes, and (4) for certain values of $x$ and very small $h$, the estimated truncation error may be zero if successive finite-difference approximations are equal (‘stray minima’).
-2. The naïve rule of thumb without extra multipliers works well compared to the oracle because the truncated term containing the third derivative is bounded and the step size itself is small.
-3. The addition of faraway stencil points may improve numerical accuracy, reducing the median absolute error by $\approx16\%$ in this particular case. These gains depend on the behaviour of the function and the remoteness of the outermost points.
-
-The reader is invited to experiment with other function, other argument ranges, and other stencils with large and small gaps produce by more drastic step changes in iterations.
-
-During numerical optimisation, drop, do not store
-
-Near the optimum, store
-
-\textcolor{red}{!!! Add other rules here}
-
-
 # Complex derivatives    
 
 If the function $f(x)$ supports complex arguments and outputs, as is the case with many simple arithmetic and algebraic functions, then, evaluating complex arguments allows one to obtain highly accurate numerical derivatives with fewer function evaluations.
@@ -1442,7 +1043,6 @@ See @lai2008extensions for more details.
 
 Note that this approach is not feasible in many applications where the function is not defined for complex inputs.
 In econometrics, densities are non-negative, probabilities are bounded, and the function in question is often the objective function of a non-linear model where many more numerical procedures are run under the hood (loops, numerical root searches, integration routines, data-driven hyper-parameter cross-validation etc.), not allowing any complex inputs.
-
 
 Currently, the complex method is not supported in the `pnd` package; derivations and an implementation may be done in the future to fully restore the functionality of `numDeriv`.
 

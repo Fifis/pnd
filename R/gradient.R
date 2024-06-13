@@ -1,11 +1,9 @@
-#' Gradient and Jacobian computation with parallel capabilities
+#' Computation of derivative matrices with parallel capabilities
 #'
-#' Computes numerical derivatives, gradients and Jacobians. Supports both two-sided
-#' (central) and one-sided (forward or backward) derivatives. Calculations can be
-#' executed on multiple cores to cut down execution time for slow functions or
-#' to attain higher accuracy faster. Currently for Mac & Linux only because
-#' Windows cannot handle \code{parallel::mclapply()}. A \code{parallel::parLapply}
-#' version is in development.
+#' Numerical derivatives arranged into a generic matrix that can be processed
+#' by [Grad()] and [Jacobian()] or used independently. Supports mixed orders
+#' of derivation and arbitrary accuracies and sides for different coordinates
+#' of the argument vector.
 #'
 #' @param FUN A function returning a numeric scalar or a vector.
 #'   If the function returns a vector, the output will be is a Jacobian.
@@ -26,7 +24,8 @@
 #'   Central differences are recommended unless computational cost is prohibitive.
 #' @param f0 Optional numeric scalar or vector: if provided and applicable, used
 #'   where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
-#'   to save time. Currently ignored.
+#'   to save time.
+#'   TODO: Currently ignored.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
@@ -41,6 +40,9 @@
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
+#'
+#' For computation of Jacobians, use \code{Jacobian} or \code{Grad}. These two functions
+#' are equivalent, but using \code{Grad} for vector-valued returns will produce a warning.
 #'
 #' If the step size is too large, the slope of the secant poorly estimates the derivative;
 #' if it is too small, it leads to numerical instability due to the function value rounding.
@@ -63,51 +65,16 @@
 #'
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
-#' @examples
-#'
-#' f <- function(x) sum(sin(x))
-#' g1 <- Grad(x = 1:4, FUN = f)
-#' g2 <- Grad(x = 1:4, FUN = f, h = 7e-6)
-#' g2 - g1 # Tiny differences due to different step sizes
-#' g3 <- Grad(x = 1:4, FUN = f, h = "SW")
-#' g3.full <- Grad(x = 1:4, FUN = f, h = "SW", report = 2)
-#' attr(g3.full, "step.search")$exitcode  # Success
-#'
-#' \dontrun{
-#' slowFun <- function(x) {Sys.sleep(0.05); print(x, digits = 12); sum(sin(x))}
-#' slowFunVec <- function(x) {Sys.sleep(0.05); print(x, digits = 12)
-#'                            c(sin = sum(sin(x)), exp = sum(exp(x)))}
-#' true.g <- cos(1:4)  # Analytical gradient
-#' true.j <- rbind(cos(1:4), exp(1:4)) # Analytical Jacobian
-#' x0 <- c(each = 1, par = 2, is = 3, named = 4)
-#'
-#' # Compare computation times
-#' system.time(g.slow <- numDeriv::grad(slowFun, x = x0) - true.g)
-#' system.time(j.slow <- numDeriv::jacobian(slowFunVec, x = x0) - true.j)
-#' system.time(g.fast <- Grad(slowFun, x = x0, cores = 4) - true.g)
-#' system.time(j.fast <- Grad(slowFunVec, x = x0, cores = 4) - true.j)
-#' system.time(j.fast4 <- Grad(slowFunVec, x = x0, acc.order = 4, cores = 4) - true.j)
-#'
-#' # Compare accuracy
-#' rownames(j.slow) <- rep("numDeriv.jac", nrow(j.slow))
-#' rownames(j.fast) <- paste0("pnd.jac.order2.", rownames(j.fast))
-#' rownames(j.fast4) <- paste0("pnd.jac.order.4", rownames(j.fast4))
-#' # Discrepancy
-#' print(rbind(numDeriv.grad = g.slow, pnd.Grad = g.fast, j.slow, j.fast, j.fast4), 2)
-#' # The order-4 derivative is more accurate for functions
-#' # with non-zero third and higher derivatives -- look at pnd.jac.order.4
-#'}
-#'
 #' @export
-Grad <- function(FUN, x,
-                 deriv.order = 1L, side = 0,
-                 acc.order = ifelse(abs(side) == 1, 1L, 2L),
+GenD <- function(FUN, x,
+                 deriv.order = 1L, side = 0, acc.order = 2,
                  h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
                  cores = 1, load.balance = TRUE, func = NULL,
                  report = 1L,
                  ...) {
   n <- length(x)
+  if (.Platform$OS.type == "windows" && cores > 1) cores <- 1
   #########################################
   # BEGIN compatibility with numDeriv::grad
   # Detecting numDeriv named arguments (e.g. method.args) in ... first, and handling them
@@ -116,6 +83,7 @@ Grad <- function(FUN, x,
   if (!is.null(m <- ell[["method"]])) {
     if (length(m) == 1 && m %in% c("simple", "complex", "Richardson")) {
       if (m == "simple") {
+        if (is.null(side)) side <- rep(0, n)
         acc.order <- ifelse(side == 0, 2, 1)
       } else if (m == "complex") {
         stop("Complex derivatives not implemented yet.")
@@ -226,4 +194,101 @@ Grad <- function(FUN, x,
   }
 
   return(jac)
+}
+
+
+#' Gradient computation with parallel capabilities
+#'
+#' Computes numerical derivatives and gradients. Supports both two-sided
+#' (central) and one-sided (forward or backward) derivatives. Calculations can be
+#' executed on multiple cores to cut down execution time for slow functions or
+#' to attain higher accuracy faster. Currently, parallelisation works for Mac and
+#' Linux only because Windows cannot handle \code{parallel::mclapply()}.
+#' A \code{parallel::parLapply} version is in development.
+#'
+#' @inheritParams GenD
+#' @seealso [GenD()], [Jacobian()]
+#' @export
+#'
+#' @examples
+#' f <- function(x) sum(sin(x))
+#' g1 <- Grad(FUN = f, x = 1:4)
+#' g2 <- Grad(FUN = f, x = 1:4, h = 7e-6)
+#' g2 - g1  # Tiny differences due to different step sizes
+#' g.auto <- Grad(FUN = f, x = 1:4, h = "SW")
+#' g3.full <- Grad(FUN = f, x = 1:4, h = "SW", report = 2)
+#' print(g3.full)
+#' attr(g3.full, "step.search")$exitcode  # Success
+#'
+Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
+                 h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
+                 h0 = NULL, control = list(), f0 = NULL,
+                 cores = 1, load.balance = TRUE,
+                 func = NULL, report = 1L, ...) {
+  d <- GenD(FUN = FUN, x = x, deriv.order = deriv.order, side = side, acc.order = acc.order,
+            h = h, h0 = h0, control = control, f0 = f0, cores = cores, load.balance = load.balance,
+            func = func, report = report, ...)
+  if (is.matrix(d))
+    warning(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions "),
+                   "to obtain a matrix of derivatives.")
+  return(d)
+}
+
+
+#' Jacobian computation with parallel capabilities
+#'
+#' Computes a numerical Jacobian of a function: rows correspond to the function
+#' dimension, column to the input argument dimension. Supports both two-sided
+#' (central) and one-sided (forward or backward) derivatives. Calculations can be
+#' executed on multiple cores to cut down execution time for slow functions or
+#' to attain higher accuracy faster. Currently, parallelisation works for Mac and
+#' Linux only because Windows cannot handle \code{parallel::mclapply()}.
+#' A \code{parallel::parLapply} version is in development.
+#'
+#' @inheritParams GenD
+#' @seealso [GenD()], [Grad()]
+#'
+#' @examples
+#' \dontrun{
+#' slowFun <- function(x) {Sys.sleep(0.05); print(x, digits = 12); sum(sin(x))}
+#' slowFunVec <- function(x) {Sys.sleep(0.05); print(x, digits = 12)
+#'                            c(sin = sum(sin(x)), exp = sum(exp(x)))}
+#' true.g <- cos(1:4)  # Analytical gradient
+#' true.j <- rbind(cos(1:4), exp(1:4)) # Analytical Jacobian
+#' x0 <- c(each = 1, par = 2, is = 3, named = 4)
+#'
+#' # Compare computation times
+#' system.time(g.slow <- numDeriv::grad(slowFun, x = x0) - true.g)
+#' system.time(j.slow <- numDeriv::jacobian(slowFunVec, x = x0) - true.j)
+#' system.time(g.fast <- Grad(slowFun, x = x0, cores = 4) - true.g)
+#' system.time(j.fast <- Grad(slowFunVec, x = x0, cores = 4) - true.j)
+#' system.time(j.fast4 <- Grad(slowFunVec, x = x0, acc.order = 4, cores = 4) - true.j)
+#'
+#' # Compare accuracy
+#' rownames(j.slow) <- rep("numDeriv.jac", nrow(j.slow))
+#' rownames(j.fast) <- paste0("pnd.jac.order2.", rownames(j.fast))
+#' rownames(j.fast4) <- paste0("pnd.jac.order.4", rownames(j.fast4))
+#' # Discrepancy
+#' print(rbind(numDeriv.grad = g.slow, pnd.Grad = g.fast, j.slow, j.fast, j.fast4), 2)
+#' # The order-4 derivative is more accurate for functions
+#' # with non-zero third and higher derivatives -- look at pnd.jac.order.4
+#'}
+#'
+#' @export
+Jacobian <- function(FUN, x,
+                     deriv.order = 1L, side = 0, acc.order = 2,
+                     h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
+                     h0 = NULL, control = list(), f0 = NULL,
+                     cores = 1, load.balance = TRUE, func = NULL,
+                     report = 1L, ...) {
+  d <- GenD(FUN = FUN, x = x, deriv.order = deriv.order, side = side, acc.order = acc.order,
+            h = h, h0 = h0, control = control, f0 = f0, cores = cores, load.balance = load.balance,
+            func = func, report = report, ...)
+  if (is.null(dim(d))) {
+    warning(paste0("Use 'Grad()' instead of 'Jacobian()' for scalar-valued functions ",
+                   "to obtain a vector of derivatives. This output is a matrix with 1 row, ",
+                   "but a vector with NULL dimensions would be more appropriate."))
+    d <- matrix(d, nrow = 1)
+  }
+  return(d)
 }
