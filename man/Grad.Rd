@@ -14,7 +14,7 @@ Grad(
   h0 = NULL,
   control = list(),
   f0 = NULL,
-  cores = 2,
+  cores = 1,
   load.balance = TRUE,
   func = NULL,
   report = 1L,

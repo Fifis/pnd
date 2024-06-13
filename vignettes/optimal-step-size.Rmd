@@ -1,15 +1,13 @@
 ---
 title: "Fast and accurate parallel numerical derivatives in R"
 output:
-  rmarkdown::html_document:
+  rmarkdown::html_vignette:
     toc: true
     toc_depth: 2
     number_sections: true
-header-includes:
-  - \usepackage{mathtools}
 bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: "`r Sys.Date()`"
+date: "Created: 2024-06-13, last modified: 2024-06-13, compiled: `r Sys.Date()`"
 abstract: "We ... and illustrate how to invoke them using the novel **pnd** package for **R**. Finally, we discuss the real-world limitations of numerical derivatives and offer empirically backed advice for common situations where finite-difference approximations are unreliable."
 keywords: "numerical differentiation, approximation error, finite differences"
 vignette: >
@@ -23,7 +21,7 @@ vignette: >
 knitr::knit_hooks$set(pngquant = knitr::hook_pngquant)
 knitr::opts_chunk$set(
   dev = "png",
-  dev.args = list(type = "cairo-png"),
+  dev.args = list(type = if (Sys.info()["sysname"] == "Darwin") "quartz" else "cairo-png"),
   fig.width = 512 / 72,
   fig.height = 320 / 72,
   out.width="10cm",
@@ -33,11 +31,6 @@ knitr::opts_chunk$set(
   comment = "#>",
   pngquant = "--speed=1 --quality=50-60"
 )
-def.chunk.hook  <- knitr::knit_hooks$get("chunk")
-knitr::knit_hooks$set(chunk = function(x, options) {
-  x <- def.chunk.hook(x, options)
-  paste0("\n \\", "footnotesize", "\n\n", x, "\n\n \\normalsize")
-})
 ```
 
 # Introduction
@@ -140,10 +133,8 @@ We reserve the letter $a$ for the accuracy order -- requested by the user and ac
 
 Central differences are second-order-accurate owing to the cancellation of even-power terms in the Taylor expansion:
 \[
-\begin{multlined}
 f(x+h) - f(x-h) = (f(x) - f(x)) + (h - (-h)) f'(x)+ (h^2/2 - h^2/2) f''(x)  \\
 + \frac{h^3}{6} f'''(x+\alpha_1 h) + \frac{h^3}{6}  f'''(x - \alpha_2 h)
-\end{multlined}
 \]
 where $\alpha_1, \alpha_2 \in [0, 1]$.
 To simplify this expression, we use the Generalsed Intermediate Value Theorem (GIVT).
@@ -353,10 +344,8 @@ Each function-rounding error is thus bounded:
 
 Expanding the numerator:
 \[
-\begin{multlined}
 -0.5 \hat f(x-h) + 0.5\hat f(x+h) = -0.5 (f(x-h) + \varepsilon_{f,1}) + 0.5(f(x+h) + \varepsilon_{f,2}) \\
 = 0.5(-f(x-h) + f(x+h)) + 0.5(\varepsilon_{f,2} - \varepsilon_{f,1})
-\end{multlined}
 \]
 The function-rounding error is bounded due to the triangle inequality:
 \[
@@ -365,12 +354,10 @@ The function-rounding error is bounded due to the triangle inequality:
 
 The total error decomposition into truncation and rounding errors follows:
 \[
-\begin{multlined}
 f'(x) - \hat f'_{\mathrm{CD}_2}(x) = f'(x) - \frac{0.5([-\hat f(x-h)] + [\hat f(x+h)])}{h} \\
 = \underbrace{f'(x) - \frac{0.5(-f(x-h) + f(x+h))}{h}}_{\varepsilon_{\mathrm{t}}} +
 \underbrace{\frac{0.5(\varepsilon_{f_2} - \varepsilon_{f_1})}{h}}_{\varepsilon_{\mathrm{r}}}  \\
 = \frac{h^2}{6}f'''(x + \alpha h) + \frac{0.5(\varepsilon_{f_2} - \varepsilon_{f_1})}{h} \le \frac{h^2}{6}f'''(x + \alpha h) + \frac{0.5|f(x)|\epsilon_{\mathrm{m}}}{h}
-\end{multlined}
 \]
 
 We use an extra approximation $f'''(x + \alpha h) \approx f'''(x)$ because this term is not the largest source of error in this expression.
@@ -482,10 +469,8 @@ where $\alpha_4^+, \alpha_4 \in [0, 1]$ and $\alpha_4 \in [-1, 1]$.
 
 The approximations differ from the true derivatives by the following terms:
 \[
-\begin{multlined}
 f''_{\mathrm{CD}}(x) = \frac{f(x-h) - 2 f(x) + f(x+h)}{h^2}  \\
 = \frac{h^2 f''(x) + \frac{h^4}{24} (f''''(x+\alpha_{4}^+ h) +  f''''(x - \alpha_{4}^- h)) }{h^2} = f''(x) + \frac{h^2}{12}f''''(x + \alpha_4 h),
-\end{multlined}
 \]
 where $\alpha_4 \in [0, 1]$.
 
@@ -495,22 +480,18 @@ Since $h\to 0$, we use the same approximate bound for steps of length $2h$:
 \]
 The rounding error in the numerator is bounded thusly:
 \[
-\begin{multlined}
 [f(x-h)] - 2[f(x)] + [f(x+h)] = f(x-h) + \varepsilon_1 - 2(f(x) + \varepsilon_2) + f(x-h) + \varepsilon_3 \\
 \le f(x-h) - 2f(x) + f(x+h) + 4\cdot 0.5|f(x)| \cdot \epsilon_{\mathrm{m}} \\
 = f(x-h) - 2f(x) + f(x+h) + 2 |f(x)| \epsilon_{\mathrm{m}}
-\end{multlined}
 \]
 
 
 
 The overall error is
 \[
-\begin{multlined}
 f''(x) - \hat f''_\mathrm{CD}(x) = f''(x) - \frac{[f(x-h)] - 2[f(x)] + [f(x+h)]}{h^2} \\
 \le f''(x) - \frac{f(x-h) - 2f(x) + f(x+h)}{h^2} + \frac{2 |f(x)| \epsilon_{\mathrm{m}} }{h^2} \\
 \approx \frac{h^2}{12}f''''(x + \alpha_4 h) + \frac{2 |f(x)| \epsilon_{\mathrm{m}} }{h^2}
-\end{multlined}
 \]
 
 Since $f''''(x + \alpha_4 h) \approx f''''(x)$, the absolute error of $f''_{\mathrm{CD}_2}(x)$ is bounded by
@@ -548,40 +529,32 @@ f''''(x) = \frac{f(x-2h) - 4f(x-h) + 6f(x) - 4f(x+h) + f(x+2h)}{h^4} + O(h^5)
 
 The Taylor expansions for step-size multipliers $c \in \{1, 2\}$ are 
 \[
-\begin{multlined}
 f(x\pm c\cdot h) = f(x) \pm \frac{ch}{1!}\cdot f'(x) + \frac{(ch)^2}{2!} f''(x) \pm \frac{(ch)^3}{3!} f'''(x) + \frac{(ch)^4}{4!} f''''(x) \\
 \pm\begin{cases}
 \frac{(ch)^5}{5!} f^{(V)}(x + \alpha ch), & m=3\\
 \frac{(ch)^5}{5!} f^{(V)}(x) + \frac{(ch)^6}{6!} f^{(VI)}(x+\alpha ch), & m=4,
 \end{cases}
-\end{multlined}
 \]
 where $\alpha \in [0, 1]$.
 
 The value of the multiplier $\alpha$ in the Lagrange remainder is different for each step $\pm h$, $\pm 2h$.
 For $m=3$, the expression becomes
 \[
-\begin{multlined}
 f'''_{\mathrm{CD}}(x) = \frac{0.5(-f(x-2h) + 2f(x-h) - 2 f(x+h) + f(x+2h))}{h^3}  \\
 = \frac{h^3 f'''(x) + \frac{h^5}{240} (32 f^{(V)}(x+2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h)}{h^3},
-\end{multlined}
 \]
 where $\alpha_{51}, \alpha_{52}, \alpha_{53}, \alpha_{54} \in [0, 1]$.
 Here, the GIVT cannot be applied because not all coefficients on $f^{(V)}$ are positive.
 They can still be grouped:
 \[
-\begin{multlined}
 32 f^{(V)}(x+2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h) \\
 = 64 f^{(V)} (x + 2\alpha_{5p}h) - 4 f^{(V)} (x + \alpha_{5m}h),
-\end{multlined}
 \]
 where $\alpha_{5p}, \alpha_{5m} \in [0, 1]$.
 To place an upper bound on this term, we use the triangle inequality for the terms' absolute values:
 \[
-\begin{multlined}
 64 f^{(V)} (x + 2\alpha_{5p}) - 4 f^{(V)} (x + \alpha_{5m}) \le 64| f^{(V)} (x + 2\alpha_{5p}h)| + 4|f^{(V)} (x + \alpha_{5m}h)| \\
 \le 68 \max\{| f^{(V)} (x + 2\alpha_{5p}h)|, |f^{(V)} (x + \alpha_{5m}h)|\}
-\end{multlined}
 \]
 Again, we rely on $h\to0$ to obtain  $f^{(V)} (x + 2\alpha_{5p}h) \approx f^{(V)}(x)  \approx f^{(V)} (x + \alpha_{5m}h) \approx f^{(V)}(x)$.
 
@@ -611,12 +584,10 @@ This yields a coefficient on $f^{(VI)}(x)$ equal to $136/720 = 17/90$, not $120/
 As for the rounding errors in the numerator, they are bounded by the sum of absolute relative errors.
 For $m=3$,
 \[
-\begin{multlined}
 [-0.5f(x-2h)] + [f(x-h)] - [f(x+h)] + 0.5[f(x+2h)] = \\
 -0.5f(x-h) - 0.5\varepsilon_1 + f(x-h) + \varepsilon_2 - f(x+h) - \varepsilon_3 + 0.5f(x+2h) + 0.5\varepsilon_4 \\
 =  \ldots - 0.5\varepsilon_1 + \varepsilon_2 - \varepsilon_3 + 0.5\varepsilon_4  \\
 \le \ldots + 0.5 |f(x)| \epsilon_{\mathrm{m}} (0.5 + 1 + 1 + 0.5) = \ldots + 1.5 |f(x)| \epsilon_{\mathrm{m}}
-\end{multlined}
 \]
 
 For $m=4$, we compute the multiplier on $0.5 |f(x)| \epsilon_{\mathrm{m}}$ in one line of code:
@@ -671,10 +642,8 @@ print(colSums(coef.tab * w$weights))
 This calculation confirms that there is no $f'''(x)$ in the expression for the difference-based approximation.
 We apply the same technique due to the presence of different step sizes and the non-applicability of the GIVT:
 \[
-\begin{multlined}
 \frac{1}{12} f(x-2h) - \frac23 f(x-h) + \frac23 f(x+h) - \frac{1}{12} f(x+2h) = \\
 f'(x) + \frac{h^5}{120}\left(-\frac83f^{(V)}(x-2\alpha_1 h) + \frac23 f^{(V)}(x-\alpha_2 h) + \frac23 f^{(V)}(x+\alpha_3 h) - \frac83 f^{(V)}(x+2\alpha_4 h)  \right)
-\end{multlined}
 \]
 Some terms in the brackets can still be grouped:
 \[
@@ -850,10 +819,8 @@ f(x\pm h) = f(x) \pm \frac{1}{1!} h' \nabla f(x) + \frac{1}{2!} h' H_f (x) h \pm
 Denote the bivariate step vector $h_{ij} := (h_i + h_j)$.
 The first numerator term of the Hessian finite-difference approximation becomes
 \[
-\begin{multlined}
 f(x + h_{ij}) = f(x) + h[ \nabla_i f(x) + \nabla_j f(x)] + \frac{1}{2} h^2 (H_{ii} + H_{ij} + H_{ji} + H_{jj}) \\
 +  \frac{1}{6} \sum_{k_1=1}^p \sum_{k_2=1}^p \sum_{k_3=1}^p  \frac{\partial^3 f(x)}{\partial x_{k_1} \partial x_{k_2} \partial x_{k_3} }  h_{ij}^{(k_1)} h_{ij}^{(k_2)} h_{ij}^{(k_3)} + O(h^4)
-\end{multlined}
 \]
 
 Since only 2 elements of $h_{ij}$  are non-zero, most elements of the triple sum are zero:

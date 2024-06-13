@@ -104,7 +104,7 @@ Grad <- function(FUN, x,
                  acc.order = ifelse(abs(side) == 1, 1L, 2L),
                  h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
-                 cores = 2, load.balance = TRUE, func = NULL,
+                 cores = 1, load.balance = TRUE, func = NULL,
                  report = 1L,
                  ...) {
   n <- length(x)
