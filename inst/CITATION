@@ -21,3 +21,14 @@ bibentry(
   textVersion = "Kostyrka, Andreï V. (2024). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.4.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
+
+bibentry(
+  bibtype="Misc",
+  title = "Step-size-selection algorithm benchmark",
+  author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
+  year = "2024",
+  organization = "University of Luxembourg",
+  note = "Vignette for the R package pnd 0.0.4.",
+  textVersion = "Kostyrka, Andreï V. (2024). Step-size-selection algorithm benchmark. Vignette for the R package pnd 0.0.4.",
+  url = "https://github.com/Fifis/pnd/tree/main/vignettes"
+)

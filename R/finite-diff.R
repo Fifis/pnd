@@ -141,8 +141,7 @@ solveVandermonde <- function(s, b) {
 #' print(t1, digits = 4)
 fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
                    acc.order = 2L, stencil = NULL,
-                   zero.action = c("drop", "round", "none"),
-                   zero.tol = NULL) {
+                   zero.action = c("drop", "round", "none"), zero.tol = NULL) {
   if (length(deriv.order) != 1L) stop("The 'deriv.order' argument must be an integer of length 1.")
   if (length(acc.order) != 1L) stop("The 'acc.order' argument must must be an integer of length 1.")
   if (!is.numeric(deriv.order) || deriv.order != round(deriv.order) || deriv.order < 0)
