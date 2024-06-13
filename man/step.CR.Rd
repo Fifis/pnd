@@ -97,6 +97,10 @@ step.CR(x = 2, f)
 step.CR(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
 step.CR(x = 2, f, version = "modified")
 step.CR(x = 2, f, version = "modified", acc.order = 4)
+
+# A bad start: too far away
+step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
+step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
 }
 \references{
 \insertAllCited{}

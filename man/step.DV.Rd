@@ -58,7 +58,11 @@ approximation error (sum of truncation and rounding errors),
 \code{0} indicates optimal termination within tolerance,
 \code{1} means that the third derivative is zero (large step size preferred),
 \code{3} indicates a solution at the boundary of the allowed value range,
-\code{4} signals that the maximum number of iterations was reached.
+\code{4} signals that the maximum number of iterations was reached and the
+found optimal step size belongs to the allowed range,
+\code{5} occurs when the maximum number of iterations was reached and the
+found optimal step size did belong to the allowed range and had to be snapped
+to one end.
 \code{message} is a summary message of the exit status.
 If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
 including the full step size search path (NB: for the 3rd derivative),

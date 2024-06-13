@@ -14,6 +14,17 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
   # Stopping criterion
   expect_gte(u, 2)
   expect_lte(u, 15)
+
+  s2 <- step.DV(x = 2, f, range = c(1e-10, 1e-7))
+  expect_equal(s2$exitcode, 3)
+  expect_true(grepl("too close to the right end", s2$message))
+
+  s3 <- step.DV(x = 2, f, range = c(1e-3, 1e-1))
+  expect_equal(s3$exitcode, 5)
+  expect_true(grepl("on the right end", s3$message))
+
+  s4 <- step.DV(x = 2, f, h0 = 100, maxit = 5)
+  expect_equal(s4$exitcode, 5)
 })
 
 test_that("Tweaking the DV algorithm for noisiser functions", {
@@ -22,4 +33,15 @@ test_that("Tweaking the DV algorithm for noisiser functions", {
   s.noisy <- step.DV(x = 2, f, h0 = 1e-7, alpha = 2)
   expect_lt(s.perfect$par, s.noisy$par)
 })
+
+test_that("DV for functions with near-zero f''' stops immediately", {
+  s1 <- step.DV(1, function(x) x^2)
+  expect_equal(s1$counts, 1)
+  expect_equal(s1$exitcode, 1)
+
+  s2 <- step.DV(1, function(x) pi*x + exp(1))
+  expect_equal(s2$counts, 1)
+  expect_equal(s2$exitcode, 1)
+})
+
 

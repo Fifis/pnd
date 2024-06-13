@@ -37,6 +37,12 @@ test_that("SW algorithm detects if h0 is too high", {
   expect_lt(s2$counts["main"], s$counts["main"])
 })
 
+test_that("SW algorithm for bad ranges", {
+  f <- function(x) x^4
+  expect_equal(step.SW(x = 2, f, h0 = 0.1, range = c(0.01, 1))$exitcode, 3)
+  expect_equal(suppressWarnings(step.SW(x = 2, f, h0 = 1e-9, range = c(1e-10, 1e-8)))$exitcode, 3)
+})
+
 test_that("SW fails when a large h0 invalidates the est. trunc. error", {
   expect_warning(step.SW(x = pi/4, sin, h0 = 1000, diagnostics = TRUE),
                  "exceeds the absolute value")

@@ -19,11 +19,22 @@ test_that("unsupported arguments withcause an error", {
                "step-selection method arguments")
 })
 
-test_that("some methods do not converge for unfortunate inputs", {
-  expect_equal(gradstep(x = 1e10, FUN = sin, h0 = 1e-20, method = "SW")$exitcode, 4)
-  expect_equal(gradstep(x = 1, FUN = sin, method = "DV",
-                      control = list(range = c(1e-20, 1e-22)))$exitcode, 0)
+test_that("the range is correctly reversed", {
+  expect_equal(gradstep(1, sin, method = "CR", control = list(range = c(1e-6, 1e-8))),
+               gradstep(1, sin, method = "CR", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(1, sin, method = "DV", control = list(range = c(1e-6, 1e-8))),
+               gradstep(1, sin, method = "DV", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(1, sin, method = "SW", control = list(range = c(1e-6, 1e-8))),
+               gradstep(1, sin, method = "SW", control = list(range = c(1e-8, 1e-6))))
+})
 
+test_that("for unfortunate inputs, the search may hit the boundary", {
+  s.sw <- suppressWarnings(gradstep(x = 1e10, FUN = sin, h0 = 1e-20, method = "SW"))
+  expect_equal(s.sw$exitcode, 3)
+  expect_true(is.finite(s.sw$abs.error))
+
+  s.dv <- gradstep(x = 1, FUN = sin, method = "DV", control = list(range = c(1e-20, 1e-22)))
+  expect_equal(s.dv$exitcode, 3)
 })
 
 test_that("gradstep correctly handles vector inputs", {
@@ -54,10 +65,10 @@ test_that("the error in vector inputs does not propagate too strongly", {
   expect_lte(r, 4)
 })
 
-
 test_that("gradstep accepts methods argument as a list", {
   expect_error(gradstep(x = 1:4, FUN = function(x) sum(sin(x)), diagnostics = TRUE))
-  expect_equal(gradstep(x = 1e10, FUN = sin, h0 = 1e-20, method = "SW")$exitcode, 4)
+  gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "SW",
+           control = list())
 })
 
 test_that("gradstep correctly handles other inputs", {

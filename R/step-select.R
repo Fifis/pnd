@@ -69,6 +69,10 @@
 #' step.CR(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
 #' step.CR(x = 2, f, version = "modified")
 #' step.CR(x = 2, f, version = "modified", acc.order = 4)
+#'
+#' # A bad start: too far away
+#' step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
+#' step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
 step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                     version = c("original", "modified"),
                     aim = if (version[1] == "original") 100 else 1,
@@ -79,6 +83,7 @@ step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
   version <- version[1]
   if (!(version %in% c("original", "modified"))) stop("step.CR: 'version' must be either 'original' or 'modified'.")
   vanilla <- version == "original"
+  if (length(range) > 1 && range[2] < range[1]) range <- c(range[2], range[1])
   if (range[1] < 2*.Machine$double.eps) range[1] <- 2*.Machine$double.eps
   if (tol <= 1) stop("The tolerance must be a positive number greater than 1 (e.g. 4).")
   acc.order <- acc.order[1]
@@ -153,12 +158,12 @@ step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
       break
     }
 
-    i <- i+1
+    i <- i + 1
   }
+
   i <- length(ulist)
-  if (i >= maxit) {
-    exitcode <- 4
-  }
+  if (i >= maxit) exitcode <- 4
+
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
                 "truncation error is exactly zero, large step is favoured",
@@ -224,7 +229,11 @@ step.CR <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
 #'   \code{0} indicates optimal termination within tolerance,
 #'   \code{1} means that the third derivative is zero (large step size preferred),
 #'   \code{3} indicates a solution at the boundary of the allowed value range,
-#'   \code{4} signals that the maximum number of iterations was reached.
+#'   \code{4} signals that the maximum number of iterations was reached and the
+#'   found optimal step size belongs to the allowed range,
+#'   \code{5} occurs when the maximum number of iterations was reached and the
+#'   found optimal step size did belong to the allowed range and had to be snapped
+#'   to one end.
 #'   \code{message} is a summary message of the exit status.
 #'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
 #'   including the full step size search path (NB: for the 3rd derivative),
@@ -243,6 +252,7 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                     ratio.limits = c(1/15, 1/2, 2, 15),
                     maxit = 40L, diagnostics = FALSE, ...) {
   k0 <- h0 * .Machine$double.eps^(-2/15)
+  if (length(range) > 1 && range[2] < range[1]) range <- c(range[2], range[1])
   range3 <- range * .Machine$double.eps^(-2/15)
   P <- 2^(log2(.Machine$double.eps/2) / alpha)
 
@@ -277,6 +287,15 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                   "], and/or try a different starting h0, which is currently ", h0, "."))
     }
 
+    # If the estimate of f''' is near-zero, then, f_inf and f_sup will have opposite signs
+    # The algorithm must therefore stop
+    if (abs(ulist[[i]]$deriv["f3"]) < 8 * .Machine$double.eps) {
+      exitcode <- 1
+      break
+    }
+
+    # TODO: find an improvement for the ratios of opposite signs
+
     if (ulist[[i]]$ratio < ratio.limits[1] || ulist[[i]]$ratio > ratio.limits[4]) {
       # The numerical error is too high
       range3[1] <- k
@@ -293,35 +312,46 @@ step.DV <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
     k <- sqrt(prod(range3)) # The interval has been sub-divided; take its geometric mean
     i <- i+1
   }
-
   i <- length(ulist)
-  if (i >= maxit) {
-    # Was the procedure systematically unsuccsessul?
-    exitcode <- if (maxit > 5 && (ndownwards >= maxit-2 || ndownwards <= 2)) 3 else 4
-  }
 
-  f3 <- sum(ulist[[i]]$f * c(-0.5, 1, -1, 0.5)) / k^3
-  if (f3 == 0) {
-    exitcode <- 1
-    f3 <- 1
-  }
-
-  msg <- switch(exitcode + 1,
-                "target error ratio reached within tolerance",
-                "truncation error is exactly zero, large step is favoured",
-                "",
-                paste0("step size too close to the range ", if (ndownwards > maxit/2) "left" else
-                       "right", " end; consider extending the range"),
-                "maximum number of iterations reached")
-
+  f3 <- if (exitcode != 1) sum(ulist[[i]]$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
   f0 <- mean(ulist[[i]]$f[2:3]) # Approximately f(x); the error is small for small h
   h <- (1.67 * P * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
+
+  if (h < range[1]) {
+    h <- range[1]
+    exitcode <- 3
+    side <- "left"
+  }
+  if (h > range[2]) {
+    h <- range[2]
+    exitcode <- 3
+    side <- "right"
+  }
+  # Was the procedure systematically unsuccsessful?
+  if (i >= maxit) {  # Did it waste many iterations in vain?
+    exitcode <- if (h == range[1] || h == range[2]) 5 else 4
+    side <- if (ndownwards >= maxit/2) "right" else "left"
+  }
+
   h <- h + x # Minimising the representation error
   h <- h - x
   xgrid <- c(x-h, x+h)
   fgrid <- sapply(xgrid, FUN, ...)
   cd <- (fgrid[2] - fgrid[1]) / h / 2
   err <- P*abs(f0)/h/3 + (exitcode != 1) * (h^5*f3^2/36/P/abs(f0) - h^8*abs(f3)^3/648/P^2/f0^2)
+
+  msg <- switch(exitcode + 1,
+                "target error ratio reached within tolerance",
+                "truncation error is zero, large step is favoured",
+                "",
+                paste0("step size too close to the ", side,
+                  " end of the range [", sprintf("%1.2e", range[1]), ", ",
+                  sprintf("%1.2e", range[2]), "]; consider extending it"),
+                "maximum number of iterations reached",
+                paste0("maximum number of iterations reached and step size occured on the ",
+                  side, " end of the range [", sprintf("%1.2e", range[1]), ", ",
+                  sprintf("%1.2e", range[2]), "]; consider expanding it"))
 
   if (diagnostics) {
     diag.list <- list(k = do.call(c, lapply(ulist, "[[", "k")),
@@ -406,6 +436,8 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 2, range = h0 / c(1e12, 1e-8),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
                     maxit = 40L, diagnostics = FALSE, ...) {
+  if (length(range) > 1 && range[2] < range[1]) range <- c(range[2], range[1])
+
   i <- 1
 
   getRatio <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
@@ -442,13 +474,12 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
         f0 <- ulist[[i]]$f0
         hnew <- ulist[[i]]$h
       }
+      if (!is.finite(f0)) {
+        stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
+      }
       if (any(bad <- !is.finite(ulist[[i]]$f))) {
-        if (is.na(f0)) {
-          stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
-        } else {
-          stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
-                      ". FUN(", x, ") is finite -- reduce the step h0, which is currently ", h0, "."))
-        }
+        stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
+                    ". FUN(", x, ") is finite -- reduce the step h0, which is currently ", h0, "."))
       }
 
       # First check: are the function values of different signs?
@@ -477,8 +508,15 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
             # If 3.15 does not hold, this increases the step size
             # If 3.16 does not hold, shrink hnew towards the 3.15-optimal value
             if (!rounding.nottoosmall) hnew <- (hold + hnew) / 2 # Bisection
+
             if (hnew > range[2]) hnew <- range[2] # Safeguarding against huge steps
             ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
+            if (abs(hnew/hold - 1) < seq.tol) { # The algorithm is stuck at one range end
+              main.loop <- TRUE
+              exitcode <- 2
+              break
+            }
+
             bad <- !is.finite(ulist[[i]]$f)
             if (any(bad) && !rounding.small)
               stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
@@ -498,6 +536,7 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
       for (j in 1:2) { # Try a decreasing sequence
         i <- i + 1
         hnew <- hnew / shrink.factor
+        if (hnew < range[1]) hnew <- range[1]
         ulist[[i]] <- getRatio(FUN, x, hnew, ratio.last = ulist[[i-1]],
                                ratio.beforelast = if (j == 1) NULL else ulist[[i-2]])
       }
@@ -522,11 +561,22 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
   hprev <- ulist[[i-2]]$h
   # Error codes ordered by severity
   if (abs(hopt / hprev - 1) < seq.tol) exitcode <- 2
+
+  # If hprev hits the upper limit, the total error needs to be compared
+  if (abs(hprev / range[2] - 1) < seq.tol) {
+    abs.error.prev <- unname(ulist[[i-1]]$est.error["trunc"] * shrink.factor + ulist[[i-2]]$est.error["round"])
+    abs.error.opt  <- unname(ulist[[i-1]]$est.error["trunc"] + ulist[[i-1]]$est.error["round"])
+    if (abs.error.prev < abs.error.opt) { # The two-times reduction was unnecessary
+      exitcode <- 3
+      hopt <- hprev
+      ulist[[i-2]]$est.error["trunc"] <- unname(ulist[[i-1]]$est.error["trunc"] * shrink.factor)
+    }
+  }
   if (abs(hopt / range[1] - 1) < seq.tol) {
     exitcode <- 3
     close.left <- TRUE
   }
-  if (abs(range[2] / hopt - 1) < seq.tol) exitcode <- 3
+
   if (i >= maxit) exitcode <- 4
 
   # !!! If exitcode e, return the last one
@@ -535,17 +585,18 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                 "", # The code cannot be 1 here
                 "step size did not change between iterations",
                 paste0("step size too close to the ", if (close.left)
-                  "left" else "right", " end of the range; consider starting from a ",
-                  if (close.left) "larger" else "smaller", " h0 value."),
+                  "left" else "right", " end of the range; consider extending the range ",
+                  "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),
                 "maximum number of iterations reached")
 
   if (exitcode == 2) warning(paste0("The step size did not change between iterations. ",
                              "This should not happen. Send a bug report to andrei.kostyrka@gmail.com."))
   if (exitcode == 3 && !close.left)
     warning(paste0("The algorithm terminated at the right range of allowed step sizes. ",
-                   "Either h0 is too low and the bisection step overshot the next value, ",
-                   "or h0 was too large and the truncation error estimate is invalid. ",
-                   "Please try a slightly larger and a slightly smaller h0."))
+                   "Possible reasons: (1) h0 is too low and the bisection step overshot ",
+                   "the next value; (2) h0 was too large and the truncation error estimate ",
+                   "is invalid; (3) the range is too narrow. Please try a slightly larger ",
+                   "and a slightly smaller h0, or expand the range."))
 
   if (diagnostics) {
     diag.list <- list(h = do.call(c, lapply(ulist, "[[", "h")),
@@ -556,10 +607,12 @@ step.SW <- function(x, FUN, h0 = 1e-5 * (abs(x) + (x == 0)),
                       monotone = do.call(rbind, lapply(ulist, "[[", "monotone")))
   }
 
-  ret <- list(par = hopt, value = ulist[[i-1]]$deriv,
+  best.i <- if (exitcode == 3 && !close.left) i-2 else i-1
+  ret <- list(par = hopt,
+              value = ulist[[best.i]]$deriv,
               counts = c(preliminary = i.prelim, main = i - i.prelim),
               exitcode = exitcode, message = msg,
-              abs.error = sum(ulist[[i-1]]$est.error),
+              abs.error = sum(ulist[[best.i]]$est.error),
               iterations = if (diagnostics) diag.list else NULL)
 
   if (abs(x) + 7e-6 < ret$par)
