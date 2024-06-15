@@ -2,7 +2,7 @@
 % Please edit documentation in R/gradient.R
 \name{Jacobian}
 \alias{Jacobian}
-\title{Jacobian computation with parallel capabilities}
+\title{Jacobian matrix computation with parallel capabilities}
 \usage{
 Jacobian(
   FUN,
@@ -22,61 +22,67 @@ Jacobian(
 )
 }
 \arguments{
-\item{FUN}{A function returning a numeric scalar or a vector.
-If the function returns a vector, the output will be is a Jacobian.
-If instead of \code{FUN}, \code{func} is passed, as in \code{numDeriv::grad},
-it will be reassigned to \code{FUN} with a warning.}
+\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed
+If the function returns a vector, the output will be is a Jacobian.}
 
-\item{x}{Numeric vector or scalar: point at which the derivative is estimated.
-\code{FUN(x)} must return a finite value.}
+\item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
+\code{FUN(x)} must be finite value.}
 
-\item{deriv.order}{Integer indicating the derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}.}
+\item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
+\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
 
-\item{side}{Integer scalar or vector indicating difference type:
+\item{side}{Integer scalar or vector indicating the type of finite difference:
 \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 Central differences are recommended unless computational cost is prohibitive.}
 
-\item{acc.order}{Integer specifying the desired accuracy order.
-The error typically scales as \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+\item{acc.order}{Integer or vector of integers specifying the desired accuracy order
+for each element of \code{x}.
+The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
-\item{h}{Numeric scalar, vector, or character specifying the step size for the numerical
-difference. If character (\code{"CR"}, \code{"CRm"}, \code{"DV"}, or \code{"SW"}),
-calls \code{gradstep()} with the appropriate step-selection method.
-Must be length 1 or match \code{length(x)}.}
+\item{h}{Numeric or character specifying the step size(s) for the numerical
+difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
+\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
 
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
-\item{f0}{Optional numeric scalar or vector: if provided and applicable, used
+\item{f0}{Optional numeric: if provided and applicable, used
 where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
 to save time.
 TODO: Currently ignored.}
 
-\item{cores}{Integer specifying the number of parallel processes to use. Recommended
-value: the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
 
 \item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}.}
 
-\item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
+\item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
+\code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
 
-\item{report}{Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
-attaches the step size and its selection method: \code{2} or higher, attaches the full
-diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).}
+\item{report}{Integer for the level of detail in the output. If \code{0},
+returns a gradient without any attributes; if \code{1},
+attaches the step size and its selection method: \code{2} or higher attaches the full
+diagnostic output as an attribute.}
 
 \item{...}{Additional arguments passed to \code{FUN}.}
 }
+\value{
+Matrix where each row corresponds to a function output and each column
+to an input coordinate. For scalar-valued functions, a warning is issued and
+the output is returned as a row matrix.
+}
 \description{
-Computes a numerical Jacobian of a function: rows correspond to the function
-dimension, column to the input argument dimension. Supports both two-sided
-(central) and one-sided (forward or backward) derivatives. Calculations can be
-executed on multiple cores to cut down execution time for slow functions or
-to attain higher accuracy faster. Currently, parallelisation works for Mac and
-Linux only because Windows cannot handle \code{parallel::mclapply()}.
-A \code{parallel::parLapply} version is in development.
+Computes the numerical Jacobian for vector-valued functions. Its columns are
+partial derivatives of the function with respect to the input elements.
+This function supports both two-sided (central, symmetric) and
+one-sided (forward or backward) derivatives. It can utilise parallel processing
+to accelerate computation of gradients for slow functions or
+to attain higher accuracy faster. Currently, only Mac and Linux are supported
+\code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
+is under development.
 }
 \examples{
 \dontrun{
