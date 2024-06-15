@@ -1,42 +1,43 @@
-#' Computation of derivative matrices with parallel capabilities
+#' Numerical derivative matrices with parallel capabilities
 #'
-#' Numerical derivatives arranged into a generic matrix that can be processed
-#' by [Grad()] and [Jacobian()] or used independently. Supports mixed orders
-#' of derivation and arbitrary accuracies and sides for different coordinates
-#' of the argument vector.
+#' Computes numerical derivatives of a scalar or vector function using finite-difference methods.
+#' This function serves as a backbone for [Grad()] and [Jacobian()], allowing for detailed control
+#' over the derivative computation process, including order of derivatives, accuracy, and step size.
+#' \code{GenD} is fully vectorised over different coordinates of the function argument,
+#' allowing arbitrary accuracies, sides, and derivative orders for different coordinates.
 #'
-#' @param FUN A function returning a numeric scalar or a vector.
+#' @param FUN A function returning a numeric scalar or a vector whose derivatives are to be computed
 #'   If the function returns a vector, the output will be is a Jacobian.
-#'   If instead of \code{FUN}, \code{func} is passed, as in \code{numDeriv::grad},
-#'   it will be reassigned to \code{FUN} with a warning.
-#' @param x Numeric vector or scalar: point at which the derivative is estimated.
-#'   \code{FUN(x)} must return a finite value.
-#' @param h Numeric scalar, vector, or character specifying the step size for the numerical
-#'   difference. If character (\code{"CR"}, \code{"CRm"}, \code{"DV"}, or \code{"SW"}),
-#'   calls \code{gradstep()} with the appropriate step-selection method.
-#'   Must be length 1 or match \code{length(x)}.
-#' @param deriv.order Integer indicating the derivative order,
-#'   \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}.
-#' @param acc.order Integer specifying the desired accuracy order.
-#'   The error typically scales as \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
-#' @param side Integer scalar or vector indicating difference type:
+#' @param x Numeric vector or scalar: the point(s) at which the derivative is estimated.
+#'   \code{FUN(x)} must be finite value.
+#' @param deriv.order Integer or vector of integers indicating the desired derivative order,
+#'   \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.
+#' @param acc.order Integer or vector of integers specifying the desired accuracy order
+#'   for each element of \code{x}.
+#'   The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
+#' @param side Integer scalar or vector indicating the type of finite difference:
 #'   \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 #'   Central differences are recommended unless computational cost is prohibitive.
-#' @param f0 Optional numeric scalar or vector: if provided and applicable, used
+#' @param h Numeric or character specifying the step size(s) for the numerical
+#'   difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
+#'   \code{"DV"}, or \code{"SW"} to be used in [gradstep()]).
+#' @param f0 Optional numeric: if provided and applicable, used
 #'   where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
 #'   to save time.
 #'   TODO: Currently ignored.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
-#' @param cores Integer specifying the number of parallel processes to use. Recommended
-#'   value: the number of physical cores on the machine minus one.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
 #' @param load.balance Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 #'   or enables load balancing with \code{parLapplyLB()}.
-#' @param func Deprecated; for \code{numDeriv::grad()} compatibility only.
-#' @param report Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
-#'   attaches the step size and its selection method: \code{2} or higher, attaches the full
-#'   diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).
+#' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
+#'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
+#' @param report Integer for the level of detail in the output. If \code{0},
+#'   returns a gradient without any attributes; if \code{1},
+#'   attaches the step size and its selection method: \code{2} or higher attaches the full
+#'   diagnostic output as an attribute.
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
@@ -57,11 +58,15 @@
 #' The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 #' and \code{f.upper} in \code{uniroot()}.
 #'
-#' @return Depends on the output of \code{FUN}. If \code{FUN} returns a scalar:
-#'   returns a gradient vector matching the length of \code{x}. If \code{FUN} returns a vector:
-#'   returns a Jacobian matrix with dimensions \code{length(FUN(x)), length(x)}.
-#'   Unlike the output of \code{numDeriv::grad} and \code{numDeriv::jacobian},
-#'   this output preserves the names of \code{x} and \code{FUN(x)}.
+#' For convenience, \code{report = 2} overrides \code{diagnostics = FALSE} in the
+#' \code{control}) list.
+#'
+#' Unlike \code{numDeriv::grad()} and \code{numDeriv::jacobian()}, this function
+#' fully preserves the names of \code{x} and \code{FUN(x)}.
+#'
+#' @return A vector or matrix containing the computed derivatives, structured according
+#'   to the dimensionality of \code{x} and \code{FUN}. If \code{FUN} is scalar-valued,
+#'   returns a gradient vector. If \code{FUN} is vector-valued, returns a Jacobian matrix.
 #'
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
@@ -175,9 +180,9 @@ GenD <- function(FUN, x,
   jac <- sweep(jac, 2, h^deriv.order, "/")
   if (nrow(jac) == 1) {
     jac <- drop(jac)
-    if (!is.null(names(x))) names(jac) <- names(x)
+    if (!is.null(names(x))) names(jac) <- names(h) <- names(x)
   } else {
-    if (!is.null(names(x))) colnames(jac) <- names(x)
+    if (!is.null(names(x))) colnames(jac) <- names(h) <- names(x)
     if (!is.null(colnames(fvals))) rownames(jac) <- colnames(fvals)
   }
 
@@ -199,14 +204,19 @@ GenD <- function(FUN, x,
 
 #' Gradient computation with parallel capabilities
 #'
-#' Computes numerical derivatives and gradients. Supports both two-sided
-#' (central) and one-sided (forward or backward) derivatives. Calculations can be
-#' executed on multiple cores to cut down execution time for slow functions or
-#' to attain higher accuracy faster. Currently, parallelisation works for Mac and
-#' Linux only because Windows cannot handle \code{parallel::mclapply()}.
-#' A \code{parallel::parLapply} version is in development.
+#' Computes numerical derivatives and gradients of scalar-valued functions using
+#' finite differences. This function supports both two-sided (central, symmetric) and
+#' one-sided (forward or backward) derivatives. It can utilise parallel processing
+#' to accelerate computation of gradients for slow functions or
+#' to attain higher accuracy faster. Currently, only Mac and Linux are supported
+#' \code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
+#' is under development.
 #'
 #' @inheritParams GenD
+#'
+#' @return Numeric vector of the gradient. If \code{FUN} returns a vector,
+#' a warning is issued suggesting the use of `Jacobian()`.
+#'
 #' @seealso [GenD()], [Jacobian()]
 #' @export
 #'
@@ -235,17 +245,23 @@ Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
 }
 
 
-#' Jacobian computation with parallel capabilities
+#' Jacobian matrix computation with parallel capabilities
 #'
-#' Computes a numerical Jacobian of a function: rows correspond to the function
-#' dimension, column to the input argument dimension. Supports both two-sided
-#' (central) and one-sided (forward or backward) derivatives. Calculations can be
-#' executed on multiple cores to cut down execution time for slow functions or
-#' to attain higher accuracy faster. Currently, parallelisation works for Mac and
-#' Linux only because Windows cannot handle \code{parallel::mclapply()}.
-#' A \code{parallel::parLapply} version is in development.
+#' Computes the numerical Jacobian for vector-valued functions. Its columns are
+#' partial derivatives of the function with respect to the input elements.
+#' This function supports both two-sided (central, symmetric) and
+#' one-sided (forward or backward) derivatives. It can utilise parallel processing
+#' to accelerate computation of gradients for slow functions or
+#' to attain higher accuracy faster. Currently, only Mac and Linux are supported
+#' \code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
+#' is under development.
 #'
 #' @inheritParams GenD
+#'
+#' @return Matrix where each row corresponds to a function output and each column
+#' to an input coordinate. For scalar-valued functions, a warning is issued and
+#' the output is returned as a row matrix.
+#'
 #' @seealso [GenD()], [Grad()]
 #'
 #' @examples

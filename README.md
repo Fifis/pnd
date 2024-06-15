@@ -25,6 +25,64 @@ Optimal step sizes and parallel evaluation of numerical derivatives translate di
 - **Optimal step size selection:** obtain adaptive step size to ensure the best trade-off between mathematical truncation error and computer floating-point rounding error for the best overall accuracy.
 - **Four optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2024) modification, Dumontet–Vignes (1977), and Stepleman–Winarsky (1979) algorithms. Future versions will feature parallelised algorithms.
 
+## Getting started
+
+This package has `numDeriv`-compatible syntax.
+Simply replace the first letter of `numDeriv` commands with a capital one to get the improved commands: `Grad`, `Jacobian`, and `Hessian`.
+
+Here is how to compute the gradient of `f(x) = sum(sin(x))` at the point `x = (1, 2, 3, 4)`.
+
+```r
+f <- function(x) sum(sin(x))
+x <- 1:4
+names(x) <- c("Jan", "Feb", "Mar", "Apr")
+
+numDeriv::grad(f, x)
+#> 0.5403023 -0.4161468 -0.9899925 -0.6536436
+
+pnd::Grad(f, x)
+#>       Jan        Feb        Mar        Apr
+#> 0.5403023 -0.4161468 -0.9899925 -0.6536436
+#> attr(,"step.size")
+#>          Jan          Feb          Mar          Apr
+#> 6.055454e-06 1.211091e-05 1.816636e-05 2.422182e-05
+#> attr(,"step.size.method")
+#> "default"
+```
+
+The output contains diagnostic information about the chosen step size. Our function
+preserved the names of the input argument, unlike `grad`.
+
+The default step size in many implementations is proportional to the argument value, and this is reflected in the default output.
+Should the user desire a fixed step size, this can be easily achieved with an extra argument named `h`:
+
+```r
+pnd::Grad(f, x, h = c(1e-5, 1e-5, 1e-5, 2e-5))
+#>       Jan        Feb        Mar        Apr 
+#> 0.5403023 -0.4161468 -0.9899925 -0.6536436 
+#> attr(,"step.size")
+#>   Jan   Feb   Mar   Apr 
+#> 1e-05 1e-05 1e-05 2e-05 
+attr(,"step.size.method")
+#> "user-supplied"
+```
+
+Finally, it is easy to request an algorithmically chosen optimal step size -- here is how to do it with the Stepleman--Winarsky (1979) rule, named `"SW"`, that works well in practice:
+
+```r
+pnd::Grad(f, x, h = "SW")
+#>       Jan        Feb        Mar        Apr 
+#> 0.5403023 -0.4161468 -0.9899925 -0.6536436 
+#> attr(,"step.size")
+#>          Jan          Feb          Mar          Apr 
+#> 5.048535e-06 1.000000e-05 7.500000e-06 1.000000e-05 
+#> attr(,"step.size.method")
+#> "SW"
+```
+
+Extensive diagnostics and error estimates can be requested at any time:
+`pnd::Grad(f, x, h = "SW", report = 2)` will contain the step-search path for each coordinate of `x`. Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad` would.
+
 ## Learning resources
 
 - [PDF of an early 2024 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2024-brown-bag-seminar.pdf) *(Some functions might be outdated – check the package vignette for up-to-date examples!)*
@@ -42,13 +100,13 @@ The following articles provide the theory behind the methods implemented in this
 ## Installation
 
 This package currently exists only on GitHub. To install it, run the following two commands:
-```{r}
+```r
 install.packages("devtools")
 devtools::install_github("Fifis/pnd")
 ```
 
 To load this package, include this line in the code:
-```{r}
+```r
 library(pnd)
 ```
 

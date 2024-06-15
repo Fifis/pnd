@@ -1,4 +1,4 @@
-# pnd 0.next (2024-XX-XX)
+# pnd 0.dev (2024-XX-XX)
 
 - BUG: `pnd::Grad(func = sin, x = 1:4, deriv.order = 1)` fails
 - BUG: zero-order derivatives do not work with the BP algorithm
@@ -36,7 +36,7 @@
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
-# pnd 0.0.5 (2023-06-XX)
+# pnd 0.next (2023-06-XX)
 - Feature: separate `Grad()` and `Jacobian()` that call the workhors, `GenD()`, for compatibility with `numDeriv`
 
 # pnd 0.0.4 (2023-06-10)
