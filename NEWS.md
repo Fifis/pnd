@@ -1,13 +1,9 @@
 # pnd 0.dev (2024-XX-XX)
 
-- BUG: `pnd::Grad(func = sin, x = 1:4, deriv.order = 1)` fails
-- BUG: zero-order derivatives do not work with the BP algorithm
-- BUG: the attributes on long stencils, e.g. `fdCoef(deriv.order = 3, stencil = -4:4)`, are full of digits -- `zero.tol` must be attached to the coefficient magnitu
-- SYNTAX: should `x` bo before `FUN` in `Grad`? Check for 2 first unnamed argument types for compatibility.
-- SYNTAX: `Grad()` fails if `h` is text and a Jacobian is needed.
 - SYNTAX: Add side -1, 0, 1 for compatibility with `numDeriv`
 - SYNTAX: Align with the syntax of `optimParallel`
 - Evaluating the accuracy of numerical approximations
+- FEATURE: plug-in step size with an estimated `f'''` with a rule of thumb (add this as a one-step DV, e.g. via `maxit = 1`)
 - FEATURE: SW algorithm for arbitrary derivative and accuracy orders
 - FEATURE: Handle NA in step size selection
 - FEATURE: Auto-shrink the step size at the beginning of all procedures if FUN(x) is not finite
@@ -34,6 +30,7 @@
 - MISC: Detailed vignette explaining the mathematics behind the functions with full transparency about the choice of parameters
 - DEV: ensure that `Grad` takes all the arguments of `GendD` and `Jacobian`, and vice versa
 - DEV: Ensure unit-test coverage >90%
+- DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
 # pnd 0.next (2023-06-XX)

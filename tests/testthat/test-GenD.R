@@ -9,4 +9,5 @@ test_that("input validation", {
   expect_error(Grad(x = 1:4), "Pass the function")
   expect_error(Grad(x = 1:4, FUN = sum, deriv.order = c(1, 2)), "'deriv.order' must have length")
   expect_error(Grad(x = 1:4, FUN = sum, acc.order = c(1, 2)), "'acc.order' must have length")
+  expect_error(Grad(1:4, sin), "argument order")
 })

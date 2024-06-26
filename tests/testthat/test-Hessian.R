@@ -44,6 +44,7 @@ test_that("input check works", {
   "'acc.order' must have length")
   expect_error(suppressWarnings(Hessian(as.character, 1:3, h = 1:2)),
                "must have length")
+  expect_error(Hessian(1:4, f), "argument order")
 })
 
 test_that("compatibility with numDeriv", {

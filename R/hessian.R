@@ -67,6 +67,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2,
                     h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order)),
                     symmetric = TRUE, h0 = NULL, control = list(), f0 = NULL,
                     cores = 1, load.balance = TRUE, func = NULL, report = 1L, ...) {
+  if (is.function(x) && !is.function(FUN)) stop("The argument order must be FUN and then x, not vice versa.")
   n <- length(x)
   h.default <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order))
   if (.Platform$OS.type == "windows" && cores > 1) cores <- 1
