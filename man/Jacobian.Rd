@@ -10,7 +10,7 @@ Jacobian(
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
-  h = (abs(x) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
   h0 = NULL,
   control = list(),
   f0 = NULL,

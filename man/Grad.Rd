@@ -10,7 +10,7 @@ Grad(
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
-  h = (abs(x) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
   h0 = NULL,
   control = list(),
   f0 = NULL,
@@ -81,6 +81,55 @@ to accelerate computation of gradients for slow functions or
 to attain higher accuracy faster. Currently, only Mac and Linux are supported
 \code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
 is under development.
+}
+\details{
+This function aims to be 100\% compatible with the syntax of \code{numDeriv::Grad()}.
+
+There is one feature of the default step size in \code{numDeriv} that deserves
+an explanation.
+
+\itemize{
+\item If \code{method = "simple"}, then, simple forward differences are used with
+a fixed step size \code{eps}, which we denote by \eqn{\varepsilon}{eps}.
+\item If \code{method = "Richardson"}, then, central differences are used with
+a fixed step
+\eqn{h := |d\cdot x| + \varepsilon (|x| < \mathrm{zero.tol})}{h := |d*x| + eps*(|x| < zero.tol)},
+where \code{d = 1e-4} is the relative step size and \code{eps} becomes an extra
+addition to the step size for the argument that are closer to zero than \code{zero.tol}.
+}
+We believe that the latter may lead to mistakes when the user believes that they can set
+the step size for near-zero arguments, whereas in reality, a combination of \code{d} and \code{eps}
+is used.
+
+Here is the synopsis of the old arguments:
+\describe{
+\item{side}{\code{numDeriv} uses \code{NA} for handling two-sided differences.
+The \code{pnd} equivalent is \code{0}, and \code{NA} is replaced with \code{0}.}
+\item{eps}{If \code{numDeriv} \code{method = "simple"}, then, \code{eps = 1e-4} is
+the absolute step size and forward differences are used.
+If \code{method = "Richardson"}, then, \code{eps = 1e-4} is the absolute increment of the step
+size for small arguments below the zero tolerance.}
+\item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
+step size for arguments above the zero tolerance and the baseline step size for
+small arguments that gets incremented by \code{eps}.}
+\item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
+For two-sided differences, each extrapolation increases the accuracy order by 2.}
+\item{v}{The reduction factor in Richardson extrapolations.}
+}
+
+Here are the differences in the new compatible implementation.
+\describe{
+\item{eps}{If \code{numDeriv} \code{method = "simple"}, then,
+\code{ifelse(x!=0, abs(x), 1) * sqrt(.Machine$double.eps) * 2} is used because
+one-sided differences require a smaller step size to reduce the truncation error.
+If \code{method = "Richardson"}, then, \code{eps = 1e-5}.}
+\item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
+step size for arguments above the zero tolerance and the baseline step size for
+small arguments that gets incremented by \code{eps}.}
+\item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
+For two-sided differences, each extrapolation increases the accuracy order by 2.}
+\item{v}{The reduction factor in Richardson extrapolations.}
+}
 }
 \examples{
 f <- function(x) sum(sin(x))

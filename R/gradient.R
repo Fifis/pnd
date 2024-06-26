@@ -42,6 +42,7 @@
 #'
 #' @details
 #'
+#'
 #' For computation of Jacobians, use \code{Jacobian} or \code{Grad}. These two functions
 #' are equivalent, but using \code{Grad} for vector-valued returns will produce a warning.
 #'
@@ -52,8 +53,9 @@
 #' to balance the Taylor series truncation error with the rounding error due to storing
 #' function values with limited precision. For two-sided differences, it is proportional
 #' to Mach.eps^(1/3). However, selecting the best step size typically requires knowledge
-#' of higher-order derivatives, which may not be readily available. Future releases
-#' will allow character arguments to invoke automatic data-driven step-size selection.
+#' of higher-order derivatives, which may not be readily available. Luckily,
+#' using \code{step = "SW"} invokes a reliable automatic data-driven step-size selection.
+#' Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
 #'
 #' The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 #' and \code{f.upper} in \code{uniroot()}.
@@ -72,34 +74,51 @@
 #'
 #' @export
 GenD <- function(FUN, x,
-                 deriv.order = 1L, side = 0, acc.order = 2,
-                 h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
+                 deriv.order = 1L, side = 0, acc.order = 2L,
+                 h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
                  cores = 1, load.balance = TRUE, func = NULL,
                  report = 1L,
                  ...) {
   n <- length(x)
   if (.Platform$OS.type == "windows" && cores > 1) cores <- 1
+  h.default <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order))
   #########################################
   # BEGIN compatibility with numDeriv::grad
   # Detecting numDeriv named arguments (e.g. method.args) in ... first, and handling them
-
   ell <- list(...)
+  compat <- FALSE
   if (!is.null(m <- ell[["method"]])) {
+    compat <- TRUE
     if (length(m) == 1 && m %in% c("simple", "complex", "Richardson")) {
+      margs <- ell$method.arguments
+      ma <- list(eps = 1e-5, d = NA, zero.tol = 1e-5, r = 4, show.details = FALSE)
+      # Using a better step size for one-sided differences
+      if (m == "simple") ma$eps <- (abs(x) * (x!=0) + (x==0)) * sqrt(.Machine$double.eps) * 2
+      ma[names(margs)] <- margs
+      # If the user did not supply a custom step size, use numDeriv method arguments
+      if (identical(unname(h), unname(h.default))) h <- ma$eps
       if (m == "simple") {
-        if (is.null(side)) side <- rep(0, n)
-        acc.order <- ifelse(side == 0, 2, 1)
+        side <- acc.order <- rep(1L, n)
       } else if (m == "complex") {
         stop("Complex derivatives not implemented yet.")
-      } else if (identical(m, "Richardson")) { # More arguments to grab
-        if (!is.null(ma <- ell$method.arguments)) {
-          if (is.numeric(ma$r)) acc.order <- ma$r
-          # TODO: finish grabbing all the arguments
+      } else if (m == "Richardson") {
+        side <- numeric(n)
+        acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) 2*ma$r else 8
+        if (is.na(ma$d)) ma$d <- .Machine$double.eps^(1 / (1 + acc.order))
+        if (is.numeric(ma$v)) {
+          warning(paste0("Unlike numDeriv, which uses a large initial step size and ",
+                         "shrinkage, pnd uses a smaller initial step and an enlarging equispaced ",
+                         "grid. The method argument 'v' will be therefore ignored."))
         }
+        is.small <- abs(x) < ma$zero.tol
+        h <- ma$d * abs(x) + ma$eps * is.small
       }
       ell[["method"]] <- NULL
     }
+    warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
+                   "with more approproate default values and facilities for automatic ",
+                   "step-size selection. See ?Grad and ?gradstep for more information."))
   }
 
   if (missing(FUN)) {
@@ -192,6 +211,8 @@ GenD <- function(FUN, x,
       attr(jac, "step.size.method") <- method
     } else if (all(h == (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)))) {
       attr(jac, "step.size.method") <- "default"
+    } else if (compat) {
+      attr(jac, "step.size.method") <- "numDeriv-like"
     } else {
       attr(jac, "step.size.method") <- "user-supplied"
     }
@@ -214,6 +235,55 @@ GenD <- function(FUN, x,
 #'
 #' @inheritParams GenD
 #'
+#' @details
+#' This function aims to be 100% compatible with the syntax of \code{numDeriv::Grad()}.
+#'
+#' There is one feature of the default step size in \code{numDeriv} that deserves
+#' an explanation.
+#'
+#' \itemize{
+#'   \item If \code{method = "simple"}, then, simple forward differences are used with
+#'   a fixed step size \code{eps}, which we denote by \eqn{\varepsilon}{eps}.
+#'   \item If \code{method = "Richardson"}, then, central differences are used with
+#'   a fixed step
+#'   \eqn{h := |d\cdot x| + \varepsilon (|x| < \mathrm{zero.tol})}{h := |d*x| + eps*(|x| < zero.tol)},
+#'   where \code{d = 1e-4} is the relative step size and \code{eps} becomes an extra
+#'   addition to the step size for the argument that are closer to zero than \code{zero.tol}.
+#' }
+#' We believe that the latter may lead to mistakes when the user believes that they can set
+#' the step size for near-zero arguments, whereas in reality, a combination of \code{d} and \code{eps}
+#' is used.
+#'
+#' Here is the synopsis of the old arguments:
+#' \describe{
+#'   \item{side}{\code{numDeriv} uses \code{NA} for handling two-sided differences.
+#'   The \code{pnd} equivalent is \code{0}, and \code{NA} is replaced with \code{0}.}
+#'   \item{eps}{If \code{numDeriv} \code{method = "simple"}, then, \code{eps = 1e-4} is
+#'   the absolute step size and forward differences are used.
+#'   If \code{method = "Richardson"}, then, \code{eps = 1e-4} is the absolute increment of the step
+#'   size for small arguments below the zero tolerance.}
+#'   \item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
+#'   step size for arguments above the zero tolerance and the baseline step size for
+#'   small arguments that gets incremented by \code{eps}.}
+#'   \item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
+#'   For two-sided differences, each extrapolation increases the accuracy order by 2.}
+#'   \item{v}{The reduction factor in Richardson extrapolations.}
+#' }
+#'
+#' Here are the differences in the new compatible implementation.
+#' \describe{
+#'   \item{eps}{If \code{numDeriv} \code{method = "simple"}, then,
+#'   \code{ifelse(x!=0, abs(x), 1) * sqrt(.Machine$double.eps) * 2} is used because
+#'   one-sided differences require a smaller step size to reduce the truncation error.
+#'   If \code{method = "Richardson"}, then, \code{eps = 1e-5}.}
+#'   \item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
+#'   step size for arguments above the zero tolerance and the baseline step size for
+#'   small arguments that gets incremented by \code{eps}.}
+#'   \item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
+#'   For two-sided differences, each extrapolation increases the accuracy order by 2.}
+#'   \item{v}{The reduction factor in Richardson extrapolations.}
+#' }
+#'
 #' @return Numeric vector of the gradient. If \code{FUN} returns a vector,
 #' a warning is issued suggesting the use of `Jacobian()`.
 #'
@@ -231,7 +301,7 @@ GenD <- function(FUN, x,
 #' attr(g3.full, "step.search")$exitcode  # Success
 #'
 Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
-                 h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
+                 h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
                  cores = 1, load.balance = TRUE,
                  func = NULL, report = 1L, ...) {
@@ -239,8 +309,8 @@ Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
             h = h, h0 = h0, control = control, f0 = f0, cores = cores, load.balance = load.balance,
             func = func, report = report, ...)
   if (is.matrix(d))
-    warning(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions "),
-                   "to obtain a matrix of derivatives.")
+    warning(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
+                   "to obtain a matrix of derivatives."))
   return(d)
 }
 
@@ -293,7 +363,7 @@ Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
 #' @export
 Jacobian <- function(FUN, x,
                      deriv.order = 1L, side = 0, acc.order = 2,
-                     h = (abs(x) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
+                     h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                      h0 = NULL, control = list(), f0 = NULL,
                      cores = 1, load.balance = TRUE, func = NULL,
                      report = 1L, ...) {

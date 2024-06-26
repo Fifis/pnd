@@ -9,8 +9,8 @@ GenD(
   x,
   deriv.order = 1L,
   side = 0,
-  acc.order = 2,
-  h = (abs(x) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  acc.order = 2L,
+  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
   h0 = NULL,
   control = list(),
   f0 = NULL,
@@ -92,8 +92,9 @@ The optimal step size for one-sided differences typically approaches Mach.eps^(1
 to balance the Taylor series truncation error with the rounding error due to storing
 function values with limited precision. For two-sided differences, it is proportional
 to Mach.eps^(1/3). However, selecting the best step size typically requires knowledge
-of higher-order derivatives, which may not be readily available. Future releases
-will allow character arguments to invoke automatic data-driven step-size selection.
+of higher-order derivatives, which may not be readily available. Luckily,
+using \code{step = "SW"} invokes a reliable automatic data-driven step-size selection.
+Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
 
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.
