@@ -2,6 +2,7 @@
 
 export(GenD)
 export(Grad)
+export(Hessian)
 export(Jacobian)
 export(fdCoef)
 export(gradstep)
