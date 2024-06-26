@@ -1,0 +1,65 @@
+---
+title: "Compatilibility of pnd with the syntax of numDeriv"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+bibliography: "../inst/REFERENCES.bib"
+author: "Andreï V. Kostyrka, University of Luxembourg"
+date: "Created: 2024-07-01, last modified: 2024-07-01, compiled: `r Sys.Date()`"
+abstract: "We describe the syntax of the widely popular `numDeriv` package and show how the functions from the `pnd` package recognise and handle the parameters related to numerical difference computation."
+keywords: "numerical differentiation, finite differences, backwards compatibility"
+vignette: >
+  %\VignetteIndexEntry{Compatilibility of pnd with the syntax of numDeriv}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r, include = FALSE}
+knitr::knit_hooks$set(pngquant = knitr::hook_pngquant)
+knitr::opts_chunk$set(
+  dev = "png",
+  dev.args = list(type = if (Sys.info()["sysname"] == "Darwin") "quartz" else "cairo-png"),
+  fig.width = 512 / 72,
+  fig.height = 320 / 72,
+  out.width="10cm",
+  dpi = 72,
+  fig.retina = 1,
+  collapse = TRUE,
+  comment = "#>",
+  pngquant = "--speed=1 --quality=50-60"
+)
+```
+
+Load the packages first:
+```{r setup}
+library(pnd)
+# library(numDeriv)
+```
+
+# Compatibility implies syntax support, not identical values
+
+## Zero tolerances may cause a discontinuity
+
+Why using `d*x + (abs(x)<zero.tol) * eps` is confusing
+
+# Richardson extrapolation
+
+To dissect the Richardson extrapolation practically, it suffices to add the printed output to a function.
+
+```{r}
+f <- function(x) {print(x); sin(x)}
+x0 <- 1
+# numDeriv::grad(f, x0)
+```
+
+Even with 4 Richardson extrapolations, the default final step size is `1.25e-5`, which is larger than the rule-of-thumb value `MachEps^(1/3)`.
+
+
+# References
+
+<div id="refs"></div>
+
+
