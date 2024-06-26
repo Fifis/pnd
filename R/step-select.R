@@ -97,7 +97,7 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   getRatio <- function(FUN, x, h, vanilla, ...) {
     # TODO: parallelise
     xgrid <- x + if (vanilla) c(-h, 0, h) else c(-h, -h/2, h/2, h)
-    fgrid  <- sapply(xgrid, function(z) .safeF(FUN, z, ...))
+    fgrid  <- vapply(xgrid, function(z) .safeF(FUN, z, ...), FUN.VALUE = numeric(1))
     if (vanilla) {
       fd <- (fgrid[3] - fgrid[2]) / h
       bd <- (fgrid[2] - fgrid[1]) / h
@@ -337,7 +337,7 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   h <- h + x # Minimising the representation error
   h <- h - x
   xgrid <- c(x-h, x+h)
-  fgrid <- sapply(xgrid, FUN, ...)
+  fgrid <- vapply(xgrid, FUN, ..., FUN.VALUE = numeric(1))
   cd <- (fgrid[2] - fgrid[1]) / h / 2
   err <- P*abs(f0)/h/3 + (exitcode != 1) * (h^5*f3^2/36/P/abs(f0) - h^8*abs(f3)^3/648/P^2/f0^2)
 
@@ -693,7 +693,7 @@ gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'."))
   if (is.null(h0)) h0 <- 1e-5 * (abs(x) + (x == 0))
   f0 <- .safeF(FUN, x, ...)
-  if (length(f0) > 1) stop("The function FUN must return a scalar.")
+  if (length(f0) > 1) stop("Automatic step selection works only when the function FUN returns a scalar.")
   if (is.na(f0)) stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
   if (length(x) == 1 && length(h0) > 1) stop("The argument 'h0' must be a scalar for scalar 'x'.")
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))

@@ -10,7 +10,6 @@ test_that("input validation works", {
   expect_error(fdCoef(deriv.order = c(1, 2)), "'deriv.order' argument")
   expect_error(fdCoef(acc.order = c(1, 2)), "'acc.order' argument")
   expect_error(fdCoef(acc.order = NULL), "'acc.order' argument")
-  expect_error(fdCoef(deriv.order = 0), "not implemented")
 })
 
 test_that("zero.action handling", {
@@ -58,4 +57,16 @@ test_that("stencils of inappropriate length are correctly handled", {
   expect_equal(attr(suppressWarnings(fdCoef(stencil = c(-1, -1, 0, 1))),
                     "accuracy.order"), c(requested = NA, effective = 2))
   expect_warning(fdCoef(acc.order = 8, stencil = c(-2, -1, 1, 2)), "only 4th")
+})
+
+test_that("interpolation (degree-0 derivative) works", {
+  expect_equal(attr(fdCoef(0, stencil = c(0.1, 0.2, 0.4, 0.8, 0.9) - 2/3),
+                    "accuracy.order"), c(requested = NA, effective = 5))
+
+  f0 <- fdCoef(0, stencil = c(0.1, 0.2, 0.4, 0.8, 0.9) - 0.1)
+  expect_equal(f0$stencil, 0)
+  expect_equal(f0$weights, c(x = 1))
+  expect_equal(attr(f0, "expansion"), "f exactly")
+  expect_equal(attr(f0, "accuracy.order"), c(requested = NA, effective = Inf))
+  expect_equal(attr(f0, "remainder.coef"), 0)
 })

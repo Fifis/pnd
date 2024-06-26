@@ -43,5 +43,3 @@ test_that("DV for functions with near-zero f''' stops immediately", {
   expect_equal(s2$counts, 1)
   expect_equal(s2$exitcode, 1)
 })
-
-

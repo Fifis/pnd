@@ -47,4 +47,3 @@ test_that("SW fails when a large h0 invalidates the est. trunc. error", {
   expect_warning(step.SW(x = pi/4, sin, h0 = 1000, diagnostics = TRUE),
                  "exceeds the absolute value")
 })
-

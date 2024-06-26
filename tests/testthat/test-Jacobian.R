@@ -19,4 +19,3 @@ test_that("function dimension check works", {
 # TODO: compatibility with numDeriv
 
 # TODO: parallelisation
-

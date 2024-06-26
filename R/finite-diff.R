@@ -159,7 +159,6 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   if (!(zero.action %in% c("drop", "round", "none")))
     stop("The 'zero.action' argument must be 'drop', 'round', or 'none'.")
   # TODO: implement interpolation
-  if (deriv.order == 0) stop("Derivative order 0 (interpolation) not implemented yet.")
 
   if (is.null(stencil)) { # Miminally sufficient stencil to prevent zero weights
     acc.requested <- acc.order
@@ -238,17 +237,23 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   B <- outer(stencil, oseq, "^")
   resulting.terms <- colSums(B * weights) / factorial(oseq)
   resulting.terms[abs(resulting.terms) < zero.tol] <- 0
-  flabs <- sapply(oseq, function(i) if (i == 0) " f" else if (i <= 4)
-    paste0(" f", paste0(rep("'", i), collapse = "")) else paste0(" f^(", i, ")"))
+  flabs <- vapply(oseq, function(i) if (i == 0) " f" else if (i <= 4)
+    paste0(" f", paste0(rep("'", i), collapse = "")) else paste0(" f^(", i, ")"), FUN.VALUE = character(1))
   frac <- paste0(sprintf("%.4e", resulting.terms), flabs)
-  frac <- paste0(frac[which(resulting.terms != 0)[1:2]], collapse = " + ")
-  frac <- gsub("*1\\.0000e\\+00", "", frac)
-  frac <- paste0(gsub("\\+ -", "- ", gsub("^ +", "", frac)), " + ...")
-  # Updating the effective accuracy order in case of zero stencil elements
-  ea <- diff(which(abs(resulting.terms) > 1024*zero.tol)[1:2])
+  # If the interpolation is exact, then, the total error is zero
+  if (identical(stencil, 0)) {
+    frac <- "f exactly"
+    ea <- Inf
+  } else {
+    frac <- paste0(frac[which(resulting.terms != 0)[1:2]], collapse = " + ")
+    frac <- gsub("*1\\.0000e\\+00", "", frac)
+    frac <- paste0(gsub("\\+ -", "- ", gsub("^ +", "", frac)), " + ...")
+    # Updating the effective accuracy order in case of zero stencil elements
+    ea <- diff(which(abs(resulting.terms) > 1024*zero.tol)[1:2])
+  }
 
   ret <- list(stencil = stencil, weights = weights)
-  attr(ret, "remainder.coef") <- resulting.terms[which(resulting.terms != 0)[2]]
+  attr(ret, "remainder.coef") <- if (is.finite(ea)) resulting.terms[which(resulting.terms != 0)[2]] else 0
   attr(ret, "accuracy.order") <- c(requested = acc.requested, effective = ea)
   attr(ret, "expansion") <- frac
 
