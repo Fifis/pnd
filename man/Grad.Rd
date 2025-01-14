@@ -7,6 +7,7 @@
 Grad(
   FUN,
   x,
+  vectorised = "auto",
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
@@ -15,7 +16,7 @@ Grad(
   control = list(),
   f0 = NULL,
   cores = 1,
-  load.balance = TRUE,
+  preschedule = TRUE,
   func = NULL,
   report = 1L,
   ...
@@ -27,6 +28,14 @@ If the function returns a vector, the output will be is a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite value.}
+
+\item{vectorised}{Logical or character: if \code{TRUE} or \code{"yes"}, the function
+is assumed to be vectorised: it will accept a vector of parameters and return
+a vector of values. Use \code{FALSE} or \code{"no"}  for functions that take
+vector arguments and return outputs of arbitrary length (for
+\eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
+\code{NULL}, or \code{"auto"}, checks the output length and assumes vectorisation
+if it matches the input length; this check is safe but potentially slow.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -56,8 +65,9 @@ TODO: Currently ignored.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}.}
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -141,6 +151,9 @@ g3.full <- Grad(FUN = f, x = 1:4, h = "SW", report = 2)
 print(g3.full)
 attr(g3.full, "step.search")$exitcode  # Success
 
+# Gradients for vectorised functions -- e.g. leaky ReLU
+LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
+Grad(LReLU, seq(-1, 1, 0.1))
 }
 \seealso{
 \code{\link[=GenD]{GenD()}}, \code{\link[=Jacobian]{Jacobian()}}

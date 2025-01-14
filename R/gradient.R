@@ -10,6 +10,13 @@
 #'   If the function returns a vector, the output will be is a Jacobian.
 #' @param x Numeric vector or scalar: the point(s) at which the derivative is estimated.
 #'   \code{FUN(x)} must be finite value.
+#' @param vectorised Logical or character: if \code{TRUE} or \code{"yes"}, the function
+#'   is assumed to be vectorised: it will accept a vector of parameters and return
+#'   a vector of values. Use \code{FALSE} or \code{"no"}  for functions that take
+#'   vector arguments and return outputs of arbitrary length (for
+#'   \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
+#'   \code{NULL}, or \code{"auto"}, checks the output length and assumes vectorisation
+#'   if it matches the input length; this check is safe but potentially slow.
 #' @param deriv.order Integer or vector of integers indicating the desired derivative order,
 #'   \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.
 #' @param acc.order Integer or vector of integers specifying the desired accuracy order
@@ -30,8 +37,9 @@
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
 #' @param cores Integer specifying the number of CPU cores used for parallel computation.
 #'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param load.balance Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
 #'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
 #' @param report Integer for the level of detail in the output. If \code{0},
@@ -41,7 +49,6 @@
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
-#'
 #'
 #' For computation of Jacobians, use \code{Jacobian} or \code{Grad}. These two functions
 #' are equivalent, but using \code{Grad} for vector-valued returns will produce a warning.
@@ -73,17 +80,50 @@
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
 #' @export
-GenD <- function(FUN, x,
+#'
+#' @examples
+#'
+#' # Case 1: Vector argument, vector output
+#' f1 <- sin
+#' g1 <- GenD(FUN = f1, x = 1:100, vectorised = TRUE)
+#' g1.true <- cos(1:100)
+#' plot(1:100, g1 - g1.true, main = "Approximation error of d/dx sin(x)")
+#'
+#' # Case 2: Vector argument, scalar result
+#' f2 <- function(x) sum(sin(x))
+#' g2 <- GenD(FUN = f2, x = 1:4, vectorised = FALSE)
+#' g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, vectorised = FALSE)
+#' g2 - g2.h2  # Tiny differences due to different step sizes
+#' g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE)
+#' g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
+#' print(attr(g2.full, "step.search")$exitcode)  # Success
+#'
+#' # Gradients for vectorised functions -- e.g. leaky ReLU
+#' LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
+#' system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
+#' system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
+#'
+#' # Saving time for slow functions by using pre-computed values
+#' x <- 1:4
+#' finner <- function(x) sin(x*log(abs(x)+1))
+#' fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$value
+#' # The outer function is non-vectorised
+#' fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
+#' f0 <- sapply(x, fouter)
+#' system.time(GenD(fslow, x, side = 1, f0 = f0, vectorised = FALSE))  # TODO: in this example,
+#' system.time(GenD(fslow, x, side = 1))  # the 1:4 vector is not de-duped
+GenD <- function(FUN, x, vectorised = "auto",
                  deriv.order = 1L, side = 0, acc.order = 2L,
                  h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
-                 cores = 1, load.balance = TRUE, func = NULL,
+                 cores = 1, preschedule = TRUE, func = NULL,
                  report = 1L,
                  ...) {
   if (is.function(x) && !is.function(FUN)) stop("The argument order must be FUN and then x, not vice versa.")
   n <- length(x)
   if (.Platform$OS.type == "windows" && cores > 1) cores <- 1
   h.default <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order))
+
   #########################################
   # BEGIN compatibility with numDeriv::grad
   # Detecting numDeriv named arguments (e.g. method.args) in ... first, and handling them
@@ -139,13 +179,14 @@ GenD <- function(FUN, x,
   if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
   if (length(side) == 1) side <- rep(side, n)
   if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or same length as x.")
-  side[!is.finite(side)] <- 0 # NA --> default 'central -- numDeriv COMPATIBILITY
+  side[!is.finite(side)] <- 0 # NA --> default central for numDeriv compatibility
   if (!all(side %in% -1:1)) stop("The 'side' argument must contain values 0 for central, 1 for forward, and -1 for backward difference.")
 
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
 
   # TODO: the part where step is compared to step.CR, step.DV etc.
+  # TODO: for long vectorised argument, vectorise the check
   autostep <- FALSE
   if (is.character(h)) {
     method <- h
@@ -162,42 +203,125 @@ GenD <- function(FUN, x,
   if (length(acc.order) != n) stop("The argument 'acc.order' must have length 1 or length(x).")
   if (length(h) != n) stop("The argument 'h' (step size) must have length 1 or length(x).")
 
-  xlist <- lapply(1:n, function(i) {
-    sw <- fdCoef(deriv.order = deriv.order[i], acc.order = acc.order[i], side = side[i])
-    b <- sw$stencil
-    w  <- sw$weights
-    bh <- sw$stencil * h[i]
-    dx <- matrix(0, ncol = n, nrow = length(b))
-    dx[, i] <- bh
-    xmat <- matrix(rep(x, length(b)), ncol = n, byrow = TRUE) + dx
-    xmat <- as.data.frame(xmat)
-    xmat$index <- i
-    xmat$weights <- w
-    xmat
-  })
-  xdf <- do.call(rbind, xlist)
-  xm <- as.matrix(xdf[, 1:n])
-  colnames(xm) <- names(x)
-  xvals <- lapply(seq_len(nrow(xdf)), function(i) xm[i, ])
+  # Vectorisation checks similar to case1or3 in numDeriv, but better optimised
+  # to catch errors and waste fewer evaluations f(x) where the real evaluation
+  # should be happening at f(x+h) and f(x-h)
+  if (identical(vectorised, "yes"))  vectorised <- TRUE
+  if (identical(vectorised, "no")) vectorised <- FALSE
+  if (is.null(vectorised) || identical(vectorised, "auto")) vectorised <- NA
+  if (!(isTRUE(vectorised) || isFALSE(vectorised) || identical(vectorised, NA)))
+    stop("The 'vectorised' argument must be TRUE (or 'yes'), FALSE (or 'no'), or NA (or 'auto').")
+
+  if (!is.null(f0)) {
+    if (is.na(vectorised))  # Before computing f0 check if the user provided it
+      stop("Supplying f0 must be accompanied by 'vectorised = TRUE' or 'FALSE'")
+    if (length(f0) != n) {
+      warning(paste0("The supplied pre-computed f0 = FUN(x) does not have length ",
+                     n, "(length(x)) -- discarding it and computing anew."))
+      f0 <- NULL
+    }
+  }
+
+  if (is.na(vectorised)) {
+    vectorised <- FALSE
+    # TODO: do the check at the grid already!
+    # f0 has remained NULL because 'vectorised' cannot be NA if f0 is not NULL
+    f0 <- tryCatch(do.call(FUN, c(list(x), ell)), error = function(e) return(NULL))
+
+    # Checking vector input handling
+    ## TODO: Find where it maps vectors to vectors of different dimensions
+    do.vec.of.1d.derivs <- length(f0) == n  # FUN(x) was evaluated to same-length output, not a scalar or NULL
+    if (do.vec.of.1d.derivs) {
+      vectorised <- TRUE
+      if (report > 0) message("This function returns vector output for vector input. Use 'vectorised = TRUE' to save time.")
+    } else {
+      if (length(f0) == 1) {
+        if (report > 0) message("This function returns scalar output for vector input. Use 'vectorised = FALSE' to save time.")
+      } else if (is.null(f0)) {  # FUN(vector) did not work and returned neither a scalar or a vector
+        f0 <- tryCatch(sapply(x, function(y) do.call(FUN, c(list(y), ell))), error = function(e) return(NULL))
+        if (length(f0) == n) {
+          do.vec.of.1d.derivs <- TRUE
+          if (report > 0) message("This function cannot handle vector arguments. Use 'vectorised = FALSE' to save time.")
+        } else if (length(f0) > 0) {
+          if (report > 0) warning("This function seems to map scalars/vectors to vectors of different dimensions. Use 'vectorised = FALSE' to save time.")
+        } else {
+          stop("Computing FUN(x) and FUN(x[1]) failed, aborting. Change the function to return non-null output for FUN(x).")
+        }
+      }
+    }
+    ## TODO: do vectorisation check in a much better way, take x[1:2]...
+    # f(x), f(x[c(1, 1) or something not equal to length(x)])
+  } else {  # We can infer this if f0 is supplied
+    do.vec.of.1d.derivs <- length(f0) == n
+    # TODO: check if both are necessary
+  }
+
+
+  # TODO: Try assuming that the function is vectorised and prepare a small chunk of length 2
+  if (vectorised) {
+    xlist <- lapply(1:n, function(i) {
+      sw <- fdCoef(deriv.order = deriv.order[i], acc.order = acc.order[i], side = side[i])
+      w  <- sw$weights
+      bh <- sw$stencil * h[i]
+      xmat <- x[i] + bh
+      xmat <- as.data.frame(xmat)
+      xmat$index <- i
+      xmat$weights <- w
+      xmat
+    })
+    xdf <- do.call(rbind, xlist)
+    xm <- xdf[, 1]  # Only the 1st dimension of x is taken if the input is a scalar
+    names(xm) <- names(x)
+    xvals <- as.list(xm)
+  } else {
+    # (NULL = vector of non-vectorised f(x1), f(x2), ..., length N = vector f(x1, x2, ...))
+    xlist <- lapply(1:n, function(i) {
+      sw <- fdCoef(deriv.order = deriv.order[i], acc.order = acc.order[i], side = side[i])
+      b <- sw$stencil
+      w  <- sw$weights
+      bh <- sw$stencil * h[i]
+      if (do.vec.of.1d.derivs) {
+        xmat <- matrix(x[i] + bh)
+      } else {
+        dx <- matrix(0, ncol = n, nrow = length(b))
+        dx[, i] <- bh
+        xmat <- matrix(rep(x, length(b)), ncol = n, byrow = TRUE) + dx
+      }
+      xmat <- as.data.frame(xmat)
+      xmat$index <- i
+      xmat$weights <- w
+      xmat
+    })
+    xdf <- do.call(rbind, xlist)
+    xm <- if (do.vec.of.1d.derivs) as.matrix(xdf[, 1]) else as.matrix(xdf[, 1:n, drop = FALSE])
+    if (!do.vec.of.1d.derivs) colnames(xm) <- names(x)
+    xvals <- lapply(seq_len(nrow(xdf)), function(i) xm[i, ])
+  }
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # The rubbish in the ellipsis (...) should have been sanitised by now
-  FUN1 <- function(x) do.call(FUN, c(list(x = x), ell))
+  # TODO: deduplicate, save CPU
+  FUN1 <- function(x) do.call(FUN, c(list(x), ell))
   fvals <- if (cores > 1) {
-    parallel::mclapply(X = xvals, FUN = FUN1, mc.cores = cores, mc.preschedule = !load.balance)
+    parallel::mclapply(X = xvals, FUN = FUN1, mc.cores = cores, mc.preschedule = preschedule)
   } else {
-    lapply(xvals, FUN1)
+    if (vectorised) {  # The output has the same length as x -- avoiding the overhead
+      as.list(FUN1(xm))
+    } else {  # Handling outputs of arbitrary dimensions
+      if (do.vec.of.1d.derivs) lapply(xvals, function(x) sapply(x, FUN1)) else lapply(xvals, FUN1)
+    }
   }
   if (any(!sapply(fvals, function(x) is.numeric(x) | is.na(x))))
     stop("'FUN' must output numeric values only, but non-numeric values were returned.")
 
-  # The output can be vector-valued, which is why we ensure that dimensions are not dropped
+  # The function can be vector-valued, which is why we ensure that dimensions are not dropped
   fvals <- do.call(rbind, fvals)
   wf <- fvals * xdf$weights
   wf <- split(as.data.frame(wf), f = xdf$index) # Matrices lose dimensions when split
   wf <- lapply(wf, function(x) colSums(as.matrix(x)))
   jac <- unname(do.call(cbind, wf))
   jac <- sweep(jac, 2, h^deriv.order, "/")
+
   if (nrow(jac) == 1) {
     jac <- drop(jac)
     if (!is.null(names(x))) names(jac) <- names(h) <- names(x)
@@ -301,17 +425,21 @@ GenD <- function(FUN, x,
 #' print(g3.full)
 #' attr(g3.full, "step.search")$exitcode  # Success
 #'
-Grad <- function(FUN, x, deriv.order = 1L, side = 0, acc.order = 2,
+#' # Gradients for vectorised functions -- e.g. leaky ReLU
+#' LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
+#' Grad(LReLU, seq(-1, 1, 0.1))
+Grad <- function(FUN, x, vectorised = "auto", deriv.order = 1L, side = 0, acc.order = 2,
                  h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                  h0 = NULL, control = list(), f0 = NULL,
-                 cores = 1, load.balance = TRUE,
+                 cores = 1, preschedule = TRUE,
                  func = NULL, report = 1L, ...) {
-  d <- GenD(FUN = FUN, x = x, deriv.order = deriv.order, side = side, acc.order = acc.order,
-            h = h, h0 = h0, control = control, f0 = f0, cores = cores, load.balance = load.balance,
+  d <- GenD(FUN = FUN, x = x, vectorised = vectorised, deriv.order = deriv.order,
+            side = side, acc.order = acc.order, h = h, h0 = h0, control = control,
+            f0 = f0, cores = cores, preschedule = preschedule,
             func = func, report = report, ...)
   if (is.matrix(d))
-    warning(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
-                   "to obtain a matrix of derivatives."))
+    stop(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
+                "to obtain a matrix of derivatives."))
   return(d)
 }
 
@@ -366,10 +494,11 @@ Jacobian <- function(FUN, x,
                      deriv.order = 1L, side = 0, acc.order = 2,
                      h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (deriv.order + acc.order)),
                      h0 = NULL, control = list(), f0 = NULL,
-                     cores = 1, load.balance = TRUE, func = NULL,
+                     cores = 1, preschedule = TRUE, func = NULL,
                      report = 1L, ...) {
-  d <- GenD(FUN = FUN, x = x, deriv.order = deriv.order, side = side, acc.order = acc.order,
-            h = h, h0 = h0, control = control, f0 = f0, cores = cores, load.balance = load.balance,
+  d <- GenD(FUN = FUN, x = x, vectorised = FALSE, deriv.order = deriv.order,
+            side = side, acc.order = acc.order, h = h, h0 = h0, control = control,
+            f0 = f0, cores = cores, preschedule = preschedule,
             func = func, report = report, ...)
   if (is.null(dim(d))) {
     warning(paste0("Use 'Grad()' instead of 'Jacobian()' for scalar-valued functions ",
