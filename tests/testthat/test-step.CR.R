@@ -4,7 +4,7 @@ test_that("Curtis-Reid step selection handles inputs well", {
   expect_error(step.CR(sin, 1, version = "orig"), "must be either")
   expect_error(step.CR(sin, 1, tol = 1e-4), "must be a positive number greater than 1")
   expect_warning(step.CR(sin, 1, acc.order = 4), "Setting acc.order")
-  expect_equal(step.CR(sin, 1, range = c(0, 1))$exitcode, 0)
+  expect_error(step.CR(sin, 1, range = c(0, 1)), "must be a positive vector of length 2")
 })
 
 
