@@ -7,7 +7,7 @@ output:
     number_sections: true
 bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: "Created: 2024-06-13, last modified: 2024-06-13, compiled: `r Sys.Date()`"
+date: "Created: 2024-10-01, last modified: 2024-10-01, compiled: `r Sys.Date()`"
 abstract: "We illustrate how to use the novel **pnd** package for **R** to obtain numerical derivatives, gradients, and Hessians and offer empirically backed advice for common situations where finite-difference approximations are unreliable."
 keywords: "numerical differentiation, approximation error, finite differences, parallel computing"
 vignette: >
@@ -1115,6 +1115,7 @@ for (i in 1:4) {
 }
 ```
 
+\textcolor{red}{!!! TO BE COMPLETED!}
 
 # References
 

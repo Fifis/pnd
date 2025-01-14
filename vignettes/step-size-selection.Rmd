@@ -345,10 +345,10 @@ abserr <- abs(err)
 print(summary(err))
 print(summary(abserr))
 
+squish <- function(x, pow = 1/6, shift = 1e-12) ((abs(x) + shift)^pow - shift^pow) * sign(x)
 xnice <- seq(0, 2*pi, length.out = 401)
 plot(xnice, hOpt(xnice), type = "l", log = "y", main = "Optimal step size for sin(x)", bty = "n")
 
-squish <- function(x, pow = 1/6, shift = 1e-12) ((abs(x) + shift)^pow - shift^pow) * sign(x)
 par(mar = c(2, 4, 0, 0) + .1)
 matplot(xgrid, squish(abserr[, 2:3] - abserr[, 1]), type = "p", bty = "n",
         xlab = "", ylab = "", ylim = squish(c(-5e-10, 5e-11)), yaxt = "n",
@@ -372,7 +372,7 @@ During numerical optimisation, drop, do not store
 
 Near the optimum, store
 
-\textcolor{red}{!!! Add other rules here}
+\textcolor{red}{!!! TO BE COMPLETED!}
 
 
 # References
