@@ -1,4 +1,5 @@
 <!-- badges: start -->
+[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![R-CMD-check](https://github.com/Fifis/pnd/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Fifis/pnd/actions/workflows/R-CMD-check.yaml)
 [![codecov](https://codecov.io/gh/Fifis/pnd/graph/badge.svg?token=2ZTHBCRLBR)](https://app.codecov.io/gh/Fifis/pnd)
 <!-- badges: end -->

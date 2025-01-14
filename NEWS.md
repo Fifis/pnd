@@ -1,10 +1,15 @@
 # pnd 0.dev (2024-XX-XX)
 
-- SYNTAX: Add side -1, 0, 1 for compatibility with `numDeriv`
-- SYNTAX: Align with the syntax of `optimParallel`
-- Evaluating the accuracy of numerical approximations
+- BUG: Derivatives of vectorised functions do not work. Check compatibility with `numDeriv` for functions that take vector `x` are return `f(x)` of the same length. Solution: is f vectorised? Is the output the same length as x? Example: `Grad(sin, 1:4)`
+- BUG: Check the example with neural networks where `gr` does not accept the arguments of `f`
+- BUG: Matching in the Hessian is too slow -- de-duplicate first
+- BUG: 1x1 Hessians?
+- SYNTAX: Split the gradient into 1D vectorised input and multi-d non-vectorised? Think about it.
+- SYNTAX: Align with the syntax of `optimParallel`, borrow ideas from `forecast::auto.arima`
 - FEATURE: plug-in step size with an estimated `f'''` with a rule of thumb (add this as a one-step DV, e.g. via `maxit = 1`)
 - FEATURE: SW algorithm for arbitrary derivative and accuracy orders
+- FEATURE: AutoDX algorithm for arbitrary derivative and accuracy orders
+- FEATURE: update the rounding error as the estimated sum of differences and evaluations of f
 - FEATURE: Handle NA in step size selection
 - FEATURE: Auto-shrink the step size at the beginning of all procedures if FUN(x) is not finite
 - FEATURE: Extend the step selection routines to gradients
@@ -24,16 +29,19 @@
 - FEATURE: Return attribute of the estimated absolute error
 - FEATURE: Add print-out showing the order of h and derivative from the Taylor expansion
 - FEATURE: Arbitrary mixed orders
+- DOCUMENTATION: Compare with `stats::numericDeriv`
 - MISC: Write the list of controls on the help page of `gradstep()` explicitly!
 - MISC: Check which packages depend on `numDeriv` and check compatibility with 10 top!
 - MISC: Add links to documentation and tutorials onto the GitHub page.
 - MISC: Detailed vignette explaining the mathematics behind the functions with full transparency about the choice of parameters
-- DEV: ensure that `Grad` takes all the arguments of `GendD` and `Jacobian`, and vice versa
+- DEV: add examples for large matrices (200 x 200)
+- DEV: ensure that `Grad` takes all the arguments of `GenD` and `Jacobian`, and vice versa
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
 # pnd 0.next (2023-06-XX)
+- Feature: added `Hessian()` that supports central differences (for the moment) and arbitrary accuracy
 - Feature: separate `Grad()` and `Jacobian()` that call the workhors, `GenD()`, for compatibility with `numDeriv`
 
 # pnd 0.0.4 (2023-06-10)

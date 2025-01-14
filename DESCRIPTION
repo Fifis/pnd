@@ -1,7 +1,7 @@
 Package: pnd
 Type: Package
 Title: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order
-Version: 0.0.4
+Version: 0.0.5
 Authors@R: person(given = c("Andreï", "Victorovitch"), family = "Kostyrka",
         role = c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
@@ -24,12 +24,13 @@ Imports:
     parallel,
     Rdpack
 Suggests:
+    numDeriv,
     microbenchmark,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
 RdMacros: Rdpack
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
