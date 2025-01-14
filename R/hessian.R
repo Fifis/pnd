@@ -31,8 +31,10 @@
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
 #' @param cores Integer specifying the number of parallel processes to use. Recommended
 #'   value: the number of physical cores on the machine minus one.
-#' @param load.balance Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}.
+#' @param preschedule Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+#'   and disables load balancing with \code{parLapplyLB()}. Minimises overhead at the cost
+#'   of potentially unequal loads at the end of a job. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param func Deprecated; for \code{numDeriv::grad()} compatibility only.
 #' @param report Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
 #'   attaches the step size and its selection method: \code{2} or higher, attaches the full
@@ -42,7 +44,8 @@
 #' @details
 #'
 #'
-#' The optimal step size for central differences is of the order Mach.eps^(1/4)
+#' The optimal step size for 2nd-order-accurate central-differences-based Hessians
+#' is of the order Mach.eps^(1/4)
 #' to balance the Taylor series truncation error with the rounding error.
 #' However, selecting the best step size typically requires knowledge
 #' of higher-order cross derivatives and is highly technically involved. Future releases
@@ -63,10 +66,14 @@
 #' @examples
 #' f <- function(x) prod(sin(x))
 #' Hessian(f, 1:4)
+#' # Large matrices
+#' \donttest{
+#'   system.time(Hessian(f, 1:100))
+#' }
 Hessian <- function(FUN, x, side = 0, acc.order = 2,
                     h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order)),
                     symmetric = TRUE, h0 = NULL, control = list(), f0 = NULL,
-                    cores = 1, load.balance = TRUE, func = NULL, report = 1L, ...) {
+                    cores = 1, preschedule = TRUE, func = NULL, report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) stop("The argument order must be FUN and then x, not vice versa.")
   n <- length(x)
   h.default <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order))
@@ -111,7 +118,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2,
   # TODO: compute f0, check the dimension of f0 output, cannot be a vector
   # TODO: if x is a scalar, do simpler stuff
 
-  xlist.diagonal <- lapply(1:n, function(i) {
+  xmat.diagonal <- lapply(1:n, function(i) {
     sw <- fdCoef(deriv.order = 2, acc.order = acc.order[i], side = side[i])
     b <- sw$stencil
     w  <- sw$weights
@@ -120,11 +127,14 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2,
     dx[, i] <- bh
     xmat <- matrix(rep(x, length(b)), ncol = n, byrow = TRUE) + dx
     if (!is.null(names)) colnames(xmat) <- names(x)
-    xmat <- as.data.frame(xmat)
-    xmat$index2 <- xmat$index1 <- i
-    xmat$weights <- w
+    xmat <- cbind(xmat, index1 = i, index2 = i, weights = w)
     xmat
   })
+  xmat.diagonal <- do.call(rbind, xmat.diagonal)
+  n1 <- nrow(xmat.diagonal)
+  # The duplicated element would be x0
+  is.x0 <- which(rownames(xmat.diagonal) == "x")
+  is.dup.x0 <- is.x0[-1]
 
   sw.list <- lapply(1:n, function(j) fdCoef(deriv.order = 1, acc.order = acc.order[j], side = side[j]))
   bh.list <- lapply(1:n, function(j) sw.list[[j]]$stencil * h[j])
@@ -135,55 +145,64 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2,
     dx
   })
   # TODO: try mixed accuracy orders
-  inds <- as.matrix(expand.grid(i = 1:n, j = 1:n))
-  inds <- inds[inds[, 1] < inds[, 2], ] # Optimise?
-  xlist.uppertri <- lapply(seq_len(nrow(inds)), function(k) {
+  inds <- t(utils::combn(x = n, m = 2))
+  colnames(inds) <- c("i", "j")
+  # TODO: rewrite this in C++ to eliminate bottlenecks
+  xmat.uppertri <- lapply(seq_len(nrow(inds)), function(k) {
     i <- inds[k, "i"]
     j <- inds[k, "j"]
     dxi <- dx.list[[i]]
     dxj <- dx.list[[j]]
     # For each step from dx.list[[i]] and dx.list[[j]]...
-    iinds <- as.matrix(expand.grid(ii = seq_len(nrow(dxi)), jj = seq_len(nrow(dxj))))
+    iinds <- cbind(ii = rep(seq_len(nrow(dxi)), nrow(dxj)),
+                   jj = rep(seq_len(nrow(dxj)), each = nrow(dxi)))
     xlist <- lapply(seq_len(nrow(iinds)), function(kk) {
       ii <- iinds[kk, "ii"]
       jj <- iinds[kk, "jj"]
       xnew <- x + dxi[ii, ] + dxj[jj, ]
       return(list(x = xnew, weights = w.list[[i]][ii] * w.list[[j]][jj]))
     })
-    xmat <- as.data.frame(do.call(rbind, lapply(xlist, "[[", "x")))
-    xmat$index1 <- i
-    xmat$index2 <- j
-    xmat$weights <- do.call(c, lapply(xlist, "[[", "weights"))
+    xmat <- do.call(rbind, lapply(xlist, "[[", "x"))
+    xmat <- cbind(xmat, index1 = i, index2 = j,
+                  weights = do.call(c, lapply(xlist, "[[", "weights")))
     xmat
   })
+  xmat.uppertri <- do.call(rbind, xmat.uppertri)
+  n2 <- nrow(xmat.uppertri)
 
-  xdf <- do.call(rbind, c(xlist.diagonal, xlist.uppertri))
-  xdf <- xdf[order(xdf$index1, xdf$index2), ]
-  xm <- as.matrix(xdf[, 1:n])
-  colnames(xm) <- names(x)
-  rownames(xm) <- NULL
-  # De-duplication to get rid of unnecessary values through factors
-  xm.uniq <- unique(xm)
-  dup.ind <- apply(xm, 1, function(row) which(apply(xm.uniq, 1, function(ur) all(ur == row))))
-  spl.ind <- paste0(xdf$index1, "_", xdf$index2)
-  xvals <- lapply(seq_len(nrow(xm.uniq)), function(i) xm.uniq[i, ])
+  # De-duplicate from the very beginning, mark f0
+  xvals <- rbind(xmat.diagonal, xmat.uppertri)
+  rownames(xvals) <- NULL
+  weights <- xvals[, "weights"]
+  i1 <- as.integer(xvals[, "index1"])
+  i2 <- as.integer(xvals[, "index2"])
+  spl.ind <- paste0(i1, "_", i2)
+  xvals <- xvals[, 1:n, drop = FALSE]
+  if (!is.null(names(x))) colnames(xvals) <- names(x)
+  xvals <- t(xvals) # Column operations are faster than row operations
+  xvals <- lapply(seq_len(ncol(xvals)), function(i) xvals[, i])
+
+  ivals <- c(setdiff(1:n1, is.dup.x0), (n1+1):(n1+n2)) # Unique grid values
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
-  FUN1 <- function(x) do.call(FUN, c(list(x = x), ell))
-  fvals <- if (cores > 1) {
-    parallel::mclapply(X = xvals, FUN = FUN1, mc.cores = cores, mc.preschedule = !load.balance)
+  FUN1 <- function(i) do.call(FUN, c(list(x = xvals[[i]]), ell))
+  fvals0 <- if (cores > 1) {
+    parallel::mclapply(X = ivals, FUN = FUN1, mc.cores = cores, mc.preschedule = preschedule)
   } else {
-    lapply(xvals, FUN1)
+    lapply(ivals, FUN1)
   }
-  if (any(!sapply(fvals, function(x) is.numeric(x) | is.na(x))))
+  if (any(!sapply(fvals0, function(x) is.numeric(x) | is.na(x))))
     stop("'FUN' must output numeric values only, but non-numeric values were returned.")
 
-  # The output can be vector-valued, which is why we ensure that dimensions are not dropped
-  fvals <- do.call(rbind, fvals)
-  if (NCOL(fvals) > 1) stop("Hessian() supports only scalar functions, but the output of FUN has length > 1.")
-  fvals <- drop(fvals)[dup.ind]
-  wf <- fvals * xdf$weights
-  wfh <- wf / h[xdf$index1] / h[xdf$index2]
+  # If the output is vector-valued, raise suspicion
+  fvals0 <- do.call(rbind, fvals0)
+  if (NCOL(fvals0) > 1) stop("Hessian() supports only scalar functions, but the output of FUN has length > 1.")
+  fvals0 <- drop(fvals0)
+  fvals <- numeric(length(xvals))
+  fvals[ivals] <- fvals0
+  fvals[is.dup.x0] <- fvals0[is.x0[1]]
+  wf <- fvals * weights
+  wfh <- wf / unname(h[i1] * h[i2])
   wfh <- split(wfh, f = spl.ind)
   wfh <- vapply(wfh, sum, FUN.VALUE = numeric(1))
   hes <- matrix(NA, n, n)

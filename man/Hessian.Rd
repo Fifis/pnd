@@ -15,7 +15,7 @@ Hessian(
   control = list(),
   f0 = NULL,
   cores = 1,
-  load.balance = TRUE,
+  preschedule = TRUE,
   func = NULL,
   report = 1L,
   ...
@@ -59,8 +59,10 @@ TODO: Currently ignored.}
 \item{cores}{Integer specifying the number of parallel processes to use. Recommended
 value: the number of physical cores on the machine minus one.}
 
-\item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}.}
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+and disables load balancing with \code{parLapplyLB()}. Minimises overhead at the cost
+of potentially unequal loads at the end of a job. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
 
@@ -83,7 +85,8 @@ Arbitrary accuracies and sides for different coordinates
 of the argument vector are supported.
 }
 \details{
-The optimal step size for central differences is of the order Mach.eps^(1/4)
+The optimal step size for 2nd-order-accurate central-differences-based Hessians
+is of the order Mach.eps^(1/4)
 to balance the Taylor series truncation error with the rounding error.
 However, selecting the best step size typically requires knowledge
 of higher-order cross derivatives and is highly technically involved. Future releases
@@ -95,6 +98,10 @@ and \code{f.upper} in \code{uniroot()}.
 \examples{
 f <- function(x) prod(sin(x))
 Hessian(f, 1:4)
+# Large matrices
+\donttest{
+  system.time(Hessian(f, 1:100))
+}
 }
 \seealso{
 \code{\link[=gradstep]{gradstep()}} for automatic step-size selection.
