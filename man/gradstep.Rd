@@ -8,7 +8,7 @@ gradstep(
   FUN,
   x,
   h0 = 1e-05 * (abs(x) + (x == 0)),
-  method = c("SW", "CR", "CRm", "DV"),
+  method = c("SW", "CR", "CRm", "DV", "M"),
   control = NULL,
   cores = 2,
   ...
@@ -25,7 +25,8 @@ slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 
 
 \item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 \code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
-and \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}.}
+\code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
+\insertCite{mathur2012analytical}{pnd}.}
 
 \item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
@@ -72,6 +73,7 @@ gradstep(x = 1, FUN = sin, method = "CR")
 gradstep(x = 1, FUN = sin, method = "CRm")
 gradstep(x = 1, FUN = sin, method = "DV")
 gradstep(x = 1, FUN = sin, method = "SW")
+gradstep(x = 1, FUN = sin, method = "M")
 # Works for gradients
 gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 }
@@ -80,6 +82,7 @@ gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 }
 \seealso{
 \code{\link[=step.CR]{step.CR()}} for Curtis--Reid (1974) and its modification,
-\code{\link[=step.DV]{step.DV()}} for Dumontet--Vignes (1977), and
-\code{\link[=step.SW]{step.SW()}} for Stepleman--Winarsky (1979).
+\code{\link[=step.DV]{step.DV()}} for Dumontet--Vignes (1977),
+\code{\link[=step.SW]{step.SW()}} for Stepleman--Winarsky (1979), and
+\code{\link[=step.M]{step.M()}} for Mathur (2012).
 }

@@ -8,7 +8,7 @@ step.SW(
   FUN,
   x,
   h0 = 1e-05 * (abs(x) + (x == 0)),
-  shrink.factor = 2,
+  shrink.factor = 0.5,
   range = h0/c(1e+12, 1e-08),
   seq.tol = 1e-04,
   max.rel.error = .Machine$double.eps/2,
@@ -25,9 +25,9 @@ step.SW(
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
-\item{shrink.factor}{A scalar greater than 1 that is used to divide the step size
-during the search. The authors recommend 4, but this may be result in earlier
-termination at slightly sub-optimal steps. Change to 3 for a faster search.}
+\item{shrink.factor}{A scalar less than 1 that is used to multiply the step size
+during the search. The authors recommend 0.25, but this may be result in earlier
+termination at slightly sub-optimal steps. Change to 0.5 for a more thorough search.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 

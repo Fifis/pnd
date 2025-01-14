@@ -63,6 +63,7 @@ found optimal step size belongs to the allowed range,
 \code{5} occurs when the maximum number of iterations was reached and the
 found optimal step size did belong to the allowed range and had to be snapped
 to one end.
+\code{6} is used when \code{maxit = 1} and no search was performed.
 \code{message} is a summary message of the exit status.
 If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
 including the full step size search path (NB: for the 3rd derivative),
@@ -81,6 +82,9 @@ derivative of 1 to prevent division-by-zero errors.
 f <- function(x) x^4
 step.DV(x = 2, f)
 step.DV(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
+
+# Plug-in estimator with only one evaluation of f'''
+step.DV(x = 2, f, maxit = 1)
 }
 \references{
 \insertAllCited{}

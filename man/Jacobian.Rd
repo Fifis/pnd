@@ -15,7 +15,7 @@ Jacobian(
   control = list(),
   f0 = NULL,
   cores = 1,
-  load.balance = TRUE,
+  preschedule = TRUE,
   func = NULL,
   report = 1L,
   ...
@@ -56,8 +56,9 @@ TODO: Currently ignored.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}.}
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}

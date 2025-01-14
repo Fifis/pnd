@@ -7,6 +7,7 @@
 GenD(
   FUN,
   x,
+  vectorised = "auto",
   deriv.order = 1L,
   side = 0,
   acc.order = 2L,
@@ -15,7 +16,7 @@ GenD(
   control = list(),
   f0 = NULL,
   cores = 1,
-  load.balance = TRUE,
+  preschedule = TRUE,
   func = NULL,
   report = 1L,
   ...
@@ -27,6 +28,14 @@ If the function returns a vector, the output will be is a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite value.}
+
+\item{vectorised}{Logical or character: if \code{TRUE} or \code{"yes"}, the function
+is assumed to be vectorised: it will accept a vector of parameters and return
+a vector of values. Use \code{FALSE} or \code{"no"}  for functions that take
+vector arguments and return outputs of arbitrary length (for
+\eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
+\code{NULL}, or \code{"auto"}, checks the output length and assumes vectorisation
+if it matches the input length; this check is safe but potentially slow.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -56,8 +65,9 @@ TODO: Currently ignored.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{load.balance}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}.}
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -104,6 +114,38 @@ For convenience, \code{report = 2} overrides \code{diagnostics = FALSE} in the
 
 Unlike \code{numDeriv::grad()} and \code{numDeriv::jacobian()}, this function
 fully preserves the names of \code{x} and \code{FUN(x)}.
+}
+\examples{
+
+# Case 1: Vector argument, vector output
+f1 <- sin
+g1 <- GenD(FUN = f1, x = 1:100, vectorised = TRUE)
+g1.true <- cos(1:100)
+plot(1:100, g1 - g1.true, main = "Approximation error of d/dx sin(x)")
+
+# Case 2: Vector argument, scalar result
+f2 <- function(x) sum(sin(x))
+g2 <- GenD(FUN = f2, x = 1:4, vectorised = FALSE)
+g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, vectorised = FALSE)
+g2 - g2.h2  # Tiny differences due to different step sizes
+g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE)
+g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
+print(attr(g2.full, "step.search")$exitcode)  # Success
+
+# Gradients for vectorised functions -- e.g. leaky ReLU
+LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
+system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
+system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
+
+# Saving time for slow functions by using pre-computed values
+x <- 1:4
+finner <- function(x) sin(x*log(abs(x)+1))
+fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$value
+# The outer function is non-vectorised
+fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
+f0 <- sapply(x, fouter)
+system.time(GenD(fslow, x, side = 1, f0 = f0, vectorised = FALSE))  # TODO: in this example,
+system.time(GenD(fslow, x, side = 1))  # the 1:4 vector is not de-duped
 }
 \seealso{
 \code{\link[=gradstep]{gradstep()}} for automatic step-size selection.
