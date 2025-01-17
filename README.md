@@ -24,7 +24,7 @@ Optimal step sizes and parallel evaluation of numerical derivatives translate di
 - **Gradient and Hessian calculations:** obtain the direction and curvature required by most quasi-Newton optimisation algorithms.
 - **Parallel capabilities:** evaluate multiple values under the best parallelisation scheme that reduces overhead. For example, on a 12-core machine, a 4th-order accurate Jacobian of a 3-dimensional function takes almost the same amount of time as one function evaluation.
 - **Optimal step size selection:** obtain adaptive step size to ensure the best trade-off between mathematical truncation error and computer floating-point rounding error for the best overall accuracy.
-- **Four optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2024) modification, Dumontet–Vignes (1977), and Stepleman–Winarsky (1979) algorithms. Future versions will feature parallelised algorithms.
+- **Five optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2025) modification, Dumontet–Vignes (1977), Stepleman–Winarsky (1979), and Mathur (2012) algorithms. Future versions will feature parallelised algorithms.
 
 ## Getting started
 
@@ -82,7 +82,8 @@ pnd::Grad(f, x, h = "SW")
 ```
 
 Extensive diagnostics and error estimates can be requested at any time:
-`pnd::Grad(f, x, h = "SW", report = 2)` will contain the step-search path for each coordinate of `x`. Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad` would.
+`pnd::Grad(f, x, h = "SW", report = 2)` will contain the step-search path for each coordinate of `x`.
+Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad` would.
 
 ## Learning resources
 
