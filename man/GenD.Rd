@@ -7,35 +7,44 @@
 GenD(
   FUN,
   x,
-  vectorised = "auto",
+  vectorised = NA,
+  multivalued = NA,
   deriv.order = 1L,
   side = 0,
   acc.order = 2L,
-  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h = NULL,
+  zero.tol = sqrt(.Machine$double.eps),
   h0 = NULL,
   control = list(),
   f0 = NULL,
   cores = 1,
   preschedule = TRUE,
+  cl = NULL,
   func = NULL,
   report = 1L,
   ...
 )
 }
 \arguments{
-\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed
-If the function returns a vector, the output will be is a Jacobian.}
+\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed.
+If the function returns a vector, the output will be a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite value.}
+\code{FUN(x)} must be finite.}
 
-\item{vectorised}{Logical or character: if \code{TRUE} or \code{"yes"}, the function
+\item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values. Use \code{FALSE} or \code{"no"}  for functions that take
-vector arguments and return outputs of arbitrary length (for
+a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
-\code{NULL}, or \code{"auto"}, checks the output length and assumes vectorisation
-if it matches the input length; this check is safe but potentially slow.}
+checks the output length and assumes vectorisation if it matches the input length;
+this check is necessary and potentially slow.}
+
+\item{multivalued}{Logical: if \code{TRUE}, the function is assumed to return vectors longer
+than 1. Use \code{FALSE} for functions that have output of length 1 for each coordinate of
+input, i.e. \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} and
+\eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n} functions regardless of their vectorisation.
+If \code{NA}, attempts inferring it from the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -52,15 +61,17 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
 \code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
 
+\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically guessed
+step size is relative (\code{x} multiplied by the step), unless an auto-selection procedure is
+requested; otherwise, it is absolute.}
+
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
-\item{f0}{Optional numeric: if provided and applicable, used
-where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
-to save time.
-TODO: Currently ignored.}
+\item{f0}{Optional numeric: if provided, used to determine the vectorisation type
+to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
@@ -68,6 +79,11 @@ Recommended to be set to the number of physical cores on the machine minus one.}
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
+
+\item{cl}{An optional user-supplied \code{cluster} object (created by \code{makeCluster}
+or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
+(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
+Do not set for \code{mclapply} (fork cluster).}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -132,10 +148,16 @@ g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE)
 g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
 print(attr(g2.full, "step.search")$exitcode)  # Success
 
+# Case 3: vector input, vector argument of different length
+f3 <- function(x) c(sum(sin(x)), prod(cos(x)))
+x3 <- 1:3
+j3 <- GenD(f3, x3, multivalued = TRUE)
+print(j3)
+
 # Gradients for vectorised functions -- e.g. leaky ReLU
 LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
-system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
-system.time(replicate(20, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
+system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
+system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
 
 # Saving time for slow functions by using pre-computed values
 x <- 1:4
@@ -144,8 +166,10 @@ fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$valu
 # The outer function is non-vectorised
 fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
 f0 <- sapply(x, fouter)
-system.time(GenD(fslow, x, side = 1, f0 = f0, vectorised = FALSE))  # TODO: in this example,
-system.time(GenD(fslow, x, side = 1))  # the 1:4 vector is not de-duped
+system.time(GenD(fslow, x, side = 1, acc.order = 2, f0 = f0, vectorised = FALSE))
+# TODO: in this example, the 1:4 vector is not de-duped
+# TODO: fix the next example
+# system.time(GenD(fslow, x, side = 1, acc.order = 2, vectorised = FALSE))
 }
 \seealso{
 \code{\link[=gradstep]{gradstep()}} for automatic step-size selection.

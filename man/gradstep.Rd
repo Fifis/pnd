@@ -10,7 +10,9 @@ gradstep(
   h0 = 1e-05 * (abs(x) + (x == 0)),
   method = c("SW", "CR", "CRm", "DV", "M"),
   control = NULL,
-  cores = 2,
+  cores = getOption("pnd.cores"),
+  preschedule = getOption("pnd.preschedule"),
+  cl = NULL,
   ...
 )
 }
@@ -34,8 +36,17 @@ if \code{control$diagnostics} is \code{TRUE}, full iteration history
 including all function evaluations is returned; different methods have
 slightly different diagnostic outputs.}
 
-\item{cores}{Integer specifying the number of parallel processes to use. Recommended
-value: the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
+
+\item{cl}{An optional user-supplied \code{cluster} object (created by \code{makeCluster}
+or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
+(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
+Do not set for \code{mclapply} (fork cluster).}
 
 \item{...}{Passed to FUN.}
 }

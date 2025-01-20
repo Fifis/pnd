@@ -4,10 +4,14 @@ test_that("input validation", {
   expect_error(Grad(x = 1:4, FUN = sum, side = c(0, 1, 2, -2), vectorised = FALSE), "must contain values")
   expect_error(Grad(x = 1:4, FUN = sum, h = 0, vectorised = FALSE), "must be positive")
   expect_error(Grad(x = 1:4, FUN = sum, h = -0.001, vectorised = FALSE), "must be positive")
-  expect_error(Grad(x = 1:4, FUN = function(x) "0.1", vectorised = FALSE), "numeric values only")
+  expect_warning(Grad(x = 1:4, FUN = function(x) "0.1", vectorised = FALSE), "numeric values only")
   expect_error(Grad(x = 1:4, FUN = sum, side = c(-1, 1), vectorised = FALSE), "'side' argument must")
   expect_error(Grad(x = 1:4), "Pass the function")
   expect_error(Grad(x = 1:4, FUN = sum, deriv.order = c(1, 2), vectorised = FALSE), "'deriv.order' must have length")
   expect_error(Grad(x = 1:4, FUN = sum, acc.order = c(1, 2), vectorised = FALSE), "'acc.order' must have length")
   expect_error(Grad(1:4, sin), "argument order")
+})
+
+test_that("vectorisation in GenD works", {
+  expect_length(Grad(sin, 1:4, vectorised = TRUE), 4)
 })

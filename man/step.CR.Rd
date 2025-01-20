@@ -15,6 +15,8 @@ step.CR(
   range = h0/c(1e+05, 1e-05),
   maxit = 20L,
   seq.tol = 1e-04,
+  cores = 1,
+  preschedule = TRUE,
   diagnostics = FALSE,
   ...
 )
@@ -28,7 +30,7 @@ step.CR(
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
 \item{version}{Character scalar: \code{"original"} for the original 1974 version by
-Curtis and Reid; \code{"modified"} for Kostyrka’s 2024 modification, which adds an
+Curtis and Reid; \code{"modified"} for Kostyrka’s 2025 modification, which adds an
 extra evaluation for a more accurate estimate of the truncation error.}
 
 \item{aim}{Positive real scalar: desired ratio of truncation-to-rounding error. The \code{"original"}
@@ -49,6 +51,13 @@ loops in degenerate cases.}
 
 \item{seq.tol}{Numeric scalar: maximum relative difference between old and new
 step sizes for declaring convergence.}
+
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
 including all function evaluations.}

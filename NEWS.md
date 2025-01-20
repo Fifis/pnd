@@ -6,9 +6,11 @@
 - BUG: 1x1 Hessians?
 - SYNTAX: Split the gradient into 1D vectorised input and multi-d non-vectorised? Think about it.
 - SYNTAX: Align with the syntax of `optimParallel`, borrow ideas from `forecast::auto.arima`
+- FEATURE: Replace the long formula in the default step with zero tolerance: `abs(x) < zero.tol`
+- FEATURE: disable parallelisation if `f(x)` takes less than 0.001 s
+- FEATURE: homogenise handling of missing values (FUN1, FUN2, ...)
 - FEATURE: plug-in step size with an estimated `f'''` with a rule of thumb (add this as a one-step DV, e.g. via `maxit = 1`)
 - FEATURE: SW algorithm for arbitrary derivative and accuracy orders
-- FEATURE: AutoDX algorithm for arbitrary derivative and accuracy orders
 - FEATURE: update the rounding error as the estimated sum of differences and evaluations of f
 - FEATURE: Handle NA in step size selection
 - FEATURE: Auto-shrink the step size at the beginning of all procedures if FUN(x) is not finite
@@ -41,6 +43,8 @@
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
 # pnd 0.next (2023-06-XX)
+- Feature: parallelisation of steps in all selection algorithms
+- Feature: Mathur's AutoDX algorithm for step size selection `step.M()`
 - Feature: added `Hessian()` that supports central differences (for the moment) and arbitrary accuracy
 - Feature: separate `Grad()` and `Jacobian()` that call the workhors, `GenD()`, for compatibility with `numDeriv`
 

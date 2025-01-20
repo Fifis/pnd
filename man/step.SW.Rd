@@ -12,6 +12,8 @@ step.SW(
   range = h0/c(1e+12, 1e-08),
   seq.tol = 1e-04,
   max.rel.error = .Machine$double.eps/2,
+  cores = 1,
+  preschedule = TRUE,
   maxit = 40L,
   diagnostics = FALSE,
   ...
@@ -38,6 +40,13 @@ step sizes for declaring convergence.}
 error of function evaluation. For highly accurate functions with all accurate bits
 is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
 output of optimisation routines etc.), it is higher.}
+
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{maxit}{Maximum number of algorithm iterations to avoid infinite loops.
 Consider trying some smaller or larger initial step size \code{h0}

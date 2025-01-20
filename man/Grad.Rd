@@ -7,11 +7,11 @@
 Grad(
   FUN,
   x,
-  vectorised = "auto",
+  vectorised = NA,
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
-  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(deriv.order + acc.order)),
+  h = NULL,
   h0 = NULL,
   control = list(),
   f0 = NULL,
@@ -23,19 +23,19 @@ Grad(
 )
 }
 \arguments{
-\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed
-If the function returns a vector, the output will be is a Jacobian.}
+\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed.
+If the function returns a vector, the output will be a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite value.}
+\code{FUN(x)} must be finite.}
 
-\item{vectorised}{Logical or character: if \code{TRUE} or \code{"yes"}, the function
+\item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values. Use \code{FALSE} or \code{"no"}  for functions that take
-vector arguments and return outputs of arbitrary length (for
+a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
-\code{NULL}, or \code{"auto"}, checks the output length and assumes vectorisation
-if it matches the input length; this check is safe but potentially slow.}
+checks the output length and assumes vectorisation if it matches the input length;
+this check is necessary and potentially slow.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -57,10 +57,8 @@ difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
-\item{f0}{Optional numeric: if provided and applicable, used
-where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
-to save time.
-TODO: Currently ignored.}
+\item{f0}{Optional numeric: if provided, used to determine the vectorisation type
+to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}

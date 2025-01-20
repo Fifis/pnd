@@ -12,6 +12,8 @@ step.DV(
   alpha = 4/3,
   ratio.limits = c(1/15, 1/2, 2, 15),
   maxit = 40L,
+  cores = 1,
+  preschedule = TRUE,
   diagnostics = FALSE,
   ...
 )
@@ -41,6 +43,13 @@ the 3rd and 4th elements.}
 \item{maxit}{Maximum number of algorithm iterations to avoid infinite loops in cases
 the desired relative perturbation factor cannot be achieved within the given \code{range}.
 Consider extending the range if this limit is reached.}
+
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
 including all function evaluations.

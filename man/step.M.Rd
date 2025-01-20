@@ -15,7 +15,8 @@ step.M(
   correction = TRUE,
   diagnostics = FALSE,
   plot = FALSE,
-  cores = 2,
+  cores = 1,
+  preschedule = TRUE,
   ...
 )
 }
@@ -52,8 +53,12 @@ including all function evaluations.}
 \item{plot}{Logical: if \code{TRUE}, plots the estimated truncation and round-off
 errors.}
 
-\item{cores}{Integer specifying the number of parallel processes to use. Recommended
-value: the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+take less than 0.1 s per evaluation.}
 
 \item{...}{Passed to FUN.}
 }

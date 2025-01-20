@@ -40,6 +40,4 @@ test_that("function dimension check works", {
   f <- function(x) c(sum(sin(x)), sum(exp(x)))
   expect_error(Grad(f, 1:3, vectorised = FALSE), "vector-valued function")
   expect_error(Grad(f, 1:3, h = "SW", vectorised = FALSE), "returns a scalar")
-
-  w <- expect_error(pnd::Grad(sin, x = 1:4, deriv.order = 1, vectorised = FALSE))
 })

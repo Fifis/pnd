@@ -1,7 +1,3 @@
-.safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(NA))
-.pasteAnd <- function(x) paste0(x, collapse = ", ")
-.printE <- function(x, d = 1) sprintf(paste0("%1.", d, "e"), x)
-
 #' Curtis--Reid automatic step selection
 #'
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
@@ -24,6 +20,11 @@
 #'   loops in degenerate cases.
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #' @param ... Passed to \code{FUN}.
@@ -80,10 +81,13 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     acc.order = c(2L, 4L),
                     tol = if (version[1] == "original") 10 else 4,
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
+                    cores = 1, preschedule = TRUE,
                     diagnostics = FALSE, ...) {
+  cores <- .warnWindows(cores)
   version <- version[1]
   if (!(version %in% c("original", "modified"))) stop("step.CR: 'version' must be either 'original' or 'modified'.")
   vanilla <- version == "original"
+  cores <- min(cores, if (vanilla) 3 else 4)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
   if (range[1] < 2*.Machine$double.eps) range[1] <- 2*.Machine$double.eps
@@ -97,9 +101,14 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   target <- sort(c(aim / tol, aim * tol))
 
   getRatio <- function(FUN, x, h, vanilla, ...) {
-    # TODO: parallelise
     xgrid <- x + if (vanilla) c(-h, 0, h) else c(-h, -h/2, h/2, h)
-    fgrid  <- vapply(xgrid, function(z) .safeF(FUN, z, ...), FUN.VALUE = numeric(1))
+    FUN1 <- function(z) .safeF(FUN, z, ...)
+    if (cores > 1) {
+      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
+                                         mc.cores = cores, mc.preschedule = preschedule))
+    } else {
+      fgrid  <- vapply(xgrid, FUN1, FUN.VALUE = numeric(1))
+    }
     if (vanilla) {
       fd <- (fgrid[3] - fgrid[2]) / h
       bd <- (fgrid[2] - fgrid[1]) / h
@@ -210,6 +219,11 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops in cases
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #'   Note: the history tracks the third derivative, not the first.
@@ -255,8 +269,11 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' step.DV(x = 2, f, maxit = 1)
 step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     range = h0 / c(1e6, 1e-6), alpha = 4/3,
-                    ratio.limits = c(1/15, 1/2, 2, 15),
-                    maxit = 40L, diagnostics = FALSE, ...) {
+                    ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
+                    cores = 1, preschedule = TRUE,
+                    diagnostics = FALSE, ...) {
+  cores <- .warnWindows(cores)
+  cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
@@ -264,9 +281,14 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   P <- 2^(log2(.Machine$double.eps/2) / alpha)
 
   getRatio <- function(FUN, x, k, P, ...) {
-    # TODO: parallelise
     xgrid <- x + c(-2*k, -k, k, 2*k)
-    fgrid  <- sapply(xgrid, function(z) tryCatch(FUN(z, ...), error = function(e) return(NA)))
+    FUN1 <- function(z) .safeF(FUN, z, ...)
+    if (cores > 1) {
+      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
+                                         mc.cores = cores, mc.preschedule = preschedule))
+    } else {
+      fgrid  <- sapply(xgrid, FUN1)
+    }
     tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
     A <- sum(tgrid[tgrid > 0]) # Only positive terms
     B <- sum(tgrid[tgrid < 0]) # Only negative terms
@@ -359,12 +381,12 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 "truncation error is zero, large step is favoured",
                 "",
                 paste0("step size too close to the ", side,
-                       " end of the range [", .printE(range[1], 2), ", ",
-                       .printE(range[2], 2), "]; consider extending it"),
+                       " end of the range [", .printE(range[1]), ", ",
+                       .printE(range[2]), "]; consider extending it"),
                 "maximum number of iterations reached",
                 paste0("maximum number of iterations reached and step size occured on the ",
-                       side, " end of the range [", .printE(range[1], 2), ", ",
-                       .printE(range[2], 2), "]; consider expanding it"),
+                       side, " end of the range [", .printE(range[1]), ", ",
+                       .printE(range[2]), "]; consider expanding it"),
                 "only one iteration requested; no search performed for the plug-in estimator")
 
   if (diagnostics) {
@@ -402,6 +424,11 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops.
 #'   Consider trying some smaller or larger initial step size \code{h0}
 #'   if this limit is reached.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #' @param ... Passed to FUN.
@@ -449,7 +476,10 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 0.5, range = h0 / c(1e12, 1e-8),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
+                    cores = 1, preschedule = TRUE,
                     maxit = 40L, diagnostics = FALSE, ...) {
+  cores <- .warnWindows(cores)
+  cores <- min(cores, 3)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
 
@@ -457,9 +487,13 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
   getRatio <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
                        ratio.beforelast = NULL, ...) {
-    # TODO: parallelise
     xgrid <- x + if (do.f0) c(-h, 0, h) else c(-h, h)
-    fgrid  <- sapply(xgrid, function(z) .safeF(FUN, z, ...))
+    if (cores > 1) {
+      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = function(z) .safeF(FUN, z, ...),
+                                         mc.cores = cores, mc.preschedule = preschedule))
+    } else {
+      fgrid  <- sapply(xgrid, function(z) .safeF(FUN, z, ...))
+    }
     cd <- (fgrid[length(fgrid)] - fgrid[1]) / h * 0.5
     etrunc <- if (is.null(ratio.last)) NA else # Richardson extrapolation
       abs((cd - ratio.last$deriv) / (1 - (ratio.last$h / h)^2))
@@ -533,13 +567,36 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
             }
 
             bad <- !is.finite(ulist[[i]]$f)
-            if (any(bad) && !rounding.small)
-              stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
-                          ". FUN(", x, ") is finite -- try a step h0 larger than ",
-                          h0, " but smaller than ", hold, " (currently ", hnew, ")."))
-            if (any(bad) && !rounding.nottoosmall)
-              stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
-                          ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, "."))
+            if (any(bad) && !rounding.small) {  # Not in the original paper, but a necessary fail-safe
+              warning(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad])),
+                             "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- try the initial step h0 larger than ",
+                             .printE(h0), " but smaller than ", .printE(hold), ". Halving from ",
+                             .printE(hnew), " to ", .printE(hnew/2), ")."))
+              for (i in 1:maxit) {
+                hnew <- hnew/2
+                ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
+                if (is.finite(ulist[[i]]$f)) break
+              }
+              if (!is.finite(ulist[[i]]$f))
+                stop(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad])),
+                             "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- halving did not help.",
+                             " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
+            }
+
+            if (any(bad) && !rounding.nottoosmall) {
+              warning(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad, , drop = FALSE]),
+                             ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, ". ",
+                             "Halving from ", .printE(hnew), " to ", .printE(hnew/2), ")."))
+              for (i in 1:maxit) {
+                hnew <- hnew/2
+                ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
+                if (is.finite(ulist[[i]]$f)) break
+              }
+              if (!is.finite(ulist[[i]]$f))
+                stop(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad, , drop = FALSE])),
+                             "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- halving did not help.",
+                             " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
+            }
           }
         } # End initial step search
       }
@@ -662,8 +719,11 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #'   including all function evaluations.
 #' @param plot Logical: if \code{TRUE}, plots the estimated truncation and round-off
 #'   errors.
-#' @param cores Integer specifying the number of parallel processes to use. Recommended
-#'   value: the number of physical cores on the machine minus one.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
 #' @param ... Passed to FUN.
 #'
 #' @details
@@ -705,7 +765,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                    min.valid.slopes = 5L, seq.tol = 0.01,
                    correction = TRUE, diagnostics = FALSE, plot = FALSE,
-                   cores = 2, ...) {
+                   cores = 1, preschedule = TRUE, ...) {
+  cores <- .warnWindows(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * (abs(x) + (x == 0))
     h0 <- 2^round(log2(h0))
@@ -743,7 +804,12 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 
   n <- length(hgrid)
   xgrid <- x + c(-hgrid, hgrid)
-  fgrid  <- unlist(parallel::mclapply(xgrid, function(z) .safeF(FUN, z, ...), mc.cores = cores))
+  FUN1 <- function(z) .safeF(FUN, z, ...)
+  if (cores > 1) {
+    fgrid <- unlist(parallel::mclapply(xgrid, FUN1, mc.cores = cores, mc.preschedule = preschedule))
+  } else {
+    fgrid  <- sapply(xgrid, FUN1)
+  }
   # TODO: instead of subtracting one, add one
   fplus <- fgrid[(n+1):(2*n)]
   fminus <- fgrid[1:n]
@@ -778,6 +844,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
     slopes <- ldetrunc[i.start:i.end]
     valid.h <- hgrid[i.start:i.end]
     good.slopes <- abs(slopes - 2) / 2 <= seq.tol  # TODO: generalise with (d)
+    # TODO: debug this function, test with shrink.factor = 0.25; the slope seems to be 4
 
     removeFirstBad <- function(slopes) {
       slopes.rle <- rle(slopes)
@@ -830,7 +897,6 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                      "not even yield a numerical derivative."))
       exitcode <- 3
       hopt0 <- hopt <- hnaive
-      eround.opt <- NA
     }
   }
 
@@ -884,8 +950,15 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
 #'   including all function evaluations is returned; different methods have
 #'   slightly different diagnostic outputs.
-#' @param cores Integer specifying the number of parallel processes to use. Recommended
-#'   value: the number of physical cores on the machine minus one.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#'   Recommended to be set to the number of physical cores on the machine minus one.
+#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#'   take less than 0.1 s per evaluation.
+#' @param cl An optional user-supplied \code{cluster} object (created by \code{makeCluster}
+#'   or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
+#'   (if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
+#'   Do not set for \code{mclapply} (fork cluster).
 #' @param ... Passed to FUN.
 #'
 #' @details
@@ -931,8 +1004,10 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
-                     method = c("SW", "CR", "CRm", "DV", "M"),
-                     control = NULL, cores = 2, ...) {
+                     method = c("SW", "CR", "CRm", "DV", "M"), control = NULL,
+                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                     cl = NULL, ...) {
+  cores <- .warnWindows(cores)
   # TODO: implement "all"
   method <- method[1]
   ell <- list(...)
@@ -954,7 +1029,8 @@ gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
   # The h0 and range arguments are updated later
   default.args <- list(CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
-                                 range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4, diagnostics = FALSE),
+                                 range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
+                                 cores = cores, preschedule = preschedule, diagnostics = FALSE),
                        CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
                                   range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4, diagnostics = FALSE),
                        DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), alpha = 4/3,
