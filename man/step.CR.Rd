@@ -15,8 +15,9 @@ step.CR(
   range = h0/c(1e+05, 1e-05),
   maxit = 20L,
   seq.tol = 1e-04,
-  cores = 1,
-  preschedule = TRUE,
+  cores = getOption("pnd.cores"),
+  preschedule = getOption("pnd.preschedule"),
+  cl = NULL,
   diagnostics = FALSE,
   ...
 )

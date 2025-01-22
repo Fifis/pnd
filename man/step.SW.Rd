@@ -12,9 +12,10 @@ step.SW(
   range = h0/c(1e+12, 1e-08),
   seq.tol = 1e-04,
   max.rel.error = .Machine$double.eps/2,
-  cores = 1,
-  preschedule = TRUE,
   maxit = 40L,
+  cores = getOption("pnd.cores"),
+  preschedule = getOption("pnd.preschedule"),
+  cl = NULL,
   diagnostics = FALSE,
   ...
 )
@@ -41,16 +42,16 @@ error of function evaluation. For highly accurate functions with all accurate bi
 is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
 output of optimisation routines etc.), it is higher.}
 
+\item{maxit}{Maximum number of algorithm iterations to avoid infinite loops.
+Consider trying some smaller or larger initial step size \code{h0}
+if this limit is reached.}
+
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
-
-\item{maxit}{Maximum number of algorithm iterations to avoid infinite loops.
-Consider trying some smaller or larger initial step size \code{h0}
-if this limit is reached.}
 
 \item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
 including all function evaluations.}

@@ -19,12 +19,12 @@ test_that("unsupported arguments withcause an error", {
 })
 
 test_that("the range is correctly reversed", {
-  expect_equal(gradstep(sin, 1, method = "CR", control = list(range = c(1e-6, 1e-8))),
-               gradstep(sin, 1, method = "CR", control = list(range = c(1e-8, 1e-6))))
-  expect_equal(gradstep(sin, 1, method = "DV", control = list(range = c(1e-6, 1e-8))),
-               gradstep(sin, 1, method = "DV", control = list(range = c(1e-8, 1e-6))))
-  expect_equal(gradstep(sin, 1, method = "SW", control = list(range = c(1e-6, 1e-8))),
-               gradstep(sin, 1, method = "SW", control = list(range = c(1e-8, 1e-6))))
+  expect_equal(gradstep(sin, 1, method = "CR", control = list(range = c(1e-4, 1e-8))),
+               gradstep(sin, 1, method = "CR", control = list(range = c(1e-8, 1e-4))))
+  expect_equal(gradstep(sin, 1, method = "DV", control = list(range = c(1e-4, 1e-8))),
+               gradstep(sin, 1, method = "DV", control = list(range = c(1e-8, 1e-4))))
+  expect_equal(gradstep(sin, 1, method = "SW", control = list(range = c(1e-4, 1e-8))),
+               gradstep(sin, 1, method = "SW", control = list(range = c(1e-8, 1e-4))))
 })
 
 test_that("for unfortunate inputs, the search may hit the boundary", {
@@ -65,7 +65,7 @@ test_that("the error in vector inputs does not propagate too strongly", {
 })
 
 test_that("gradstep accepts methods argument as a list", {
-  expect_error(gradstep(x = 1:4, FUN = function(x) sum(sin(x)), diagnostics = TRUE))
+  expect_true(!is.null(gradstep(x = 1:4, FUN = function(x) sum(sin(x)), diagnostics = TRUE)$iterations[[1]]$h))
   gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "SW",
            control = list())
 })

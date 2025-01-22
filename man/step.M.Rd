@@ -15,8 +15,9 @@ step.M(
   correction = TRUE,
   diagnostics = FALSE,
   plot = FALSE,
-  cores = 1,
-  preschedule = TRUE,
+  cores = getOption("pnd.cores"),
+  preschedule = getOption("pnd.preschedule"),
+  cl = NULL,
   ...
 )
 }

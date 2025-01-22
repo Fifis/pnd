@@ -12,8 +12,9 @@ step.DV(
   alpha = 4/3,
   ratio.limits = c(1/15, 1/2, 2, 15),
   maxit = 40L,
-  cores = 1,
-  preschedule = TRUE,
+  cores = getOption("pnd.cores"),
+  preschedule = getOption("pnd.preschedule"),
+  cl = NULL,
   diagnostics = FALSE,
   ...
 )

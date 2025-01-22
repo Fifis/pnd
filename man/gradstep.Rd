@@ -7,7 +7,8 @@
 gradstep(
   FUN,
   x,
-  h0 = 1e-05 * (abs(x) + (x == 0)),
+  h0 = NULL,
+  zero.tol = sqrt(.Machine$double.eps),
   method = c("SW", "CR", "CRm", "DV", "M"),
   control = NULL,
   cores = getOption("pnd.cores"),
@@ -74,10 +75,11 @@ each coordinate.
 Automatic step selection for numerical derivatives
 }
 \details{
-We recommend using the Stepleman--Winarsky algorithm because it does not suffer
+We recommend using the Mathur algorithm because it does not suffer
 from over-estimation of the truncation error in the Curtis--Reid approach
 and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-approach.
+approach. It really tries muliple step sizes simultaneously and handles missing
+values due to bad evaluations for inadequate step sizes really in a robust manner.
 }
 \examples{
 gradstep(x = 1, FUN = sin, method = "CR")
