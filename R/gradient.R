@@ -208,7 +208,6 @@ GenD <- function(FUN, x, univariate = NA, vectorised = NA, multivalued = NA,
   #######################################
 
   # Setting up parallel capabilities
-  # Setting up parallel capabilities
   cores <- .warnWindows(cores)
   cl <- newCluster(cl, cores = cores)
 
@@ -386,7 +385,7 @@ GenD <- function(FUN, x, univariate = NA, vectorised = NA, multivalued = NA,
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # TODO: deduplicate, save CPU
-  fvals0 <- runParallel(FUN = FUN1, x = xvals, cores = cores, preschedule = preschedule, cl = cl)
+  fvals0 <- runParallel(FUN = FUN1, x = xvals, preschedule = preschedule, cl = cl)
   okay.f <- sapply(fvals0, is.numeric) | sapply(fvals0, is.finite) | sapply(fvals0, is.na)
   if (any(!okay.f)) {
     warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",

@@ -96,16 +96,12 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   }
   if (acc.order == 4) aim <- aim * .Machine$double.eps^(-2/15)
   target <- sort(c(aim / tol, aim * tol))
+  cl <- newCluster(cl = cl, cores = cores)
 
   getRatio <- function(FUN, x, h, vanilla, ...) {
     xgrid <- x + if (vanilla) c(-h, 0, h) else c(-h, -h/2, h/2, h)
     FUN1 <- function(z) .safeF(FUN, z, ...)
-    if (cores > 1) {
-      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
-                                         mc.cores = cores, mc.preschedule = preschedule))
-    } else {
-      fgrid  <- vapply(xgrid, FUN1, FUN.VALUE = numeric(1))
-    }
+    fgrid <- unlist(runParallel(FUN = FUN1, x = xgrid, cl = cl, preschedule = preschedule))
     if (vanilla) {
       fd <- (fgrid[3] - fgrid[2]) / h
       bd <- (fgrid[2] - fgrid[1]) / h
@@ -275,16 +271,12 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   if (range[2] < range[1]) range <- c(range[2], range[1])
   range3 <- range * .Machine$double.eps^(-2/15)
   P <- 2^(log2(.Machine$double.eps/2) / alpha)
+  cl <- newCluster(cl = cl, cores = cores)
 
   getRatio <- function(FUN, x, k, P, ...) {
     xgrid <- x + c(-2*k, -k, k, 2*k)
     FUN1 <- function(z) .safeF(FUN, z, ...)
-    if (cores > 1) {
-      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
-                                         mc.cores = cores, mc.preschedule = preschedule))
-    } else {
-      fgrid  <- sapply(xgrid, FUN1)
-    }
+    fgrid <- unlist(runParallel(FUN = FUN1, x = xgrid, cl = cl, preschedule = preschedule))
     tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
     A <- sum(tgrid[tgrid > 0]) # Only positive terms
     B <- sum(tgrid[tgrid < 0]) # Only negative terms
@@ -439,22 +431,19 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(1e4, 1e-4),
                         cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                         cl = NULL,  diagnostics = FALSE, ...) {
+  # TODO: add zero.tol everywhere
   cores <- .warnWindows(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
+  cl <- newCluster(cl = cl, cores = cores)
 
   s3 <- fdCoef(deriv.order = 3)
   xgrid3 <- x + s3$stencil*k0
   FUN1 <- function(z) .safeF(FUN, z, ...)
-  if (cores > 1) {
-    fgrid3 <- unlist(parallel::mclapply(X = xgrid3, FUN = FUN1,
-                                       mc.cores = cores, mc.preschedule = preschedule))
-  } else {
-    fgrid3  <- sapply(xgrid3, FUN1)
-  }
+  fgrid3 <- unlist(runParallel(FUN = FUN1, x = xgrid3, cl = cl, preschedule = preschedule))
   f0 <- mean(fgrid3[2:3])
   cd3 <- sum(fgrid3 * s3$weights) / k0^3
 
@@ -464,15 +453,21 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
   exitcode <- 0
   # If the estimate of f''' is near-zero, the step-size estimate may be too large --
   # only the modified one needs not be saved
+  me13 <- .Machine$double.eps^(1/3)  # 6e-06 in IEEE754
   if (abs(cd3) == 0) {
     exitcode <- 1
-    cd3 <- .Machine$double.eps^(2/3) * abs(x)
-  } else if (abs(cd3) / max(abs(f0), .Machine$double.eps^(2/3)) < 1e-8) {
-    cd3 <- 1e-8 * max(abs(f0), .Machine$double.eps^(2/3))
+    h <- pmax(me13, abs(x) / 128)
+    cd3 <- me13^2 * abs(x)
+  } else if (max(abs(f0), me13^2) / abs(cd3) > sqrt(1/.Machine$double.eps)) {
+    # The ratio of f' to f''' is too large -- safeguard against large steps
+    # small values of f0 are truncated to macheps^(2/3) ~ 4e-11
+    cd3 <- sqrt(.Machine$double.eps) * max(abs(f0), me13^2)
+    h <- pmax(me13, abs(x) / 256)
     exitcode <- 2
+  } else {  # Everything is OK
+    h <- abs(1.5 * f0/cd3 * .Machine$double.eps)^(1/3)
   }
 
-  h <- abs(1.5 * f0/cd3 * .Machine$double.eps)^(1/3)
   if (h < range[1]) {
     h <- range[1]
     exitcode <- 3
@@ -485,12 +480,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
 
   s1 <- fdCoef(deriv.order = 1)
   xgrid <- x + s1$stencil*h
-  if (cores > 1) {
-    fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
-                                       mc.cores = cores, mc.preschedule = preschedule))
-  } else {
-    fgrid  <- sapply(xgrid, FUN1)
-  }
+  fgrid <- unlist(runParallel(FUN = FUN1, x = xgrid, cl = cl, preschedule = preschedule))
   cd <- sum(fgrid * s1$weights) / h
 
   msg <- switch(exitcode + 1,
@@ -595,18 +585,13 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   cores <- min(cores, 3)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
-
-  i <- 1
+  cl <- newCluster(cl = cl, cores = cores)
 
   getRatio <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
                        ratio.beforelast = NULL, ...) {
     xgrid <- x + if (do.f0) c(-h, 0, h) else c(-h, h)
-    if (cores > 1) {
-      fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = function(z) .safeF(FUN, z, ...),
-                                         mc.cores = cores, mc.preschedule = preschedule))
-    } else {
-      fgrid  <- sapply(xgrid, function(z) .safeF(FUN, z, ...))
-    }
+    FUN1 <- function(z) .safeF(FUN, z, ...)
+    fgrid <- unlist(runParallel(FUN = FUN1, x = xgrid, cl = cl, preschedule = preschedule))
     cd <- (fgrid[length(fgrid)] - fgrid[1]) / h * 0.5
     etrunc <- if (is.null(ratio.last)) NA else # Richardson extrapolation
       abs((cd - ratio.last$deriv) / (1 - (ratio.last$h / h)^2))
@@ -624,6 +609,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     return(ret)
   }
 
+  i <- 1
   exitcode <- 0
   main.loop <- close.left <- FALSE
   first.main <- TRUE
@@ -885,6 +871,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   }
   h0 <- unname(h0)
   inv.sf <- 1 / shrink.factor
+  cl <- newCluster(cl = cl, cores = cores)
 
   if (is.null(range)) {
     ends <- log(c(2^36, 2^(-24)), base = inv.sf)
@@ -918,11 +905,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   n <- length(hgrid)
   xgrid <- x + c(-hgrid, hgrid)
   FUN1 <- function(z) .safeF(FUN, z, ...)
-  if (cores > 1) {
-    fgrid <- unlist(parallel::mclapply(xgrid, FUN1, mc.cores = cores, mc.preschedule = preschedule))
-  } else {
-    fgrid  <- sapply(xgrid, FUN1)
-  }
+  fgrid <- unlist(runParallel(FUN = FUN1, x = xgrid, cl = cl, preschedule = preschedule))
   # TODO: instead of subtracting one, add one
   fplus <- fgrid[(n+1):(2*n)]
   fminus <- fgrid[1:n]
@@ -1126,30 +1109,27 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
-                     method = c("SW", "CR", "CRm", "DV", "M"), diagnostics = FALSE, control = NULL,
+                     method = c("plugin", "SW", "CR", "CRm", "DV", "M"), diagnostics = FALSE, control = NULL,
                      cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                      cl = NULL, ...) {
+  # TODO: implement "all"
+  method <- method[1]
   # TODO: test if Mathur accepts the plot
   if (is.null(h0)) {
     lttol <- abs(x) < zero.tol
     deriv.order <- 1
     acc.order <- 2
-    h0 <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1 / (deriv.order + acc.order))
+    if (method != "M") {
+      h0 <- (abs(x)*(!lttol) + lttol) * 1e-5
+    } else {
+      h0 <- 2^round(log2(0.01 * (abs(x)*(!lttol) + lttol)))
+    }
   }
   cores <- .warnWindows(cores)
-  # TODO: implement "all"
-  method <- method[1]
   ell <- list(...)
   if (any(names(ell) == "method.args"))
     stop(paste0("'method.args' is an argument to control numDeriv::grad(). ",
                 "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'."))
-  if (is.null(h0)) {
-    if (method != "M") {
-      h0 <- 1e-5 * (abs(x) + (x == 0))
-    } else {
-      h0 <- 2^round(log2(0.01 * (abs(x) + (x == 0))))
-    }
-  }
   f0 <- .safeF(FUN, x, ...)
   if (length(f0) > 1) stop("Automatic step selection works only when the function FUN returns a scalar.")
   if (is.na(f0)) stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
@@ -1157,19 +1137,25 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
   # The h0 and range arguments are updated later
-  default.args <- list(CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
+  default.args <- list(plugin = list(h0 = h0[1], range = h0[1] / c(1e4, 1e-4),
+                                 cores = cores, preschedule = preschedule,
+                                 diagnostics = diagnostics),
+                       CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                 cores = cores, preschedule = preschedule, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
-                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4, diagnostics = diagnostics),
+                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
+                                  cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), alpha = 4/3,
-                                 ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L, diagnostics = diagnostics),
+                                 ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        SW = list(h0 = h0[1], shrink.factor = 0.5, range = h0[1] / c(1e12, 1e-8),
-                                 seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
-                                 maxit = 40L, diagnostics = diagnostics),
+                                 seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        M = list(h0 = h0[1], range = h0[1] / 2^c(36, -24), shrink.factor = 0.5,
                                 min.valid.slopes = 5L, seq.tol = 0.01, correction = TRUE,
-                                diagnostics = diagnostics, plot = FALSE, cores = cores))
+                                cores = cores, preschedule = preschedule, cl = cl,
+                                diagnostics = diagnostics, plot = FALSE))
   margs <- default.args[[method]]
   if (!is.null(control)) {
     bad.args <- setdiff(names(control), names(margs))
@@ -1184,7 +1170,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
     stop(paste0("The arguments ", .pasteAnd(conflicting.args), " of your function coincide with ",
            "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
            "incorporate the '...' explicitly."))
-  autofun <- switch(method, CR = step.CR, CRm = step.CR, DV = step.DV, SW = step.SW, M = step.M)
+  autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV, SW = step.SW, M = step.M)
   if (length(x) == 1) {
     f.args <- c(margs, x = x, FUN = FUN)
     ret <- do.call(autofun, f.args)
@@ -1198,7 +1184,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
       margs1 <- margs
       margs1$h0 <- h0[i]
       margs1$range <- if (!is.null(control$range)) control$range else
-        h0[i] / switch(method, CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
+        h0[i] / switch(method, plugin = c(1e4, 1e-4), CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
                        DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24))
       return(c(margs1, x = unname(x[i]), FUN = FUN1))
     })

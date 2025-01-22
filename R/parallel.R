@@ -41,9 +41,6 @@ newCluster <- function(cl = NULL, cores = 2) {
 #' @param FUN A function of only one argument. If there are more arguments, use
 #'   the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.
 #' @param x A list to parallelise the evaluation of \code{FUN} over.
-#' @param cores Integer specifying the number of CPU cores used for \code{mclapply}.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#'   Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.
 #' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 #'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 #'   take less than 0.1 s per evaluation.
@@ -65,7 +62,7 @@ newCluster <- function(cl = NULL, cores = 2) {
 #' print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
 #' print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
 #' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
-runParallel <- function(FUN, x, cores = 1, preschedule = FALSE, cl = NULL) {
+runParallel <- function(FUN, x, preschedule = FALSE, cl = NULL) {
   if (identical(cl, "lapply")) {
     ret <- lapply(x, FUN)
   } else if (grepl("^mclapply ", cl)) {
