@@ -27,10 +27,17 @@ and the optimal step size is estimated.}
 \item{h0}{Numeric vector or scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
+\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+procedure is requested; otherwise, it is absolute.}
+
 \item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 \code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
 \insertCite{mathur2012analytical}{pnd}.}
+
+\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
+including all function evaluations. Passed to the appropriate \code{step.XX} function.}
 
 \item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
@@ -38,17 +45,20 @@ if \code{control$diagnostics} is \code{TRUE}, full iteration history
 including all function evaluations is returned; different methods have
 slightly different diagnostic outputs.}
 
-\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
-Recommended to be set to the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
+Recommended to be set to the number of physical cores on the machine minus one.
+Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
-\item{cl}{An optional user-supplied \code{cluster} object (created by \code{makeCluster}
-or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
-Do not set for \code{mclapply} (fork cluster).}
+\item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
+of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
+(created by \code{makeCluster} or similar functions). If not \code{NULL},
+the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
+\code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
 
 \item{...}{Passed to FUN.}
 }

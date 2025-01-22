@@ -31,7 +31,7 @@ newCluster <- function(cl = NULL, cores = 2) {
              function(i) eval(parse(text = paste0("clusterEvalQ(cl, library(", loaded.pkgs[i], "))"))))
     }
   } else {
-    cl <- "mclapply"
+    cl <- paste("mclapply", cores)
   }
   return(cl)
 }
@@ -41,24 +41,35 @@ newCluster <- function(cl = NULL, cores = 2) {
 #' @param FUN A function of only one argument. If there are more arguments, use
 #'   the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.
 #' @param x A list to parallelise the evaluation of \code{FUN} over.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#' @param cores Integer specifying the number of CPU cores used for \code{mclapply}.
 #'   Recommended to be set to the number of physical cores on the machine minus one.
+#'   Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.
 #' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 #'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 #'   take less than 0.1 s per evaluation.
-#' @param cl An optional user-supplied \code{cluster} object (created by \code{makeCluster}
-#'   or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-#'   (if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows
-#'   and \code{mclapply} (fork cluster) on everything else.
+#' @param cl A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
+#'   of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
+#'   (created by \code{makeCluster} or similar functions). If not \code{NULL},
+#'   the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
+#'   \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+#'   (fork cluster) on everything else.
 #'
-#' @returns
+#'
+#' @returns The value that `lapply(x, FUN)` would have returned.
 #' @export
 #'
 #' @examples
+#' fslow <- function(x) Sys.sleep(x)
+#' x <- rep(0.05, 6)
+#' cl <- newCluster(cores = 2)
+#' print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
+#' print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
+#' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
 runParallel <- function(FUN, x, cores = 1, preschedule = FALSE, cl = NULL) {
   if (identical(cl, "lapply")) {
     ret <- lapply(x, FUN)
-  } else if (identical(cl, "mclapply")) {
+  } else if (grepl("^mclapply ", cl)) {
+    cores <- as.integer(strsplit(cl, " ")[[1]][2])
     ret <- parallel::mclapply(X = x, FUN = FUN, mc.cores = cores, mc.preschedule = preschedule)
   } else if (inherits(cl, "cluster")) {
     if (preschedule) {

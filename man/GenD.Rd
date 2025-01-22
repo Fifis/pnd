@@ -77,17 +77,20 @@ procedure is requested; otherwise, it is absolute.}
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
 to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
 
-\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
-Recommended to be set to the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
+Recommended to be set to the number of physical cores on the machine minus one.
+Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
-\item{cl}{An optional user-supplied \code{cluster} object (created by \code{makeCluster}
-or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows
-and \code{mclapply} (fork cluster) on everything else.}
+\item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
+of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
+(created by \code{makeCluster} or similar functions). If not \code{NULL},
+the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
+\code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}

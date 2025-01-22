@@ -46,12 +46,20 @@ output of optimisation routines etc.), it is higher.}
 Consider trying some smaller or larger initial step size \code{h0}
 if this limit is reached.}
 
-\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
-Recommended to be set to the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
+Recommended to be set to the number of physical cores on the machine minus one.
+Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
+
+\item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
+of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
+(created by \code{makeCluster} or similar functions). If not \code{NULL},
+the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
+\code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
 
 \item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
 including all function evaluations.}

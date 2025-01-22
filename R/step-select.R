@@ -20,11 +20,7 @@
 #'   loops in degenerate cases.
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
+#' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #' @param ... Passed to \code{FUN}.
@@ -222,11 +218,7 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops in cases
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
+#' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #'   Note: the history tracks the third derivative, not the first.
@@ -410,7 +402,7 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
 #' Plug-in step selection
 #'
-#' @inheritParams steps.DV
+#' @inheritParams step.DV
 #'
 #' @details
 #' This function computes the optimal step size for central differences using the
@@ -443,39 +435,55 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @examples
 #' f <- function(x) x^4
 #' step.plugin(x = 2, f)
-#' step.plugin(x = 0, f)
+#' step.plugin(x = 0, f, diagnostics = TRUE)  # f''' = 0, setting a large one
 step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(1e4, 1e-4),
                         cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                         cl = NULL,  diagnostics = FALSE, ...) {
   cores <- .warnWindows(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
-  cores <- min(cores, 6)
+  cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
 
-  s1 <- fdCoef(deriv.order = 1)
   s3 <- fdCoef(deriv.order = 3)
-  xgrid1 <- x + s1$stencil*h0
   xgrid3 <- x + s3$stencil*k0
-  xgrid <- c(xgrid1, xgrid3)
   FUN1 <- function(z) .safeF(FUN, z, ...)
   if (cores > 1) {
-    fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
+    fgrid3 <- unlist(parallel::mclapply(X = xgrid3, FUN = FUN1,
                                        mc.cores = cores, mc.preschedule = preschedule))
   } else {
-    fgrid  <- sapply(xgrid, FUN1)
+    fgrid3  <- sapply(xgrid3, FUN1)
   }
-  fgrid1 <- fgrid[1:2]
-  fgrid3 <- fgrid[3:6]
-  cd1 <- sum(fgrid1 * s1$weights) / h0
+  f0 <- mean(fgrid3[2:3])
   cd3 <- sum(fgrid3 * s3$weights) / k0^3
 
   iters <- vector("list", 2)
-  iters[[1]] <- list(h = c(f1 = h0, f3 = k0), x = xgrid[order(xgrid)], f = fgrid[order(xgrid)], deriv = c(f3 = cd3, f1 = cd1))
+  iters[[1]] <- list(h = c(f = h0, f3 = k0), x = xgrid3, f = fgrid3, deriv = c(f1 = NA, f3 = cd3))
 
   exitcode <- 0
-  h <- abs(1.5 * cd1/cd3 * .Machine$double.eps)^(1/3)
+  # If the estimate of f''' is near-zero, the step-size estimate may be too large --
+  # only the modified one needs not be saved
+  if (abs(cd3) == 0) {
+    exitcode <- 1
+    cd3 <- .Machine$double.eps^(2/3) * abs(x)
+  } else if (abs(cd3) / max(abs(f0), .Machine$double.eps^(2/3)) < 1e-8) {
+    cd3 <- 1e-8 * max(abs(f0), .Machine$double.eps^(2/3))
+    exitcode <- 2
+  }
+
+  h <- abs(1.5 * f0/cd3 * .Machine$double.eps)^(1/3)
+  if (h < range[1]) {
+    h <- range[1]
+    exitcode <- 3
+    side <- "left"
+  } else if (h > range[2]) {
+    h <- range[2]
+    exitcode <- 3
+    side <- "right"
+  }
+
+  s1 <- fdCoef(deriv.order = 1)
   xgrid <- x + s1$stencil*h
   if (cores > 1) {
     fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
@@ -485,27 +493,6 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
   }
   cd <- sum(fgrid * s1$weights) / h
 
-  # If the estimate of f''' is near-zero, the step-size estimate may be too large -- these objects
-  # need not be saved
-  if (abs(cd3) == 0) {
-    exitcode <- 1
-    cd3 <- .Machine$double.eps^(2/3) * abs(x)
-  } else if (abs(cd3) / max(abs(cd1), .Machine$double.eps^(2/3)) < 1e-8) {
-    cd3 <- 1e-8 * max(abs(cd1), .Machine$double.eps^(2/3))
-    exitcode <- 2
-  }
-
-  if (h < range[1]) {
-    h <- range[1]
-    exitcode <- 3
-    side <- "left"
-  }
-  if (h > range[2]) {
-    h <- range[2]
-    exitcode <- 3
-    side <- "right"
-  }
-
   msg <- switch(exitcode + 1,
                 "successfully computed non-zero f''' and f'",
                 "truncation error is zero, large step is favoured",
@@ -514,16 +501,20 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
                        " end of the reasonable range [", .printE(range[1]), ", ",
                        .printE(range[2]), "]"))
 
+  iters[[2]] <- list(h = c(f1 = h, f3 = NA), x = xgrid, f = fgrid,
+                     deriv = c(f1 = cd, f3 = NA))
+
   if (diagnostics) {
-    diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
+    diag.list <- list(h = c(f1 = h, f3 = k0),
                       x = do.call(rbind, lapply(iters, "[[", "x")),
                       f = do.call(rbind, lapply(iters, "[[", "f")),
-                      ratio = do.call(c, lapply(iters, "[[", "ratio")),
-                      deriv3 = do.call(rbind, lapply(iters, "[[", "deriv")))
+                      deriv = c(cd = cd, cd3 = cd3))
   }
 
-  ret <- list(par = h, value = cd, counts = i, exitcode = exitcode,
-              message = msg, abs.error = err,
+  etrunc <- (mean(fgrid)^2 * abs(cd3) * .Machine$double.eps^2 / 96)^(1/3)
+  eround <- max(2*etrunc, (abs(mean(fgrid)) * .Machine$double.eps)^(2/3))
+  ret <- list(par = h, value = cd, counts = 2, exitcode = exitcode,
+              message = msg, abs.error = c(trunc = etrunc, round = eround),
               iterations = if (diagnostics) diag.list else NULL)
   return(ret)
 
@@ -549,11 +540,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops.
 #'   Consider trying some smaller or larger initial step size \code{h0}
 #'   if this limit is reached.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
+#' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #' @param ... Passed to FUN.
@@ -843,15 +830,11 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #'   continuation of the downwards slope of the total error); otherwise, returns
 #'   the grid point that is is lowest in the increasing sequence of valid error
 #'   estimates.
+#' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
 #' @param plot Logical: if \code{TRUE}, plots the estimated truncation and round-off
 #'   errors.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
 #' @param ... Passed to FUN.
 #'
 #' @details
@@ -945,7 +928,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   fminus <- fgrid[1:n]
   cd <- (fplus - fminus) / hgrid * 0.5
   fd1 <- cd[-1] # Larger step
-  fd2 <- cd[-n] # Smaller step
+  fd2 <- cd[-n] # Small#' @inheritParams runParalleler step
   # Formula 3.7 from Mathur (2012) or (25) from Mathur (2013)
   # Cn*h1^2 = abs((fd2 - fd1) / (1 - (h2/h1)^2), but h2/h1 = const = 1 / shrink.factor
   etrunc <- c(NA, abs((fd2 - fd1) / (1 - shrink.factor^2)))
@@ -1082,24 +1065,21 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric vector or scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#' @param zero.tol Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+#'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+#'   procedure is requested; otherwise, it is absolute.
 #' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 #'   \code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 #'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
 #'   \insertCite{mathur2012analytical}{pnd}.
+#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
+#'   including all function evaluations. Passed to the appropriate \code{step.XX} function.
 #' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
 #'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
 #'   including all function evaluations is returned; different methods have
 #'   slightly different diagnostic outputs.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
-#' @param cl An optional user-supplied \code{cluster} object (created by \code{makeCluster}
-#'   or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-#'   (if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
-#'   Do not set for \code{mclapply} (fork cluster).
+#' @inheritParams runParallel
 #' @param ... Passed to FUN.
 #'
 #' @details
