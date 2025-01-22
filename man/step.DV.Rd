@@ -25,7 +25,9 @@ step.DV(
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
+slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
+size for first derivarives is internallt translated into the initial step size for third
+derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 

@@ -129,13 +129,13 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     return(ret)
   }
 
-  ulist <- list()
+  iters <- list()
   i <- 1
   exitcode <- 0
 
   while (i <= maxit) {
     hold <- if (i > 1) hnew else NA
-    hnew <- if (i > 1) hold * (aim / max(ulist[[i-1]]$ratio, 1))^(1/3) else h0
+    hnew <- if (i > 1) hold * (aim / max(iters[[i-1]]$ratio, 1))^(1/3) else h0
 
     # Check the relative change of the step size, which is possible at
     # the 2nd iteration even before the 2nd error calculation
@@ -153,48 +153,48 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       }
     }
 
-    ulist[[i]] <- getRatio(FUN = FUN, x = x, h = hnew, vanilla = vanilla, ...)
-    if (any(bad <- !is.finite(ulist[[i]]$f))) {
-      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
+    iters[[i]] <- getRatio(FUN = FUN, x = x, h = hnew, vanilla = vanilla, ...)
+    if (any(bad <- !is.finite(iters[[i]]$f))) {
+      stop(paste0("Could not compute the function value at ", .pasteAnd(iters[[i]]$x[bad]),
                   ". Change the range, which is currently [", .pasteAnd(range),
                   "], and/or try a different starting h0, which is currently ", h0, "."))
     }
 
-    if (ulist[[i]]$ratio >= target[1] && ulist[[i]]$ratio <= target[2]) {
+    if (iters[[i]]$ratio >= target[1] && iters[[i]]$ratio <= target[2]) {
       break # Successful termination by matching the range
     }
-    if (ulist[[i]]$ratio == 0) { # Zero truncation error -> only rounding error
+    if (iters[[i]]$ratio == 0) { # Zero truncation error -> only rounding error
       exitcode <- 1
       hnew <- hnew * 4 # For linear or quadratic functions, a large h is preferred
-      ulist[[i+1]] <- getRatio(FUN = FUN, x = x, h = hnew, vanilla = vanilla, ...)
+      iters[[i+1]] <- getRatio(FUN = FUN, x = x, h = hnew, vanilla = vanilla, ...)
       break
     }
 
     i <- i + 1
   }
 
-  i <- length(ulist)
+  i <- length(iters)
   if (i >= maxit) exitcode <- 4
 
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
                 "truncation error is exactly zero, large step is favoured",
                 "step size did not change between iterations",
-                paste0("step size landed on the range ", if (ulist[[i]]$h == range[1]) "left" else
+                paste0("step size landed on the range ", if (iters[[i]]$h == range[1]) "left" else
                          "right", " end; consider extending the range"),
                 "maximum number of iterations reached")
   if (diagnostics) {
-    diag.list <- list(h = do.call(c, lapply(ulist, "[[", "h")),
-                      x = do.call(rbind, lapply(ulist, "[[", "x")),
-                      f = do.call(rbind, lapply(ulist, "[[", "f")),
-                      deriv = do.call(rbind, lapply(ulist, "[[", "deriv")),
-                      est.error = do.call(rbind, lapply(ulist, "[[", "est.error")),
-                      ratio = do.call(c, lapply(ulist, "[[", "ratio")))
+    diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
+                      x = do.call(rbind, lapply(iters, "[[", "x")),
+                      f = do.call(rbind, lapply(iters, "[[", "f")),
+                      deriv = do.call(rbind, lapply(iters, "[[", "deriv")),
+                      est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
+                      ratio = do.call(c, lapply(iters, "[[", "ratio")))
   }
-  ret <- list(par = ulist[[i]]$h,
-              value = if (acc.order == 4) unname(ulist[[i]]$deriv["cd4"]) else unname(ulist[[i]]$deriv["cd"]),
+  ret <- list(par = iters[[i]]$h,
+              value = if (acc.order == 4) unname(iters[[i]]$deriv["cd4"]) else unname(iters[[i]]$deriv["cd"]),
               counts = i, exitcode = exitcode, message = msg,
-              abs.error = sum(ulist[[i]]$est.error),
+              abs.error = sum(iters[[i]]$est.error),
               iterations = if (diagnostics) diag.list else NULL)
   return(ret)
 }
@@ -205,7 +205,9 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
-#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
+#'   size for first derivarives is internallt translated into the initial step size for third
+#'   derivatives by multiplying it by the machine epsilon raised to the power -2/15.
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
 #' @param alpha Numeric scalar >= 1 indicating the relative reduction in the
 #'   number of accurate bits due to the calculation of \code{FUN}. A value of \code{1}
@@ -304,16 +306,16 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     return(ret)
   }
 
-  ulist <- list()
+  iters <- list()
   i <- 1
   exitcode <- 0
   ndownwards <- 0 # For counting the number of downwards shrinkages
 
   while (i <= maxit) {
     if (i == 1) k <- k0
-    ulist[[i]] <- getRatio(FUN = FUN, x = x, k = k, P = P, ...)
-    if (any(bad <- !is.finite(ulist[[i]]$f))) {
-      stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
+    iters[[i]] <- getRatio(FUN = FUN, x = x, k = k, P = P, ...)
+    if (any(bad <- !is.finite(iters[[i]]$f))) {
+      stop(paste0("Could not compute the function value at ", .pasteAnd(iters[[i]]$x[bad]),
                   ". Change the range, which is currently [", .pasteAnd(range),
                   "], and/or try a different starting h0, which is currently ", h0, "."))
     }
@@ -326,18 +328,18 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
     # If the estimate of f''' is near-zero, then, f_inf and f_sup will have opposite signs
     # The algorithm must therefore stop
-    if (abs(ulist[[i]]$deriv["f3"]) < 8 * .Machine$double.eps) {
+    if (abs(iters[[i]]$deriv["f3"]) < 8 * .Machine$double.eps) {
       exitcode <- 1
       break
     }
 
     # TODO: find an improvement for the ratios of opposite signs
 
-    if (ulist[[i]]$ratio < ratio.limits[1] || ulist[[i]]$ratio > ratio.limits[4]) {
+    if (iters[[i]]$ratio < ratio.limits[1] || iters[[i]]$ratio > ratio.limits[4]) {
       # The numerical error is too high
       range3[1] <- k
     } else {
-      if (ulist[[i]]$ratio > ratio.limits[2] && ulist[[i]]$ratio < ratio.limits[3]) {
+      if (iters[[i]]$ratio > ratio.limits[2] && iters[[i]]$ratio < ratio.limits[3]) {
         # The numerical error is too small
         range3[2] <- k
         ndownwards <- ndownwards + 1
@@ -349,10 +351,10 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     k <- sqrt(prod(range3)) # The interval has been sub-divided; take its geometric mean
     i <- i+1
   }
-  i <- length(ulist)
+  i <- length(iters)
 
-  f3 <- if (exitcode != 1) sum(ulist[[i]]$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
-  f0 <- mean(ulist[[i]]$f[2:3]) # Approximately f(x); the error is small for small h
+  f3 <- if (exitcode != 1) sum(iters[[i]]$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
+  f0 <- mean(iters[[i]]$f[2:3]) # Approximately f(x); the error is small for small h
   h <- (1.67 * P * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
 
   if (h < range[1]) {
@@ -389,14 +391,135 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 paste0("maximum number of iterations reached and step size occured on the ",
                        side, " end of the range [", .printE(range[1]), ", ",
                        .printE(range[2]), "]; consider expanding it"),
-                "only one iteration requested; no search performed for the plug-in estimator")
+                "only one iteration requested; rough values returned")
 
   if (diagnostics) {
-    diag.list <- list(k = do.call(c, lapply(ulist, "[[", "k")),
-                      x = do.call(rbind, lapply(ulist, "[[", "x")),
-                      f = do.call(rbind, lapply(ulist, "[[", "f")),
-                      ratio = do.call(c, lapply(ulist, "[[", "ratio")),
-                      deriv3 = do.call(rbind, lapply(ulist, "[[", "deriv")))
+    diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
+                      x = do.call(rbind, lapply(iters, "[[", "x")),
+                      f = do.call(rbind, lapply(iters, "[[", "f")),
+                      ratio = do.call(c, lapply(iters, "[[", "ratio")),
+                      deriv3 = do.call(rbind, lapply(iters, "[[", "deriv")))
+  }
+
+  ret <- list(par = h, value = cd, counts = i, exitcode = exitcode,
+              message = msg, abs.error = err,
+              iterations = if (diagnostics) diag.list else NULL)
+  return(ret)
+
+}
+
+#' Plug-in step selection
+#'
+#' @inheritParams steps.DV
+#'
+#' @details
+#' This function computes the optimal step size for central differences using the
+#' plug-in approach.
+#' The optimal step size is determined as the minimiser of the total error, which for central
+#' finite differences is (assuming minimal bounds for relative rounding errors)
+#' \deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x) \epsilon_{\mathrm{mach}}}}}{[(1.5 mach.eps * f' / f''')^(1/3)]}
+#' If the estimated third derivative is too small, the function assumes a third
+#' derivative of 1 to prevent division-by-zero errors.
+#'
+#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
+#'   step size found, \code{value} -- the estimated numerical first derivative (central
+#'   differences), \code{counts} -- the number of iterations (here, it is 2),
+#'   \code{abs.error} -- an estimate of the total approximation error (sum of truncation and
+#'   rounding errors),
+#'   \code{exitcode} -- an integer code indicating the termination status:
+#'   \code{0} indicates termination with checks passed tolerance,
+#'   \code{1} means that the third derivative is exactly zero (large step size preferred),
+#'   \code{2} signals that the third derivative is too close to zero (large step size preferred),
+#'   \code{3} indicates a solution at the boundary of the allowed value range.
+#'   \code{message} is a summary message of the exit status.
+#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
+#'   including the two-step size search path, argument grids, function values on those grids,
+#'   and estimated 3rd derivative values.
+#' @export
+#'
+#' @references
+#' \insertAllCited{}
+#'
+#' @examples
+#' f <- function(x) x^4
+#' step.plugin(x = 2, f)
+#' step.plugin(x = 0, f)
+step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(1e4, 1e-4),
+                        cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                        cl = NULL,  diagnostics = FALSE, ...) {
+  cores <- .warnWindows(cores)
+  h0 <- unname(h0)  # To prevent errors with derivative names
+  cores <- min(cores, 6)
+  k0 <- h0 * .Machine$double.eps^(-2/15)
+  if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
+  if (range[2] < range[1]) range <- c(range[2], range[1])
+
+  s1 <- fdCoef(deriv.order = 1)
+  s3 <- fdCoef(deriv.order = 3)
+  xgrid1 <- x + s1$stencil*h0
+  xgrid3 <- x + s3$stencil*k0
+  xgrid <- c(xgrid1, xgrid3)
+  FUN1 <- function(z) .safeF(FUN, z, ...)
+  if (cores > 1) {
+    fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
+                                       mc.cores = cores, mc.preschedule = preschedule))
+  } else {
+    fgrid  <- sapply(xgrid, FUN1)
+  }
+  fgrid1 <- fgrid[1:2]
+  fgrid3 <- fgrid[3:6]
+  cd1 <- sum(fgrid1 * s1$weights) / h0
+  cd3 <- sum(fgrid3 * s3$weights) / k0^3
+
+  iters <- vector("list", 2)
+  iters[[1]] <- list(h = c(f1 = h0, f3 = k0), x = xgrid[order(xgrid)], f = fgrid[order(xgrid)], deriv = c(f3 = cd3, f1 = cd1))
+
+  exitcode <- 0
+  h <- abs(1.5 * cd1/cd3 * .Machine$double.eps)^(1/3)
+  xgrid <- x + s1$stencil*h
+  if (cores > 1) {
+    fgrid <- unlist(parallel::mclapply(X = xgrid, FUN = FUN1,
+                                       mc.cores = cores, mc.preschedule = preschedule))
+  } else {
+    fgrid  <- sapply(xgrid, FUN1)
+  }
+  cd <- sum(fgrid * s1$weights) / h
+
+  # If the estimate of f''' is near-zero, the step-size estimate may be too large -- these objects
+  # need not be saved
+  if (abs(cd3) == 0) {
+    exitcode <- 1
+    cd3 <- .Machine$double.eps^(2/3) * abs(x)
+  } else if (abs(cd3) / max(abs(cd1), .Machine$double.eps^(2/3)) < 1e-8) {
+    cd3 <- 1e-8 * max(abs(cd1), .Machine$double.eps^(2/3))
+    exitcode <- 2
+  }
+
+  if (h < range[1]) {
+    h <- range[1]
+    exitcode <- 3
+    side <- "left"
+  }
+  if (h > range[2]) {
+    h <- range[2]
+    exitcode <- 3
+    side <- "right"
+  }
+
+  msg <- switch(exitcode + 1,
+                "successfully computed non-zero f''' and f'",
+                "truncation error is zero, large step is favoured",
+                "truncation error is near-zero, large step is favoured",
+                paste0("step size too close to the ", side,
+                       " end of the reasonable range [", .printE(range[1]), ", ",
+                       .printE(range[2]), "]"))
+
+  if (diagnostics) {
+    diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
+                      x = do.call(rbind, lapply(iters, "[[", "x")),
+                      f = do.call(rbind, lapply(iters, "[[", "f")),
+                      ratio = do.call(c, lapply(iters, "[[", "ratio")),
+                      deriv3 = do.call(rbind, lapply(iters, "[[", "deriv")))
   }
 
   ret <- list(par = h, value = cd, counts = i, exitcode = exitcode,
@@ -517,26 +640,26 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   exitcode <- 0
   main.loop <- close.left <- FALSE
   first.main <- TRUE
-  ulist <- list()
+  iters <- list()
 
   while (i <= maxit) {
     if (!main.loop) {
       if (i == 1) {
-        ulist[[i]] <- getRatio(FUN, x, h0, do.f0 = TRUE, ratio.last = NULL, ...)
-        f0 <- ulist[[i]]$f0
-        hnew <- ulist[[i]]$h
+        iters[[i]] <- getRatio(FUN, x, h0, do.f0 = TRUE, ratio.last = NULL, ...)
+        f0 <- iters[[i]]$f0
+        hnew <- iters[[i]]$h
       }
       if (!is.finite(f0)) {
         stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
       }
-      if (any(bad <- !is.finite(ulist[[i]]$f))) {
-        stop(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad]),
+      if (any(bad <- !is.finite(iters[[i]]$f))) {
+        stop(paste0("Could not compute the function value at ", .pasteAnd(iters[[i]]$x[bad]),
                     ". FUN(", x, ") is finite -- reduce the step h0, which is currently ", h0, "."))
       }
 
       # First check: are the function values of different signs?
       # If yes, h is too large -- jump to the step-shrinking main loop:
-      if (prod(sign(ulist[[i]]$f)) < 0) { # f(x+h) should be close to f(x-h)
+      if (prod(sign(iters[[i]]$f)) < 0) { # f(x+h) should be close to f(x-h)
         main.loop <- TRUE
         i.prelim <- i
         next
@@ -544,7 +667,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
         while (!main.loop && i <= maxit) {
           hold <- hnew
           # N: approx. number of inaccurate digits due to rounding at h0 and hopt
-          Nh0 <- log10(abs(f0)) - log10(2) - log10(hnew) - log10(abs(ulist[[i]]$deriv))
+          Nh0 <- log10(abs(f0)) - log10(2) - log10(hnew) - log10(abs(iters[[i]]$deriv))
           Nhopt <- -log10(max.rel.error) / 3
           rounding.nottoosmall <- Nh0 > 0 # Formula 3.16: some digits were lost,
           # the rounding error not zero, the step size not extremely large
@@ -562,42 +685,42 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
             if (!rounding.nottoosmall) hnew <- (hold + hnew) / 2 # Bisection
 
             if (hnew > range[2]) hnew <- range[2] # Safeguarding against huge steps
-            ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
+            iters[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ...)
             if (abs(hnew/hold - 1) < seq.tol) { # The algorithm is stuck at one range end
               main.loop <- TRUE
               exitcode <- 2
               break
             }
 
-            bad <- !is.finite(ulist[[i]]$f)
+            bad <- !is.finite(iters[[i]]$f)
             if (any(bad) && !rounding.small) {  # Not in the original paper, but a necessary fail-safe
-              warning(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad])),
+              warning(paste0("Could not compute the function value at [", .pasteAnd(.printE(iters[[i]]$x[bad])),
                              "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- try the initial step h0 larger than ",
                              .printE(h0), " but smaller than ", .printE(hold), ". Halving from ",
                              .printE(hnew), " to ", .printE(hnew/2), ")."))
               for (i in 1:maxit) {
                 hnew <- hnew/2
-                ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
-                if (is.finite(ulist[[i]]$f)) break
+                iters[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ...)
+                if (is.finite(iters[[i]]$f)) break
               }
-              if (!is.finite(ulist[[i]]$f))
-                stop(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad])),
+              if (!is.finite(iters[[i]]$f))
+                stop(paste0("Could not compute the function value at [", .pasteAnd(.printE(iters[[i]]$x[bad])),
                              "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- halving did not help.",
                              " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
             }
 
             if (any(bad) && !rounding.nottoosmall) {
-              warning(paste0("Could not compute the function value at ", .pasteAnd(ulist[[i]]$x[bad, , drop = FALSE]),
+              warning(paste0("Could not compute the function value at ", .pasteAnd(iters[[i]]$x[bad, , drop = FALSE]),
                              ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, ". ",
                              "Halving from ", .printE(hnew), " to ", .printE(hnew/2), ")."))
               for (i in 1:maxit) {
                 hnew <- hnew/2
-                ulist[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = ulist[[i-1]], ...)
-                if (is.finite(ulist[[i]]$f)) break
+                iters[[i]] <- getRatio(FUN, x, hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ...)
+                if (is.finite(iters[[i]]$f)) break
               }
-              if (!is.finite(ulist[[i]]$f))
+              if (!is.finite(iters[[i]]$f))
                 stop(paste0("Could not compute the function value at [",
-                            .pasteAnd(.printE(ulist[[i]]$x[bad, , drop = FALSE])),
+                            .pasteAnd(.printE(iters[[i]]$x[bad, , drop = FALSE])),
                              "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- halving did not help.",
                              " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
             }
@@ -613,12 +736,12 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
         i <- i + 1
         hnew <- hnew * shrink.factor
         if (hnew < range[1]) hnew <- range[1]
-        ulist[[i]] <- getRatio(FUN, x, hnew, ratio.last = ulist[[i-1]],
-                               ratio.beforelast = if (j == 1) NULL else ulist[[i-2]])
+        iters[[i]] <- getRatio(FUN, x, hnew, ratio.last = iters[[i-1]],
+                               ratio.beforelast = if (j == 1) NULL else iters[[i-2]])
       }
       first.main <- FALSE
     } else { # Monotonicity satisfied, continuing shrinking, only h[i+1] needed
-      if (abs(ulist[[i]]$h/ulist[[i-1]]$h - 1) < seq.tol) {
+      if (abs(iters[[i]]$h/iters[[i-1]]$h - 1) < seq.tol) {
         exitcode <- 2 # If h did not shrink, it must have hit the lower bound
         break  # or something else went wrong; this code will most likely
         # be overwritten by 3; if it does not, throws a warning
@@ -628,24 +751,24 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       hnew <- hnew * shrink.factor
       if (hnew < range[1]) hnew <- range[1]
       i <- i + 1
-      ulist[[i]] <- getRatio(FUN, x, hnew, ratio.last = ulist[[i-1]], ratio.beforelast = ulist[[i-2]])
+      iters[[i]] <- getRatio(FUN, x, hnew, ratio.last = iters[[i-1]], ratio.beforelast = iters[[i-2]])
     }
 
-    if (any(!ulist[[i]]$monotone)) break
+    if (any(!iters[[i]]$monotone)) break
   }
-  hopt <- ulist[[i-1]]$h # No monotonicity = bad
-  hprev <- ulist[[i-2]]$h
+  hopt <- iters[[i-1]]$h # No monotonicity = bad
+  hprev <- iters[[i-2]]$h
   # Error codes ordered by severity
   if (abs(hopt / hprev - 1) < seq.tol) exitcode <- 2
 
   # If hprev hits the upper limit, the total error needs to be compared
   if (abs(hprev / range[2] - 1) < seq.tol) {
-    abs.error.prev <- unname(ulist[[i-1]]$est.error["trunc"] / shrink.factor + ulist[[i-2]]$est.error["round"])
-    abs.error.opt  <- unname(ulist[[i-1]]$est.error["trunc"] + ulist[[i-1]]$est.error["round"])
+    abs.error.prev <- unname(iters[[i-1]]$est.error["trunc"] / shrink.factor + iters[[i-2]]$est.error["round"])
+    abs.error.opt  <- unname(iters[[i-1]]$est.error["trunc"] + iters[[i-1]]$est.error["round"])
     if (abs.error.prev < abs.error.opt) { # The two-times reduction was unnecessary
       exitcode <- 3
       hopt <- hprev
-      ulist[[i-2]]$est.error["trunc"] <- unname(ulist[[i-1]]$est.error["trunc"] / shrink.factor)
+      iters[[i-2]]$est.error["trunc"] <- unname(iters[[i-1]]$est.error["trunc"] / shrink.factor)
     }
   }
   if (abs(hopt / range[1] - 1) < seq.tol) {
@@ -675,20 +798,20 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                    "and a slightly smaller h0, or expand the range."))
 
   if (diagnostics) {
-    diag.list <- list(h = do.call(c, lapply(ulist, "[[", "h")),
-                      x = do.call(rbind, lapply(ulist, "[[", "x")),
-                      f = do.call(rbind, lapply(ulist, "[[", "f")),
-                      deriv = do.call(c, lapply(ulist, "[[", "deriv")),
-                      est.error = do.call(rbind, lapply(ulist, "[[", "est.error")),
-                      monotone = do.call(rbind, lapply(ulist, "[[", "monotone")))
+    diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
+                      x = do.call(rbind, lapply(iters, "[[", "x")),
+                      f = do.call(rbind, lapply(iters, "[[", "f")),
+                      deriv = do.call(c, lapply(iters, "[[", "deriv")),
+                      est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
+                      monotone = do.call(rbind, lapply(iters, "[[", "monotone")))
   }
 
   best.i <- if (exitcode == 3 && !close.left) i-2 else i-1
   ret <- list(par = hopt,
-              value = ulist[[best.i]]$deriv,
+              value = iters[[best.i]]$deriv,
               counts = c(preliminary = i.prelim, main = i - i.prelim),
               exitcode = exitcode, message = msg,
-              abs.error = sum(ulist[[best.i]]$est.error),
+              abs.error = sum(iters[[best.i]]$est.error),
               iterations = if (diagnostics) diag.list else NULL)
 
   if (abs(x) + 7e-6 < ret$par)

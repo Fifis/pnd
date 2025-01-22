@@ -112,8 +112,17 @@ over the derivative computation process, including order of derivatives, accurac
 allowing arbitrary accuracies, sides, and derivative orders for different coordinates.
 }
 \details{
-For computation of Jacobians, use \code{Jacobian} or \code{Grad}. These two functions
-are equivalent, but using \code{Grad} for vector-valued returns will produce a warning.
+The following combinations of parameters are allowed, resulting in the following input and
+output handling:\tabular{lll}{
+    \tab \code{univariate} \tab \code{!univariate} \cr
+   \code{multivalued}, \code{vectorised} \tab \emph{(undefined)} \tab \emph{(undefined)} \cr
+   \code{!multivalued}, \code{vectorised} \tab \code{FUN(xgrid)} \tab \emph{(undefined)} \cr
+   \code{multivalued}, \code{!vectorised} \tab \emph{(undefined)} \tab \verb{[mc]lapply} Jacobian \cr
+   \code{!multivalued}, \code{!vectorised} \tab \verb{[mc]lapply(xgrid, FUN)} \tab \verb{[mc]lapply} gradient \cr
+}
+
+
+For computing gradients and Jacobians, use convenience wrappers \code{Jacobian} and \code{Grad}.
 
 If the step size is too large, the slope of the secant poorly estimates the derivative;
 if it is too small, it leads to numerical instability due to the function value rounding.
@@ -128,15 +137,6 @@ Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
 
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.
-
-The following combinations of parameters are allowed:\tabular{lll}{
-    \tab \code{univariate = TRUE} \tab \code{univariate = FALSE} \cr
-   \code{multivalued}, \code{vectorised} \tab \emph{(undefined)} \tab \emph{(undefined)} \cr
-   \code{!multivalued}, \code{vectorised} \tab \code{FUN(xgrid)} \tab \emph{(undefined)} \cr
-   \code{multivalued}, \code{!vectorised} \tab \emph{(undefined)} \tab \verb{[mc]lapply} Jacobian \cr
-   \code{!multivalued}, \code{!vectorised} \tab \verb{[mc]lapply(xgrid, FUN)} \tab \verb{[mc]lapply} gradient \cr
-}
-
 
 For convenience, \code{report = 2} overrides \code{diagnostics = FALSE} in the
 \code{control}) list.

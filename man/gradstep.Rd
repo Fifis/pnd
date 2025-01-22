@@ -10,6 +10,7 @@ gradstep(
   h0 = NULL,
   zero.tol = sqrt(.Machine$double.eps),
   method = c("SW", "CR", "CRm", "DV", "M"),
+  diagnostics = FALSE,
   control = NULL,
   cores = getOption("pnd.cores"),
   preschedule = getOption("pnd.preschedule"),

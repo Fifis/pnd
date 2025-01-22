@@ -158,7 +158,6 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   zero.action <- zero.action[1]
   if (!(zero.action %in% c("drop", "round", "none")))
     stop("The 'zero.action' argument must be 'drop', 'round', or 'none'.")
-  # TODO: implement interpolation
 
   if (is.null(stencil)) { # Miminally sufficient stencil to prevent zero weights
     acc.requested <- acc.order
