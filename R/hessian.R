@@ -71,12 +71,13 @@
 #'   system.time(Hessian(f, 1:100))
 #' }
 Hessian <- function(FUN, x, side = 0, acc.order = 2,
-                    h = (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order)),
+                    h = NULL,
                     symmetric = TRUE, h0 = NULL, control = list(), f0 = NULL,
                     cores = 1, preschedule = TRUE, func = NULL, report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) stop("The argument order must be FUN and then x, not vice versa.")
   n <- length(x)
   h.default <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1 / (2 + acc.order))
+  if (is.null(h)) h <- h.default
   if (.Platform$OS.type == "windows" && cores > 1) cores <- 1
   ell <- list(...)
 
@@ -101,7 +102,8 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2,
   if (length(side) == 1) side <- rep(side, n)
   if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or same length as x.")
   side[!is.finite(side)] <- 0 # NA --> default 'central -- numDeriv COMPATIBILITY
-  if (!all(side %in% -1:1)) stop("The 'side' argument must contain values 0 for central, 1 for forward, and -1 for backward difference.")
+  if (!all(side %in% -1:1))
+    stop("The 'side' argument must contain values 0 for central, 1 for forward, and -1 for backward differences.")
 
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
 

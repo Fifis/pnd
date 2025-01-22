@@ -9,7 +9,7 @@ Hessian(
   x,
   side = 0,
   acc.order = 2,
-  h = (abs(x) * (x != 0) + (x == 0)) * .Machine$double.eps^(1/(2 + acc.order)),
+  h = NULL,
   symmetric = TRUE,
   h0 = NULL,
   control = list(),

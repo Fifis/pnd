@@ -7,6 +7,7 @@
 GenD(
   FUN,
   x,
+  univariate = NA,
   vectorised = NA,
   multivalued = NA,
   deriv.order = 1L,
@@ -26,11 +27,16 @@ GenD(
 )
 }
 \arguments{
-\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed.
-If the function returns a vector, the output will be a Jacobian.}
+\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be
+computed. If the function returns a vector, the output will be a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite.}
+
+\item{univariate}{Logical: is the domain effectively 1D, i.e. is this a mapping
+\eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
+\eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
+compares the output length ot the input length.}
 
 \item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
@@ -41,10 +47,8 @@ checks the output length and assumes vectorisation if it matches the input lengt
 this check is necessary and potentially slow.}
 
 \item{multivalued}{Logical: if \code{TRUE}, the function is assumed to return vectors longer
-than 1. Use \code{FALSE} for functions that have output of length 1 for each coordinate of
-input, i.e. \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} and
-\eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n} functions regardless of their vectorisation.
-If \code{NA}, attempts inferring it from the function output.}
+than 1. Use \code{FALSE} for univariate functions. If \code{NA}, attempts inferring it from
+the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -61,9 +65,9 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
 \code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
 
-\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically guessed
-step size is relative (\code{x} multiplied by the step), unless an auto-selection procedure is
-requested; otherwise, it is absolute.}
+\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+procedure is requested; otherwise, it is absolute.}
 
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}
@@ -82,8 +86,8 @@ take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
-Do not set for \code{mclapply} (fork cluster).}
+(if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows
+and \code{mclapply} (fork cluster) on everything else.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -125,6 +129,15 @@ Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.
 
+The following combinations of parameters are allowed:\tabular{lll}{
+    \tab \code{univariate = TRUE} \tab \code{univariate = FALSE} \cr
+   \code{multivalued}, \code{vectorised} \tab \emph{(undefined)} \tab \emph{(undefined)} \cr
+   \code{!multivalued}, \code{vectorised} \tab \code{FUN(xgrid)} \tab \emph{(undefined)} \cr
+   \code{multivalued}, \code{!vectorised} \tab \emph{(undefined)} \tab \verb{[mc]lapply} Jacobian \cr
+   \code{!multivalued}, \code{!vectorised} \tab \verb{[mc]lapply(xgrid, FUN)} \tab \verb{[mc]lapply} gradient \cr
+}
+
+
 For convenience, \code{report = 2} overrides \code{diagnostics = FALSE} in the
 \code{control}) list.
 
@@ -141,10 +154,10 @@ plot(1:100, g1 - g1.true, main = "Approximation error of d/dx sin(x)")
 
 # Case 2: Vector argument, scalar result
 f2 <- function(x) sum(sin(x))
-g2 <- GenD(FUN = f2, x = 1:4, vectorised = FALSE)
-g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, vectorised = FALSE)
+g2    <- GenD(FUN = f2, x = 1:4, univariate = FALSE)
+g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, univariate = FALSE)
 g2 - g2.h2  # Tiny differences due to different step sizes
-g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE)
+g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", univariate = FALSE)
 g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
 print(attr(g2.full, "step.search")$exitcode)  # Success
 
@@ -157,7 +170,8 @@ print(j3)
 # Gradients for vectorised functions -- e.g. leaky ReLU
 LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
 system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
-system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
+system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1),
+                                          univariate = TRUE))))
 
 # Saving time for slow functions by using pre-computed values
 x <- 1:4

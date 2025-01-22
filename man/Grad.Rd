@@ -23,8 +23,8 @@ Grad(
 )
 }
 \arguments{
-\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be computed.
-If the function returns a vector, the output will be a Jacobian.}
+\item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be
+computed. If the function returns a vector, the output will be a Jacobian.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite.}
