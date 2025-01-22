@@ -6,10 +6,14 @@
 #' \code{GenD} is fully vectorised over different coordinates of the function argument,
 #' allowing arbitrary accuracies, sides, and derivative orders for different coordinates.
 #'
-#' @param FUN A function returning a numeric scalar or a vector whose derivatives are to be computed.
-#'   If the function returns a vector, the output will be a Jacobian.
+#' @param FUN A function returning a numeric scalar or a vector whose derivatives are to be
+#'   computed. If the function returns a vector, the output will be a Jacobian.
 #' @param x Numeric vector or scalar: the point(s) at which the derivative is estimated.
 #'   \code{FUN(x)} must be finite.
+#' @param univariate Logical: is the domain effectively 1D, i.e. is this a mapping
+#'   \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
+#'   \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
+#'   compares the output length ot the input length.
 #' @param vectorised Logical: if \code{TRUE}, the function
 #'   is assumed to be vectorised: it will accept a vector of parameters and return
 #'   a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
@@ -18,10 +22,8 @@
 #'   checks the output length and assumes vectorisation if it matches the input length;
 #'   this check is necessary and potentially slow.
 #' @param multivalued Logical: if \code{TRUE}, the function is assumed to return vectors longer
-#'   than 1. Use \code{FALSE} for functions that have output of length 1 for each coordinate of
-#'   input, i.e. \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} and
-#'   \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n} functions regardless of their vectorisation.
-#'   If \code{NA}, attempts inferring it from the function output.
+#'   than 1. Use \code{FALSE} for univariate functions. If \code{NA}, attempts inferring it from
+#'   the function output.
 #' @param deriv.order Integer or vector of integers indicating the desired derivative order,
 #'   \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.
 #' @param acc.order Integer or vector of integers specifying the desired accuracy order
@@ -33,23 +35,15 @@
 #' @param h Numeric or character specifying the step size(s) for the numerical
 #'   difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
 #'   \code{"DV"}, or \code{"SW"} to be used in [gradstep()]).
-#' @param zero.tol Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically guessed
-#'   step size is relative (\code{x} multiplied by the step), unless an auto-selection procedure is
-#'   requested; otherwise, it is absolute.
+#' @param zero.tol Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+#'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+#'   procedure is requested; otherwise, it is absolute.
 #' @param f0 Optional numeric: if provided, used to determine the vectorisation type
 #'   to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
-#' @param cores Integer specifying the number of CPU cores used for parallel computation.
-#'   Recommended to be set to the number of physical cores on the machine minus one.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
-#'   take less than 0.1 s per evaluation.
-#' @param cl An optional user-supplied \code{cluster} object (created by \code{makeCluster}
-#'   or similar functions). If not \code{NULL}, the code uses \code{parLapply()}
-#'   (if \code{preschedule} is \code{TRUE}) or \code{parLapplyLB()} on that cluster.
-#'   Do not set for \code{mclapply} (fork cluster).
+#' @inheritParams runParallel
 #' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
 #'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
 #' @param report Integer for the level of detail in the output. If \code{0},
@@ -60,8 +54,17 @@
 #'
 #' @details
 #'
-#' For computation of Jacobians, use \code{Jacobian} or \code{Grad}. These two functions
-#' are equivalent, but using \code{Grad} for vector-valued returns will produce a warning.
+#' The following combinations of parameters are allowed, resulting in the following input and
+#' output handling:
+#'
+#' |                               | `univariate`             | `!univariate`         |
+#' | ----------------------------- | ------------------------ | --------------------- |
+#' | `multivalued`, `vectorised`   | *(undefined)*            | *(undefined)*         |
+#' | `!multivalued`, `vectorised`  | `FUN(xgrid)`             | *(undefined)*         |
+#' | `multivalued`, `!vectorised`  | *(undefined)*            | `[mc]lapply` Jacobian |
+#' | `!multivalued`, `!vectorised` | `[mc]lapply(xgrid, FUN)` | `[mc]lapply` gradient |
+#'
+#' For computing gradients and Jacobians, use convenience wrappers \code{Jacobian} and \code{Grad}.
 #'
 #' If the step size is too large, the slope of the secant poorly estimates the derivative;
 #' if it is too small, it leads to numerical instability due to the function value rounding.
@@ -101,10 +104,10 @@
 #'
 #' # Case 2: Vector argument, scalar result
 #' f2 <- function(x) sum(sin(x))
-#' g2 <- GenD(FUN = f2, x = 1:4, vectorised = FALSE)
-#' g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, vectorised = FALSE)
+#' g2    <- GenD(FUN = f2, x = 1:4, univariate = FALSE)
+#' g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, univariate = FALSE)
 #' g2 - g2.h2  # Tiny differences due to different step sizes
-#' g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE)
+#' g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", univariate = FALSE)
 #' g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
 #' print(attr(g2.full, "step.search")$exitcode)  # Success
 #'
@@ -117,7 +120,8 @@
 #' # Gradients for vectorised functions -- e.g. leaky ReLU
 #' LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
 #' system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
-#' system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1), vectorised = TRUE))))
+#' system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1),
+#'                                           univariate = TRUE))))
 #'
 #' # Saving time for slow functions by using pre-computed values
 #' x <- 1:4
@@ -130,12 +134,17 @@
 #' # TODO: in this example, the 1:4 vector is not de-duped
 #' # TODO: fix the next example
 #' # system.time(GenD(fslow, x, side = 1, acc.order = 2, vectorised = FALSE))
-GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
+GenD <- function(FUN, x, univariate = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2L,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps),  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
                  func = NULL, report = 1L, ...) {
-  if (is.function(x) && !is.function(FUN)) stop("The argument order must be FUN and then x, not vice versa.")
+  if (is.function(x) && !is.function(FUN)) {
+    warning("The argument order must be FUN and then x, not vice versa.")
+    x0 <- FUN
+    FUN <- x
+    x <- x0
+  }
 
   n <- length(x)
 
@@ -160,7 +169,8 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
       margs <- ell$method.args
       ma <- list(eps = 1e-5, d = NA, zero.tol = 1e-5, r = 4, show.details = FALSE)
       # Using a better step size for one-sided differences
-      if (nd.method == "simple") ma$eps <- (abs(x) * (x!=0) + (x==0)) * sqrt(.Machine$double.eps) * 2
+      if (nd.method == "simple")
+        ma$eps <- (abs(x) * (x!=0) + (x==0)) * sqrt(.Machine$double.eps) * 2
       ma[intersect(names(margs), names(ma))] <- margs[intersect(names(margs), names(ma))]
       if (identical(unname(h), unname(h.default))) h <- ma$eps
       if (nd.method == "simple") {
@@ -189,7 +199,7 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
   if (missing(FUN)) {
     if (is.function(func)) {
       FUN <- func
-      warning("Use the argument 'FUN' to pass the function for differencing to Grad instead of 'func'.")
+      warning("Use the argument 'FUN' to pass the function for differencing instead of 'func'.")
     } else {
       stop("Pass the function for differencing as the named argument 'FUN'.")
     }
@@ -208,9 +218,10 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
   # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
   if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
   if (length(side) == 1) side <- rep(side, n)
-  if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or same length as x.")
+  if (!(length(side) %in% c(1, n))) stop("The 'side' argument must have length 1 or length(x).")
   side[!is.finite(side)] <- 0 # NA --> default central for numDeriv compatibility
-  if (!all(side %in% -1:1)) stop("The 'side' argument must contain values 0 for central, 1 for forward, and -1 for backward difference.")
+  if (!all(side %in% -1:1))
+    stop("'side' must be 0 for central, 1 for forward, and -1 for backward differences.")
 
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
@@ -249,32 +260,48 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
   }
 
   # TODO: optimisation: if all deriv.order, acc.order, side are the same, do once an repeat
-  stencils <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i], acc.order = acc.order[i], side = side[i]))
+  stencils <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i],
+                                             acc.order = acc.order[i], side = side[i]))
   weights <- lapply(stencils, "[[", "weights")
   stencils <- lapply(stencils, "[[", "stencil")
   slengths <- sapply(stencils, "length")
 
   # Vectorisation can be inferred if FUN(x) is supplied
-  user.f0 <- TRUE
-  if (length(f0) > 1) {
-    if (length(f0) == n) {
+  user.f0 <- !is.null(f0)
+  needs.detection <- is.na(univariate) || is.na(vectorised) || is.na(multivalued)
+  if ((!user.f0) && needs.detection) f0 <- .safeF(FUN1, x)
+
+  # The univariate mapping by definition is having equal lengths of input and output
+  # TODO: This is NOT guaranteed, however, to guess correctly:
+  # f(x) := c(sum(x), prod(x), sd(x)) evaluated at x = 1:3 would SEEM vectorised; more checks needed
+  if (is.na(univariate)) univariate <- length(f0) == n
+
+
+
+  # At this point, having a non-finite f0 means one of the two (decreasing desirability):
+  # 1. NULL: The user supplied all 3 arguments univariate, vectorised, multivalued (good),
+  #    computing f0 is not necessary
+  # 2. structure(NA, error = "error"): non-vectorised FUN(x) cannot be computed because it is
+  #    cannot handle outputs of length greater than 1
+
+  if (length(f0) > 1) { # Not NULL and not NA
+    if (univariate) {
       vectorised <- TRUE
       multivalued <- FALSE
-    } else {
+    } else {  # Input length not equal to output length
       vectorised <- FALSE
       multivalued <- TRUE
     }
   } else if (length(f0) == 1) {  # Vectorisation capabilities are yet to be determined
     multivalued <- FALSE
-  } else {  # Otherwise, if NULL, follow the check routine with extra evaluations
-    user.f0 <- FALSE
-  }
+  } # Otherwise, vectorisation must be determined differently with extra evaluations
 
   if (is.na(vectorised)) { # Works if length(x) == 1, too; creates ((x1-h, ...), (x1+h, ...))
     vectorised <- FALSE
     # Attempt 1: modifying the 1st coordinate to get an n-point stencil and checking if the output
     # has length n and is numeric
-    sw <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i], acc.order = acc.order[i], side = side[i]))
+    sw <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i],
+                                         acc.order = acc.order[i], side = side[i]))
     coefn <- sapply(sw, function(x) x$stencil[1])
     if (n > 1) {
       xhvals  <- x + coefn * h
@@ -282,20 +309,24 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
       xhvals <- x + sw[[1]]$stencil[1:2] * h
     }
 
-    fhvals <- .safeF(FUN1, xhvals)  # Guaranteed to safely return NA with an attribute in case of failure
+    # Guaranteed to safely return NA with an attribute in case of failure
+    fhvals <- .safeF(FUN1, xhvals)
     fherr <- identical(attr(fhvals, "error"), "error")
 
     if (!all(is.na(fhvals)) && !fherr) {  # Some NAs in the output, but not from an evaluation error
       if (length(fhvals) == length(xhvals)) {  # No error; by construction length(xhvals) > 1
         vectorised <- TRUE
         multivalued <- FALSE  # Functions like sin(x)
-        if (report > 1) message("This function maps R^n -> R^n. Use 'vectorised = TRUE' and 'multivalued = FALSE' to save time.")
+        if (report > 1)
+          message("FUN maps R^n -> R^n. Use 'vectorised = TRUE' and 'multivalued = FALSE' to save time.")
       } else if (length(fhvals) == 1) {
         multivalued <- FALSE  # Functions like sum(sim(x))
-        if (report > 1) message("This function maps R^n -> R. Use 'vectorised = FALSE' and 'multivalued = FALSE' to save time.")
+        if (report > 1)
+          message("FUN maps R^n -> R. Use 'vectorised = FALSE' and 'multivalued = FALSE' to save time.")
       } else if (length(fhvals) > 1) {
         multivalued <- TRUE  # Functions like c(sum(sin(x)), sum(cos(x)))
-        if (report > 1) message("This function maps R^n -> R^m. Use 'vectorised = FALSE' and 'multivalued = TRUE' to save time.")
+        if (report > 1)
+          message("FUN maps R^n -> R^m. Use 'vectorised = FALSE' and 'multivalued = TRUE' to save time.")
       }
     } else {
       if (sum(is.na(fhvals)) == n) {
@@ -306,11 +337,10 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
     }
   }
 
-  # Now determine if FUN is multivalued
+
   if (is.na(multivalued)) {  # It is not vectorised -- determined
     multivalued <- FALSE
     # TODO: check if FUN(x) was evaluated earlier if x was in the stencil (e.g. side=1)
-    if (!user.f0) f0 <- .safeF(FUN1, x)
     if (length(f0) > 1 && length(f0) != n) {
       multivalued <- TRUE
     ## TODO: Find where it maps vectors to vectors of same dimensions and
@@ -318,11 +348,7 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
     }
   }
 
-  # Finally, inferring if this is 'case 3' from numDeriv: maps R to R
-  # TODO: do it through detecting if we are doing a gradient or not
-  deriv1d <- length(f0) == length(x)
-
-  if (deriv1d) {  # Apply the stencil to each single coordinate of the input x
+  if (univariate) {  # Apply the stencil to each single coordinate of the input x
     xlist <- lapply(1:n, function(i) {
       xmat <- as.data.frame(x = x[i] + stencils[[i]] * h[i])
       xmat$index <- i
@@ -364,8 +390,8 @@ GenD <- function(FUN, x, vectorised = NA, multivalued = NA,
   okay.f <- sapply(fvals0, is.numeric) | sapply(fvals0, is.finite) | sapply(fvals0, is.na)
   if (any(!okay.f)) {
     warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-                   "returned. Some gradient coordinates can be NA. Possible reason: point at ",
-                   "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
+              "returned. Some gradient coordinates can be NA. Possible reason: point at ",
+              "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
     fvals0[!okay.f] <- NA_real_
   }
 

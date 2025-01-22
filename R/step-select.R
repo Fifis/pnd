@@ -81,9 +81,10 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     acc.order = c(2L, 4L),
                     tol = if (version[1] == "original") 10 else 4,
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                    cores = 1, preschedule = TRUE,
-                    diagnostics = FALSE, ...) {
+                    cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                    cl = NULL, diagnostics = FALSE, ...) {
   cores <- .warnWindows(cores)
+  h0 <- unname(h0)  # To prevent errors with derivative names
   version <- version[1]
   if (!(version %in% c("original", "modified"))) stop("step.CR: 'version' must be either 'original' or 'modified'.")
   vanilla <- version == "original"
@@ -270,9 +271,10 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     range = h0 / c(1e6, 1e-6), alpha = 4/3,
                     ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
-                    cores = 1, preschedule = TRUE,
-                    diagnostics = FALSE, ...) {
+                    cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                    cl = NULL,  diagnostics = FALSE, ...) {
   cores <- .warnWindows(cores)
+  h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
@@ -475,10 +477,11 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' step.SW(x = pi/4, f, h0 = 1000, diagnostics = TRUE) # Warning
 step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 0.5, range = h0 / c(1e12, 1e-8),
-                    seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
-                    cores = 1, preschedule = TRUE,
-                    maxit = 40L, diagnostics = FALSE, ...) {
+                    seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
+                    cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                    cl = NULL, diagnostics = FALSE, ...) {
   cores <- .warnWindows(cores)
+  h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
@@ -593,7 +596,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 if (is.finite(ulist[[i]]$f)) break
               }
               if (!is.finite(ulist[[i]]$f))
-                stop(paste0("Could not compute the function value at [", .pasteAnd(.printE(ulist[[i]]$x[bad, , drop = FALSE])),
+                stop(paste0("Could not compute the function value at [",
+                            .pasteAnd(.printE(ulist[[i]]$x[bad, , drop = FALSE])),
                              "]. FUN(", .pasteAnd(.printE(x)), ") is finite -- halving did not help.",
                              " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
             }
@@ -689,8 +693,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
   if (abs(x) + 7e-6 < ret$par)
     warning(paste0("The found step size, ", ret$par, ", exceeds the absolute value of x, ",
-                   abs(x), ". Can FUN handle opposite-sign arguments? This seems unreliable. ",
-                   "Try a different starting value h0 to be sure."))
+                   abs(x), ". It seems unreliable because FUN might poorly behave handle at ",
+                   "opposite-sign arguments due to large steps. Try a different starting value h0 to be sure, ",
+                   "or ."))
 
   return(ret)
 }
@@ -765,12 +770,14 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                    min.valid.slopes = 5L, seq.tol = 0.01,
                    correction = TRUE, diagnostics = FALSE, plot = FALSE,
-                   cores = 1, preschedule = TRUE, ...) {
+                   cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
+                   cl = NULL, ...) {
   cores <- .warnWindows(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * (abs(x) + (x == 0))
     h0 <- 2^round(log2(h0))
   }
+  h0 <- unname(h0)
   inv.sf <- 1 / shrink.factor
 
   if (is.null(range)) {
@@ -782,7 +789,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   if (range[2] < range[1]) range <- c(range[2], range[1])
   # Safety checks for the range size
-  hnaive <- (abs(x)*(x!=0) + (x==0)) * .Machine$double.eps^(1/3)
+  hnaive <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1/3)
   spans <- c(hnaive/range[1], range[2]/hnaive)
   if (min(spans) < 2^16) {
     range.old <- range
@@ -830,7 +837,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   delta <- .Machine$double.eps / 2 # Error of h|f'(x)true - f'(x)| / |f(x)true|
   fmax <- pmax(abs(fplus), abs(fminus))
   fw <- fdCoef(deriv.order = 1, side = 0, acc.order = 2)  # TODO: generalise later
-  f.eps <- eps*(abs(fw$weights[1]*fminus) + abs(fw$weights[2]*fplus))
+  f.eps <- eps * (abs(fw$weights[1]*fminus) + abs(fw$weights[2]*fplus))
   f.delta <- delta*fmax
   eround <- (f.eps + f.delta) / hgrid
 
@@ -882,21 +889,22 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
     if (sum(i.min5) >= 3) {
       exitcode <- 2
       warning(paste0("Could not find a sequence of of ", min.valid.slopes, " reductions ",
-                     "of the trunctation error. ", err1,
-                     "Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
+                     "of the truncation error. Visualise by adding 'plot = TRUE'. ", err1,
+                     " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
                      "returning the approximate argmin of the total error."))
       hopt0 <- sort(hgrid[i.min5])[2]  # The median of the 3 points with the lowest error
       i.hopt <- which(hopt0 == hgrid)
       hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
     } else {
-      warning(paste0("There are only ", sum(i.min5), " finite function values on the grid. ",
+      warning(paste0("There are ", sum(i.min5), " finite function values on the grid. ",
                      "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
                      "function does not return finite values on the range x+[",
                      .pasteAnd(.printE(range)), "] with ", n,
                      " exponentially spaced points. Returning a very rough value that may ",
                      "not even yield a numerical derivative."))
       exitcode <- 3
-      hopt0 <- hopt <- hnaive
+      hopt0 <- hopt <- hnaive  # At least something should be returned
+      i.hopt <- if (sum(i.min5) > 0) min(hgrid[is.finite(log2etrunc)]) else which.min(abs(hgrid-h0))
     }
   }
 
@@ -919,15 +927,25 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 
   if (plot) {
     etotal <- etrunc + eround
+    evec <- c(etotal, etrunc, eround)
+    yl <- range(evec[is.finite(evec) & evec != 0])
     plot(hgrid[etotal != 0], etotal[etotal != 0], log = "xy", bty = "n",
-         ylim = range(setdiff(c(etotal, etrunc, eround), 0), na.rm = TRUE),
+         ylim = yl,
          ylab = "Estimated abs. error in df/dx", xlab = "Step size",
          main = "Estimated error vs. finite-difference step size")
-    graphics::points(hgrid[etrunc != 0], etrunc[etrunc != 0], pch = 2)
+    graphics::points(hgrid[etrunc != 0], etrunc[etrunc != 0], pch = 2, cex = 1.2)
     graphics::points(hgrid[eround != 0], eround[eround != 0], pch = 3)
-    graphics::legend("bottomright", c("Truncation", "Rounding", "Total"), pch = c(2, 3, 1), bty = "n")
-    graphics::mtext(paste0("assuming rel. condition err. < ", .printE(eps), ", rel. subtractive err. < ", .printE(delta)), cex = 0.8, line = 0.5)
-    if (exists("i.start")) graphics::points(hgrid[i.start:i.end], etrunc[i.start:i.end], lwd = 2, col = "#0022FF")
+    graphics::legend("top", c("Truncation", "Rounding", "Total"), pch = c(2, 3, 1), bty = "n", ncol = 3)
+    graphics::mtext(paste0("assuming rel. condition err. < ", .printE(eps),
+                           ", rel. subtractive err. < ", .printE(delta)), cex = 0.8, line = 0.5)
+    if (exists("good.slopes") && any(good.slopes)) {
+      good.h <- valid.h[which(good.slopes)]
+      i.good.h <- which(hgrid %in% good.h)
+      graphics::points(hgrid[i.start:i.end], etrunc[i.start:i.end], lwd = 1.5, col = "#3355FF", cex = 0.80)
+      ## TODO: colour okay slopes differently, warn...
+    }
+    if (exists("i.start")) graphics::points(hgrid[i.start:i.end], etrunc[i.start:i.end],
+                                            pch = 16, col = "#CC4422", cex = 0.65)
   }
 
   return(ret)
@@ -962,10 +980,11 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #' @param ... Passed to FUN.
 #'
 #' @details
-#' We recommend using the Stepleman--Winarsky algorithm because it does not suffer
+#' We recommend using the Mathur algorithm because it does not suffer
 #' from over-estimation of the truncation error in the Curtis--Reid approach
 #' and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-#' approach.
+#' approach. It really tries muliple step sizes simultaneously and handles missing
+#' values due to bad evaluations for inadequate step sizes really in a robust manner.
 #'
 #' @return A list similar to the one returned by \code{optim()} and made of
 #'   concatenated individual elements coordinate-wise lists: \code{par} -- the optimal
@@ -1003,10 +1022,17 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #' gradstep(x = 1, FUN = sin, method = "M")
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
-gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
-                     method = c("SW", "CR", "CRm", "DV", "M"), control = NULL,
+gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
+                     method = c("SW", "CR", "CRm", "DV", "M"), diagnostics = FALSE, control = NULL,
                      cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                      cl = NULL, ...) {
+  # TODO: test if Mathur accepts the plot
+  if (is.null(h0)) {
+    lttol <- abs(x) < zero.tol
+    deriv.order <- 1
+    acc.order <- 2
+    h0 <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1 / (deriv.order + acc.order))
+  }
   cores <- .warnWindows(cores)
   # TODO: implement "all"
   method <- method[1]
@@ -1030,17 +1056,17 @@ gradstep <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   # The h0 and range arguments are updated later
   default.args <- list(CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                 cores = cores, preschedule = preschedule, diagnostics = FALSE),
+                                 cores = cores, preschedule = preschedule, diagnostics = diagnostics),
                        CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
-                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4, diagnostics = FALSE),
+                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4, diagnostics = diagnostics),
                        DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), alpha = 4/3,
-                                 ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L, diagnostics = FALSE),
+                                 ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L, diagnostics = diagnostics),
                        SW = list(h0 = h0[1], shrink.factor = 0.5, range = h0[1] / c(1e12, 1e-8),
                                  seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2,
-                                 maxit = 40L, diagnostics = FALSE),
+                                 maxit = 40L, diagnostics = diagnostics),
                        M = list(h0 = h0[1], range = h0[1] / 2^c(36, -24), shrink.factor = 0.5,
                                 min.valid.slopes = 5L, seq.tol = 0.01, correction = TRUE,
-                                diagnostics = FALSE, plot = FALSE, cores = cores))
+                                diagnostics = diagnostics, plot = FALSE, cores = cores))
   margs <- default.args[[method]]
   if (!is.null(control)) {
     bad.args <- setdiff(names(control), names(margs))

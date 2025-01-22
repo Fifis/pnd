@@ -1,8 +1,7 @@
 #' @importFrom Rdpack reprompt
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Parallel numerical derivatives v. 0.0.5 (2025-01-15).")
-  packageStartupMessage("This is a pre-release version. Core functions subject to change.")
+  packageStartupMessage("Parallel numerical derivatives v. 0.0.6 (2025-01-23).")
 
   # The number of cores is auto-detected based on the OS
   os <- Sys.info()[["sysname"]]
@@ -16,9 +15,8 @@
   }
 
   if (cores > 4) cores <- cores - 1  # Leaving some resources for the system
-  msg <- paste0("Using up to ", cores, " cores for parallel function evaluation ",
-                "through forking on Linux.\nIf you want to parallelise through a ",
-                "custom cluster, create it for passing to functions via\n",
+  msg <- paste0("Using up to ", cores, " cores for parallelism through mclapply forking on Linux.\n",
+                "To use a custom cluster, create it via\n",
                 "library(parallel)\ncl <- makeCluster(", cores, ")\n",
                 "and export objects / load packages via clusterExport() and clusterEvalQ().")
   if (.Platform$OS.type != "unix") {
