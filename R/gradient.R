@@ -1,6 +1,8 @@
 #' Determine function dimensionality and vectorisation
 #'
 #' @inheritParams GenD
+#' @param stop.cluster Logical: should the cluster at the end be stopped? Should be \code{FALSE}
+#'   if an external cluster was used and will be used in the future.
 #'
 #' @details
 #' The following combinations of parameters are allowed, suggesting specific input and
@@ -53,7 +55,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
       (isTRUE(multivalued) || isFALSE(multivalued)))
     return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
 
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   if (is.null(cl)) cl <- newCluster(cl = cl, cores = cores)
 
   # Vectorisation checks similar to case1or3 in numDeriv, but better optimised
@@ -272,6 +274,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#' Recommended to be set to the number of physical cores on the machine minus one.
 #' @inheritParams runParallel
 #' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
 #'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
@@ -426,7 +430,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   #######################################
 
   # Setting up parallel capabilities
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   if (is.null(cl)) cl <- newCluster(cl, cores = cores)
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
@@ -632,7 +636,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     x <- x0
   }
 
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   if (is.null(cl)) cl <- newCluster(cl = cl, cores = cores)
 
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
@@ -718,7 +722,7 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
   }
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
 
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   if (is.null(cl)) cl <- newCluster(cl = cl, cores = cores)
 
   if (needs.detection) {

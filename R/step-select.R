@@ -20,6 +20,7 @@
 #'   loops in degenerate cases.
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
+#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -79,7 +80,7 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL, diagnostics = FALSE, ...) {
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   version <- version[1]
   if (!(version %in% c("original", "modified"))) stop("step.CR: 'version' must be either 'original' or 'modified'.")
@@ -214,6 +215,7 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops in cases
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
+#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -263,7 +265,7 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL,  diagnostics = FALSE, ...) {
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
@@ -432,7 +434,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
                         cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                         cl = NULL,  diagnostics = FALSE, ...) {
   # TODO: add zero.tol everywhere
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
@@ -530,6 +532,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops.
 #'   Consider trying some smaller or larger initial step size \code{h0}
 #'   if this limit is reached.
+#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -580,7 +583,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL, diagnostics = FALSE, ...) {
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
@@ -816,6 +819,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 #'   continuation of the downwards slope of the total error); otherwise, returns
 #'   the grid point that is is lowest in the increasing sequence of valid error
 #'   estimates.
+#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -864,7 +868,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                    correction = TRUE, diagnostics = FALSE, plot = FALSE,
                    cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                    cl = NULL, ...) {
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * (abs(x) + (x == 0))
     h0 <- 2^round(log2(h0))
@@ -1062,6 +1066,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
 #'   including all function evaluations is returned; different methods have
 #'   slightly different diagnostic outputs.
+#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
 #'
@@ -1125,7 +1130,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
       h0 <- 2^round(log2(0.01 * (abs(x)*(!lttol) + lttol)))
     }
   }
-  cores <- .checkCores(cores)
+  cores <- checkCores(cores)
   ell <- list(...)
   if (any(names(ell) == "method.args"))
     stop(paste0("'method.args' is an argument to control numDeriv::grad(). ",

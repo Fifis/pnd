@@ -1,8 +1,16 @@
 # There internal functions are not exported
 
-# Check the number of cores, check if we are on CRAN testing; there is a policy of
-# 2 cores only...
-.checkCores <- function(cores) {
+#' Number of core checks and changes
+#'
+#' @param cores Integer specifying the number of CPU cores used for parallel computation.
+#' Recommended to be set to the number of physical cores on the machine minus one.
+#'
+#' @returns An integer with the number of cores.
+#' @export
+#'
+#' @examples
+#' checkCores(100)
+checkCores <- function(cores = NULL) {
   if (is.null(cores)) cores <- max(floor(parallel::detectCores()/2 - 1), 1L)
 
   chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")  # Limit to 2 cores for CRAN checks

@@ -9,19 +9,37 @@
 #' @export
 #'
 #' @examples
-#' cl <- newCluster(cores = 1)
+#' cl <- newCluster(cores = 1)  # "lapply"
+#' cl <- newCluster("mclapply 2")
 newCluster <- function(cl = NULL, cores = 2) {
-  if (cores == 1) return("lapply")
+  if (is.character(cl) && (cl != "lapply") && !grepl("^mclapply ", cl))
+    stop(paste0("The string for the cluster must be either 'lapply' or 'mclapply 4' (change 4 to ",
+                "the desired number of cores). Leave empty and specify 'cores' for Windows."))
+  if (cores == 1 || ((is.character(cl) && cl == "lapply"))) return("lapply")
+
   windows <- .Platform$OS.type == "windows"
+
+  if (is.character(cl) && grepl("^mclapply ", cl)) {
+    s <- strsplit(cl, " ")[[1]]
+    cores2 <- as.integer(s[2])
+    if (cores != cores2) stop(paste0("A different number of cores has been requested in the string (",
+                                     cores2, ") and function argument (", cores, ")."))
+    if (windows) {  # Skip returning the fork request
+      if (cores > 1) warning("Forking unavailable on Windows; converting the mclapply request to a PSOCK one.")
+    } else {
+      return(cl)
+    }
+  }
+
   max.cores <- getOption("pnd.cores", cores)
   if (cores > max.cores) warning(paste0("You requested more cores than you have physical ",
                                         "cores. Consider setting 'cores = ", max.cores, "'.\n"))
-  if (!is.null(cl)) {
-    if (!inherits(cl, "cluster"))  # Check if the cluster is valid
-      stop(paste0("The object passed as a cluster is not a cluster. ",
-                  "Use 'cl <- makeCluster(", cores, ")' to create a proper one;",
-                  "use 'clusterExport(objs)' and clusterEvalQ(library(lib)) to add user-loaded data/features."))
-  } else if (windows) {
+  if ((!is.null(cl)) && (!inherits(cl, "cluster"))) {
+    stop(paste0("The object passed as a cluster is not a cluster. ",
+                "Use 'cl <- makeCluster(", cores, ")' to create a proper one;",
+                "use 'clusterExport(objs)' and clusterEvalQ(library(lib)) to add user-loaded data/features."))
+  }
+  if (windows) {
     cl <- parallel::makePSOCKcluster(cores)
     parallel::clusterExport(cl, setdiff(ls(envir = parent.env()), "cl"))
     core.pkgs <- c("parallel", "stats", "graphics", "grDevices", "utils", "datasets", "methods", "base")
@@ -33,6 +51,7 @@ newCluster <- function(cl = NULL, cores = 2) {
   } else {
     cl <- paste("mclapply", cores)
   }
+
   return(cl)
 }
 
