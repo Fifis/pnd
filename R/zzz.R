@@ -8,11 +8,13 @@
   if (os == "Linux") {
     cores <- sum(!duplicated(grep("^core id", readLines("/proc/cpuinfo"), value = TRUE)))
   } else if (os == "Darwin") {
-    pn <- "kernel.perf_cpu_time_max_percent"
-    cores <- system(paste0("sysctl -a | grep ", pn, " |  tr -d '", pn, " = '"), TRUE)
+    cores <- system("system_profiler SPHardwareDataType | grep -i 'Total Number of Cores'", TRUE)
+    cores <- as.integer(gsub("[^0-9]", "", cores))
   } else {  # Unfortunately one cannot go to system files
     cores <- parallel::detectCores(logical = FALSE)
   }
+  # Worst case: less than a quarter is returned
+  if (is.null(cores) || is.na(cores)) cores <- max(1, floor(parallel::detectCores()/2) - 1)
 
   if (cores > 4) cores <- cores - 1  # Leaving some resources for the system
   msg <- paste0("Using up to ", cores, " cores for parallelism through mclapply forking on Linux.\n",

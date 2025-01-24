@@ -28,9 +28,9 @@ knitr::opts_chunk$set(
   dpi = 72,
   fig.retina = 1,
   collapse = TRUE,
-  comment = "#>",
-  pngquant = "--speed=1 --quality=50-60"
+  comment = "#>"
 )
+if (.Platform$OS.type == "unix") knitr::opts_chunk$set(pngquant = "--speed=1 --quality=50-60")
 ```
 
 # Introduction
