@@ -12,7 +12,7 @@ test_that("Jacobians are correct", {
 })
 
 test_that("function dimension check works", {
-  expect_warning(Jacobian(sum, 1:3), "scalar-valued function")
+  expect_error(Jacobian(sum, 1:3), "for scalar-valued functions")
 })
 
 

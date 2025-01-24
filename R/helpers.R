@@ -2,11 +2,9 @@
 
 # Check the number of cores, check if we are on CRAN testing; there is a policy of
 # 2 cores only...
-.warnWindows <- function(cores) {
-  if (.Platform$OS.type == "windows" && cores > 1) {
-    cores <- 1
-    warning("Only non-Windows parallelisation is supported (for now). Cannot use >1 core with forking on Windows.")
-  }
+.checkCores <- function(cores) {
+  if (is.null(cores)) cores <- max(floor(parallel::detectCores()/2 - 1), 1L)
+
   chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")  # Limit to 2 cores for CRAN checks
   if (nzchar(chk) && chk == "TRUE") cores <- 2L
   return(cores)

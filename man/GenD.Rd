@@ -7,7 +7,7 @@
 GenD(
   FUN,
   x,
-  univariate = NA,
+  elementwise = NA,
   vectorised = NA,
   multivalued = NA,
   deriv.order = 1L,
@@ -33,7 +33,7 @@ computed. If the function returns a vector, the output will be a Jacobian.}
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite.}
 
-\item{univariate}{Logical: is the domain effectively 1D, i.e. is this a mapping
+\item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
 \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
 compares the output length ot the input length.}
@@ -47,7 +47,7 @@ checks the output length and assumes vectorisation if it matches the input lengt
 this check is necessary and potentially slow.}
 
 \item{multivalued}{Logical: if \code{TRUE}, the function is assumed to return vectors longer
-than 1. Use \code{FALSE} for univariate functions. If \code{NA}, attempts inferring it from
+than 1. Use \code{FALSE} for element-wise functions. If \code{NA}, attempts inferring it from
 the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
@@ -76,10 +76,6 @@ procedure is requested; otherwise, it is absolute.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
 to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
-
-\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
-Recommended to be set to the number of physical cores on the machine minus one.
-Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
@@ -115,16 +111,6 @@ over the derivative computation process, including order of derivatives, accurac
 allowing arbitrary accuracies, sides, and derivative orders for different coordinates.
 }
 \details{
-The following combinations of parameters are allowed, resulting in the following input and
-output handling:\tabular{lll}{
-    \tab \code{univariate} \tab \code{!univariate} \cr
-   \code{multivalued}, \code{vectorised} \tab \emph{(undefined)} \tab \emph{(undefined)} \cr
-   \code{!multivalued}, \code{vectorised} \tab \code{FUN(xgrid)} \tab \emph{(undefined)} \cr
-   \code{multivalued}, \code{!vectorised} \tab \emph{(undefined)} \tab \verb{[mc]lapply} Jacobian \cr
-   \code{!multivalued}, \code{!vectorised} \tab \verb{[mc]lapply(xgrid, FUN)} \tab \verb{[mc]lapply} gradient \cr
-}
-
-
 For computing gradients and Jacobians, use convenience wrappers \code{Jacobian} and \code{Grad}.
 
 If the step size is too large, the slope of the secant poorly estimates the derivative;
@@ -151,17 +137,17 @@ fully preserves the names of \code{x} and \code{FUN(x)}.
 
 # Case 1: Vector argument, vector output
 f1 <- sin
-g1 <- GenD(FUN = f1, x = 1:100, vectorised = TRUE)
+g1 <- GenD(FUN = f1, x = 1:100)
 g1.true <- cos(1:100)
 plot(1:100, g1 - g1.true, main = "Approximation error of d/dx sin(x)")
 
 # Case 2: Vector argument, scalar result
 f2 <- function(x) sum(sin(x))
-g2    <- GenD(FUN = f2, x = 1:4, univariate = FALSE)
-g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6, univariate = FALSE)
+g2    <- GenD(FUN = f2, x = 1:4)
+g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6)
 g2 - g2.h2  # Tiny differences due to different step sizes
-g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW", univariate = FALSE)
-g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", vectorised = FALSE, report = 2)
+g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW")
+g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", report = 2)
 print(attr(g2.full, "step.search")$exitcode)  # Success
 
 # Case 3: vector input, vector argument of different length
@@ -173,8 +159,7 @@ print(j3)
 # Gradients for vectorised functions -- e.g. leaky ReLU
 LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
 system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
-system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1),
-                                          univariate = TRUE))))
+system.time(replicate(10, suppressMessages(GenD(LReLU, runif(30, -1, 1)))))
 
 # Saving time for slow functions by using pre-computed values
 x <- 1:4
@@ -183,10 +168,9 @@ fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$valu
 # The outer function is non-vectorised
 fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
 f0 <- sapply(x, fouter)
-system.time(GenD(fslow, x, side = 1, acc.order = 2, f0 = f0, vectorised = FALSE))
-# TODO: in this example, the 1:4 vector is not de-duped
-# TODO: fix the next example
-# system.time(GenD(fslow, x, side = 1, acc.order = 2, vectorised = FALSE))
+system.time(GenD(fslow, x, side = 1, acc.order = 2, f0 = f0))
+# Now, with extra checks, it will be slower
+system.time(GenD(fslow, x, side = 1, acc.order = 2))
 }
 \seealso{
 \code{\link[=gradstep]{gradstep()}} for automatic step-size selection.

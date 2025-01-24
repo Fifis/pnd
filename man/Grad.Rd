@@ -7,16 +7,20 @@
 Grad(
   FUN,
   x,
+  elementwise = NA,
   vectorised = NA,
+  multivalued = NA,
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
   h = NULL,
+  zero.tol = sqrt(.Machine$double.eps),
   h0 = NULL,
   control = list(),
   f0 = NULL,
   cores = 1,
   preschedule = TRUE,
+  cl = NULL,
   func = NULL,
   report = 1L,
   ...
@@ -29,6 +33,11 @@ computed. If the function returns a vector, the output will be a Jacobian.}
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
 \code{FUN(x)} must be finite.}
 
+\item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
+\eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
+\eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
+compares the output length ot the input length.}
+
 \item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
 a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
@@ -36,6 +45,10 @@ functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
 checks the output length and assumes vectorisation if it matches the input length;
 this check is necessary and potentially slow.}
+
+\item{multivalued}{Logical: if \code{TRUE}, the function is assumed to return vectors longer
+than 1. Use \code{FALSE} for element-wise functions. If \code{NA}, attempts inferring it from
+the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
@@ -52,6 +65,10 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
 \code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
 
+\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+procedure is requested; otherwise, it is absolute.}
+
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}
 
@@ -60,13 +77,16 @@ difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
 to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
 
-\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
-Recommended to be set to the number of physical cores on the machine minus one.
-Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
-
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
+
+\item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
+of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
+(created by \code{makeCluster} or similar functions). If not \code{NULL},
+the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
+\code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -80,7 +100,7 @@ diagnostic output as an attribute.}
 }
 \value{
 Numeric vector of the gradient. If \code{FUN} returns a vector,
-a warning is issued suggesting the use of \code{Jacobian()}.
+a warning is issued suggesting the use of \code{\link[=Jacobian]{Jacobian()}}.
 }
 \description{
 Computes numerical derivatives and gradients of scalar-valued functions using
@@ -139,6 +159,10 @@ small arguments that gets incremented by \code{eps}.}
 For two-sided differences, each extrapolation increases the accuracy order by 2.}
 \item{v}{The reduction factor in Richardson extrapolations.}
 }
+
+\code{Grad} does an initial check (if \code{f0 = FUN(x)} is not provided)
+and calls \code{\link[=GenD]{GenD()}} with a set of appropriate parameters (\code{multivalued = FALSE}
+if the check succeds). In case of parameter mismatch, throws and error.
 }
 \examples{
 f <- function(x) sum(sin(x))
