@@ -74,6 +74,12 @@ returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher attaches the full
 diagnostic output as an attribute.}
 
+\item{stop.cluster}{Logical: should the cluster at the end be stopped? Should be \code{FALSE}
+if an external cluster was used and will be used in the future.}
+
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}

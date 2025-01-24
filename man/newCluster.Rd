@@ -20,5 +20,6 @@ or \code{'mclapply'} on everything else.}
 Create a cluster inside pnd-specific functions (internal use only)
 }
 \examples{
-cl <- newCluster(cores = 1)
+cl <- newCluster(cores = 1)  # "lapply"
+cl <- newCluster("mclapply 2")
 }

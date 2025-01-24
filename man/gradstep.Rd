@@ -45,6 +45,9 @@ if \code{control$diagnostics} is \code{TRUE}, full iteration history
 including all function evaluations is returned; different methods have
 slightly different diagnostic outputs.}
 
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
