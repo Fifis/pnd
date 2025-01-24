@@ -79,7 +79,7 @@ step.CR <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL, diagnostics = FALSE, ...) {
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   version <- version[1]
   if (!(version %in% c("original", "modified"))) stop("step.CR: 'version' must be either 'original' or 'modified'.")
@@ -263,7 +263,7 @@ step.DV <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL,  diagnostics = FALSE, ...) {
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
@@ -432,7 +432,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)), range = h0 / c(
                         cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                         cl = NULL,  diagnostics = FALSE, ...) {
   # TODO: add zero.tol everywhere
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
   k0 <- h0 * .Machine$double.eps^(-2/15)
@@ -580,7 +580,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                     cl = NULL, diagnostics = FALSE, ...) {
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
@@ -864,7 +864,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                    correction = TRUE, diagnostics = FALSE, plot = FALSE,
                    cores = getOption("pnd.cores"), preschedule = getOption("pnd.preschedule"),
                    cl = NULL, ...) {
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * (abs(x) + (x == 0))
     h0 <- 2^round(log2(h0))
@@ -1125,7 +1125,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
       h0 <- 2^round(log2(0.01 * (abs(x)*(!lttol) + lttol)))
     }
   }
-  cores <- .warnWindows(cores)
+  cores <- .checkCores(cores)
   ell <- list(...)
   if (any(names(ell) == "method.args"))
     stop(paste0("'method.args' is an argument to control numDeriv::grad(). ",
@@ -1139,7 +1139,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   # The h0 and range arguments are updated later
   default.args <- list(plugin = list(h0 = h0[1], range = h0[1] / c(1e4, 1e-4),
                                  cores = cores, preschedule = preschedule,
-                                 diagnostics = diagnostics),
+                                 cl = cl, diagnostics = diagnostics),
                        CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                                  cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),

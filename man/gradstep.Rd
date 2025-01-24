@@ -9,7 +9,7 @@ gradstep(
   x,
   h0 = NULL,
   zero.tol = sqrt(.Machine$double.eps),
-  method = c("SW", "CR", "CRm", "DV", "M"),
+  method = c("plugin", "SW", "CR", "CRm", "DV", "M"),
   diagnostics = FALSE,
   control = NULL,
   cores = getOption("pnd.cores"),
@@ -44,10 +44,6 @@ default values are used. See the documentation for the respective methods. Note 
 if \code{control$diagnostics} is \code{TRUE}, full iteration history
 including all function evaluations is returned; different methods have
 slightly different diagnostic outputs.}
-
-\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
-Recommended to be set to the number of physical cores on the machine minus one.
-Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that

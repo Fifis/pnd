@@ -28,10 +28,6 @@ derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
-\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
-Recommended to be set to the number of physical cores on the machine minus one.
-Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
-
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}

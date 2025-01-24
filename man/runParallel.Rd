@@ -4,17 +4,13 @@
 \alias{runParallel}
 \title{Run a function in parallel over a list (internal use only)}
 \usage{
-runParallel(FUN, x, cores = 1, preschedule = FALSE, cl = NULL)
+runParallel(FUN, x, preschedule = FALSE, cl = NULL)
 }
 \arguments{
 \item{FUN}{A function of only one argument. If there are more arguments, use
 the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.}
 
 \item{x}{A list to parallelise the evaluation of \code{FUN} over.}
-
-\item{cores}{Integer specifying the number of CPU cores used for \code{mclapply}.
-Recommended to be set to the number of physical cores on the machine minus one.
-Note: if the cluster \code{cl} is provided, the value of \code{cores} is ignored.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
