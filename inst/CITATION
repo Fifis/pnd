@@ -5,9 +5,9 @@ bibentry(
   title = "pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
-  note = "R package version 0.0.5",
+  note = "R package version 0.0.6",
   organization = "University of Luxembourg",
-  textVersion = "Kostyrka, Andreï V. (2025). pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order. R package version 0.0.5. https://github.com/Fifis/pnd",
+  textVersion = "Kostyrka, Andreï V. (2025). pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order. R package version 0.0.6. https://github.com/Fifis/pnd",
   url = "https://github.com/Fifis/pnd"
 )
 
@@ -17,8 +17,8 @@ bibentry(
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.5.",
-  textVersion = "Kostyrka, Andreï V. (2025). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.5.",
+  note = "Vignette for the R package pnd 0.0.6.",
+  textVersion = "Kostyrka, Andreï V. (2025). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.6.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
 
@@ -28,8 +28,8 @@ bibentry(
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.5.",
-  textVersion = "Kostyrka, Andreï V. (2025). Step-size-selection algorithm benchmark. Vignette for the R package pnd 0.0.5.",
+  note = "Vignette for the R package pnd 0.0.6.",
+  textVersion = "Kostyrka, Andreï V. (2025). Step-size-selection algorithm benchmark. Vignette for the R package pnd 0.0.6.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
 
@@ -39,8 +39,8 @@ bibentry(
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.5.",
-  textVersion = "Kostyrka, Andreï V. (2025). Compatilibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.0.5.",
+  note = "Vignette for the R package pnd 0.0.6.",
+  textVersion = "Kostyrka, Andreï V. (2025). Compatilibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.0.6.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
 

@@ -74,7 +74,7 @@ Instead of choosing a large evaluation grid in advance, the researcher may inste
 f_{\mathrm{Rich},4}' (x, h_1, h_2) := \frac{(h_1 / h_2)^2 f_{\mathrm{CD}}' (x, h_2) - f_{\mathrm{CD}}' (x, h_1)}{(h_1 / h_2)^2 - 1}
 \]
 
-If $h_2 = h_1 / 2$, then, this extrapolation formula reduces to $f_{\mathrm{CD},4}' (x, h_2)$. There is a general solution to obtaining high-order-accurate derivatives from function values evaluated at multiple points; see @fornberg1988generation for the solution and the algorithm and @kostyrka2024what for derivation and stability analysis.
+If $h_2 = h_1 / 2$, then, this extrapolation formula reduces to $f_{\mathrm{CD},4}' (x, h_2)$. There is a general solution to obtaining high-order-accurate derivatives from function values evaluated at multiple points; see @fornberg1988generation for the solution and the algorithm and @kostyrka2025what for derivation and stability analysis.
 
 **NB.** For accuracy order $a > 2$, more than 2 function evaluations are required, which is why the notion of ‘step size’ becomes unclear: it could signify the initial step size in the Richardson extrapolation before the first reduction, or the space between the elements of a symmetric grid $\{\pm h, \pm 2h, \pm 3h, \ldots\}$ excluding zero, or the space between the elements of an equispaced symmetric grid $\{\pm h, \pm 3h, \pm 5h, \ldots\}$, or some other measure describing the scaling of the deviations around the point of interest.
 

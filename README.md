@@ -91,13 +91,15 @@ Use `report = 0` to produce just the numerical gradient without any attributes, 
 
 ## Literature
 
-This package is supported by a vignette:
+This package is supported by 3 vignettes:
 
-* Kostyrka, A. V. Using parallel numerical derivatives for fast optimisation and reliable inference in R. *In progress.*
+* Kostyrka, A. V. Fast and accurate parallel numerical derivatives in R. *In progress.*
+* Kostyrka, A. V. Compatilibility of pnd with the syntax of numDeriv. *In progress.*
+* Kostyrka, A. V. Step-size-selection algorithm benchmark. *In progress.*
 
 The following articles provide the theory behind the methods implemented in this package:
 
-* Kostyrka, A. V. (2024). What are you doing, step size: fast computation of accurate numerical derivatives with finite precision. *In progress.*
+* Kostyrka, A. V. (2025). What are you doing, step size: fast computation of accurate numerical derivatives with finite precision. *In progress.*
 
 ## Installation
 
@@ -117,4 +119,4 @@ group and is included in most R distributions.
 
 ## Licence
 
-This software is released under the free/open-source [EUPL 1.2 licence](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+This software is released under the free/open-source [EUPL 1.2 licence](https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12).

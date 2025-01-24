@@ -72,7 +72,7 @@ very inaccurate, especially for long one-sided stencils.
 
 The weights computed for the stencil via this algorithm are very reliable; numerical
 simulations in \insertCite{higham1987error}{pnd} show that the relative error is
-low even for ill-conditioned systems. \insertCite{kostyrka2024what}{pnd}
+low even for ill-conditioned systems. \insertCite{kostyrka2025what}{pnd}
 computes the exact relative error of the weights on the stencils returned by
 this function; the zero tolerance is based on these calculations.
 }

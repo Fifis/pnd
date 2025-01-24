@@ -35,7 +35,7 @@ if (.Platform$OS.type == "unix") knitr::opts_chunk$set(pngquant = "--speed=1 --q
 
 # Introduction
 
-As of 2024, most popular R numerical optimisers and functions for computing numerical derivative approximations continue to rely on serial evaluation of functions, and even in scenarios where parallelisation is feasible, users often lack a convenient parallel solution.
+As of 2025, most popular R numerical optimisers and functions for computing numerical derivative approximations continue to rely on serial evaluation of functions, and even in scenarios where parallelisation is feasible, users often lack a convenient parallel solution.
 The `pnd` package addresses this lacuna by providing functions that:
 
 1. Use multiple CPU cores to reduce numerical derivative computation time;
@@ -209,7 +209,7 @@ The weights for stencils $(-2, -1, 1, 2)$ and $(-10, -5, 5, 10)$ are therefore i
 The idea is to find such coefficients $\{w_i\}_{i=1}^n$ that the derivatives of order less than $m$ cancel out and the coefficients on the $m$^th^ derivative add up to unity.
 Our implementation uses the @bjorck1970solution algorithm to avoid inverting the matrix the numerically ill-conditioned Vandermonde matrix $B$.
 Using numerical routines relying on matrix inversion (such as LAPACK) invokable through `base::solve()` is not recommended due to the rapid deterioration of the solution accuracy.
-See Appendix A in @kostyrka2024what for an investigation of this numerical instability.
+See Appendix A in @kostyrka2025what for an investigation of this numerical instability.
 
 By default, `fdCoef()` assumes central differences for second-order-accurate first derivatives, but every aspect of numerical differencing can be customised.
 

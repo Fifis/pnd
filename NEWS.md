@@ -42,20 +42,20 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
-# pnd 0.next (2023-06-XX)
+# pnd 0.5 (2025-01-14)
 - Feature: parallelisation of steps in all selection algorithms
 - Feature: Mathur's AutoDX algorithm for step size selection `step.M()`
 - Feature: added `Hessian()` that supports central differences (for the moment) and arbitrary accuracy
-- Feature: separate `Grad()` and `Jacobian()` that call the workhors, `GenD()`, for compatibility with `numDeriv`
+- Feature: separate `Grad()` and `Jacobian()` that call the workhorse, `GenD()`, for compatibility with `numDeriv`
 
-# pnd 0.0.4 (2023-06-10)
+# pnd 0.0.4 (2024-06-10)
 - Feature: Stepleman--Winarsky algorithm for step size selection `step.SW()`
 - Feature: automated wrapper for step size selection `gradstep()`
 - Improvement: Safe handling of function errors and non-finite returns in step-size selection procedures
 - Improvement: Finite-difference coefficients gained attributes: Taylor expansion, coefficient on the largest truncated term, and effective accuracy (useful for custom stencils)
 - Improvement: added unit tests for core features
 
-# pnd 0.0.3 (2023-06-01)
+# pnd 0.0.3 (2024-06-01)
 - Feature: `solveVandermonde()` to solve ill-conditioned problems that arise in weight calculation
 - Feature: Dumontet--Vignes algorithm for step size selection `step.DV()`
 - Feature: Curtis--Reid algorithm for step size selection `step.CR()` and its modification
