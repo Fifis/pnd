@@ -7,7 +7,7 @@
 step.CR(
   FUN,
   x,
-  h0 = 1e-05 * (abs(x) + (x == 0)),
+  h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
   version = c("original", "modified"),
   aim = if (version[1] == "original") 100 else 1,
   acc.order = c(2L, 4L),
@@ -15,8 +15,8 @@ step.CR(
   range = h0/c(1e+05, 1e-05),
   maxit = 20L,
   seq.tol = 1e-04,
-  cores = getOption("pnd.cores"),
-  preschedule = getOption("pnd.preschedule"),
+  cores = getOption("pnd.cores", 2),
+  preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   diagnostics = FALSE,
   ...
@@ -107,6 +107,12 @@ are still estimated for the 2OA differences. Therefore, the estimating truncatio
 error is higher and the real truncation error of 4OA differences is lower.
 
 TODO: mention that f must be one-dimensional
+
+The arguments passed to \code{...} must not partially match those of \code{\link[=step.CR]{step.CR()}}. For example, if
+\code{cl} exists, then, attempting to avoid cluster export by using
+\code{step.CR(f, x, h = 1e-4, cl = cl, a = a)} will result in an error: \code{a} matches \code{aim}
+and \code{acc.order}. Redefine the function for this argument to have a name that is not equal
+to the beginning of one of the arguments of \code{\link[=step.CR]{step.CR()}}.
 }
 \examples{
 f <- function(x) x^4
@@ -118,6 +124,21 @@ step.CR(x = 2, f, version = "modified", acc.order = 4)
 # A bad start: too far away
 step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
 step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
+
+\dontrun{
+library(parallel)
+cl <- makePSOCKcluster(names = 3, outfile = "")
+abc <- 2
+f <- function(x, abc) {Sys.sleep(0.1); prod(abc*sin(x))}
+x <- pi/4
+system.time(step.CR(f, x, h = 1e-4, cores = 1, abc = abc))  # To remove speed-ups
+system.time(step.CR(f, x, h = 1e-4, cl = cl, abc = abc))
+
+setDefaultCluster(cl)
+system.time(step.CR(f, x, h = 1e-4, abc = abc))
+
+setDefaultCluster(cl=NULL); stopCluster(cl)
+}
 }
 \references{
 \insertAllCited{}

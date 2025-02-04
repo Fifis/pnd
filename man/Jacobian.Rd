@@ -20,6 +20,7 @@ Jacobian(
   f0 = NULL,
   cores = 1,
   preschedule = TRUE,
+  stop.cluster = TRUE,
   cl = NULL,
   func = NULL,
   report = 1L,
@@ -83,6 +84,9 @@ Recommended to be set to the number of physical cores on the machine minus one.}
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
+
+\item{stop.cluster}{Logical: should the cluster at the end be stopped? Should be \code{FALSE}
+if an external cluster was used and will be used in the future.}
 
 \item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
 of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object

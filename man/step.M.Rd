@@ -15,8 +15,8 @@ step.M(
   correction = TRUE,
   diagnostics = FALSE,
   plot = FALSE,
-  cores = getOption("pnd.cores"),
-  preschedule = getOption("pnd.preschedule"),
+  cores = getOption("pnd.cores", 2),
+  preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   ...
 )
@@ -101,7 +101,8 @@ step.M(x = 1, f, h0 = 1e-9) # Starting low
 step.M(x = 1, f, h0 = 1000) # Starting high
 
 f <- sin  # The derivative at pi/4 is sqrt(2)/2
-step.M(x = pi/2, f)  # Bad case -- TODO a fix
+step.M(x = pi/2, f, plot = TRUE)  # Bad case -- TODO a fix
+step.M(x = pi/4, f, plot = TRUE)
 step.M(x = pi/4, f, h0 = 1e-9) # Starting low
 step.M(x = pi/4, f, h0 = 1000) # Starting high
 # where the truncation error estimate is invalid

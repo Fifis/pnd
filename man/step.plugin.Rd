@@ -7,10 +7,10 @@
 step.plugin(
   FUN,
   x,
-  h0 = 1e-05 * (abs(x) + (x == 0)),
+  h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
   range = h0/c(10000, 1e-04),
-  cores = getOption("pnd.cores"),
-  preschedule = getOption("pnd.preschedule"),
+  cores = getOption("pnd.cores", 2),
+  preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   diagnostics = FALSE,
   ...
