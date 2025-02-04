@@ -17,12 +17,10 @@
   if (is.null(cores) || is.na(cores)) cores <- max(1, floor(parallel::detectCores()/2) - 1)
 
   if (cores > 4) cores <- cores - 1  # Leaving some resources for the system
-  msg <- paste0("Using up to ", cores, " cores for parallelism through mclapply forking on Linux.\n",
-                "To use a custom cluster, create it via\n",
-                "library(parallel)\ncl <- makeCluster(", cores, ")\n",
-                "and export objects / load packages via clusterExport() and clusterEvalQ().")
+  msg <- paste0("Using up to ", cores, " cores for parallelism through mclapply forking on Linux.\n")
+  if (os == "Windows") msg <- paste0(msg, "Create and register a default cluster first.")
   if (.Platform$OS.type != "unix") {
-    msg <- "Using only one core (parallelism on Windows in development)."
+    msg <- gsub("mclapply forking on Linux", "PSOCK cluster workers on Windows", msg)
   } else if (os == "Darwin") {
     msg <- gsub("Linux", "Mac", msg)
   }
