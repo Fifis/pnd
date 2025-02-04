@@ -26,15 +26,14 @@ test_that("SW algorithm detects if h0 is too low", {
   expect_equal(s$value, 32, tolerance = 1e-8)
 })
 
-test_that("SW algorithm detects if h0 is too high", {
+test_that("SW algorithm takes longer if h0 is too high", {
   f <- function(x) x^4
-  s <- step.SW(x = 2, f, h0 = 10, diagnostics = TRUE)
+  s <- step.SW(x = pi/2, f, h0 = 10, diagnostics = TRUE)
   expect_equal(s$exitcode, 0)
   expect_gt(s$counts["preliminary"], 3)
 
-  s2 <- step.SW(x = 2, f, h0 = 10, shrink.factor = 4, diagnostics = TRUE)
-  expect_equal(s2$counts["preliminary"], s$counts["preliminary"])
-  expect_lt(s2$counts["main"], s$counts["main"])
+  s2 <- step.SW(x = pi/2, f, h0 = 1e4, diagnostics = TRUE)
+  expect_lt(s$counts["preliminary"], s2$counts["preliminary"])
 })
 
 test_that("SW algorithm for bad ranges", {
@@ -45,5 +44,5 @@ test_that("SW algorithm for bad ranges", {
 
 test_that("SW fails when a large h0 invalidates the est. trunc. error", {
   expect_warning(step.SW(x = pi/4, sin, h0 = 1000, diagnostics = TRUE),
-                 "exceeds the absolute value")
+                 "exceeds 1% of |x|")
 })

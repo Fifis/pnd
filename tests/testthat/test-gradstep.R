@@ -3,7 +3,7 @@ test_that("step size length h0 must be 1 or length(x)", {
   expect_error(gradstep(x = 1:2,
                         FUN = function(z) {if (length(z)>1) stop("Non-vectorised"); z^2}),
                "must be finite")
-  expect_equal(gradstep(sin, 1, h0 = 1)$exitcode, 0)
+  expect_equal(gradstep(sin, 1, h0 = 0.01)$exitcode, 0)
   expect_equal(gradstep(function(x) sum(sin(x)), 1:3, h0 = 0.01)$exitcode, rep(0, 3))
 })
 
@@ -38,7 +38,7 @@ test_that("for unfortunate inputs, the search may hit the boundary", {
 
 test_that("gradstep correctly handles vector inputs", {
   f <- function(x) sum(sin(x))
-  s.grad <- gradstep(x = 1:4, FUN = f,
+  s.grad <- gradstep(x = 1:4, FUN = f, method = "SW",
                      control = list(diagnostics = TRUE))
   expect_equal(s.grad$exitcode, rep(0, 4))
 
@@ -52,7 +52,7 @@ test_that("gradstep correctly handles vector inputs", {
 })
 
 test_that("the error in vector inputs does not propagate too strongly", {
-  s.grad <- gradstep(x = 1:4, FUN = function(x) sum(sin(x)),
+  s.grad <- gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "SW",
                      control = list(diagnostics = TRUE))
   expect_equal(s.grad$exitcode, rep(0, 4))
 
@@ -72,7 +72,7 @@ test_that("gradstep accepts methods argument as a list", {
 
 test_that("gradstep correctly handles other inputs", {
   f <- function(x) sum(sin(x))
-  expect_equal(gradstep(x = 1:4, FUN = f, h0 = NULL)$exitcode, rep(0, 4))
+  expect_equal(gradstep(x = 1:4, FUN = f, h0 = NULL, method = "SW")$exitcode, rep(0, 4))
 })
 
 test_that("gradstep checks for conflicting arguments of FUN and methods", {

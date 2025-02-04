@@ -1,9 +1,9 @@
 test_that("Curtis-Reid step selection handles inputs well", {
   f <- function(x) return(NA)
   expect_error(step.CR(x = 2, f), "Could not compute the function value")
-  expect_error(step.CR(sin, 1, version = "orig"), "must be either")
-  expect_error(step.CR(sin, 1, tol = 1e-4), "must be a positive number greater than 1")
-  expect_warning(step.CR(sin, 1, acc.order = 4), "Setting acc.order")
+  expect_error(step.CR(sin, 1, version = "new"), "should be one of")
+  expect_error(step.CR(sin, 1, tol = 1e-4), "must be >=")
+  expect_warning(step.CR(sin, 1, acc.order = 4), "Using acc.order")
   expect_error(step.CR(sin, 1, range = c(0, 1)), "must be a positive vector of length 2")
 })
 
@@ -31,7 +31,7 @@ test_that("Curtis-Reid step selection behaves reasonably", {
 
 })
 
-test_that("Curtis-Reid steps grow for linear functions", {
+test_that("Curtis--Reid steps grow for linear functions", {
   expect_equal(step.CR(x = 1, function(x) x)$exitcode, 1)
 })
 
@@ -44,3 +44,12 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
   expect_equal(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3)
   expect_equal(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 4, range = c(1e-12, 1))$exitcode, 4)
 })
+
+# test_that("Parallelisation speeds things up for Curtis--Reid", {
+#   f <- function(x) {Sys.sleep(0.3); return(sin(x))}
+#   cl <- parallel::makeCluster(2)
+#   t1 <- system.time(step.CR(f, pi/4, version = "modified", cores = 1))
+#   t2 <- system.time(step.CR(f, pi/4, version = "modified", cl = cl))
+#   parallel::stopCluster(cl)
+#   expect_lt(t2[3], t1[3])
+# })
