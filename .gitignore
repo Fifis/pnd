@@ -5,3 +5,4 @@
 .directory
 .lintr
 vignettes/optimal-step-size.pdf
+tests/testthat/Rplots.pdf
