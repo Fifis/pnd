@@ -1,8 +1,6 @@
 #' Determine function dimensionality and vectorisation
 #'
 #' @inheritParams GenD
-#' @param stop.cluster Logical: should the cluster at the end be stopped? Should be \code{FALSE}
-#'   if an external cluster was used and will be used in the future.
 #'
 #' @details
 #' The following combinations of parameters are allowed, suggesting specific input and
@@ -33,11 +31,11 @@
 #' checkDimensions(function(x) c(sin(x), cos(x)), x = 1, h = 1e-5, report = 2)  # R -> Rn, Jacobian
 #' checkDimensions(function(x) c(sin(x), cos(x)), x = 1:4, h = 1e-5, report = 2)  # vec Jac
 #' checkDimensions(function(x) c(integrate(sin, 0, x)$value, integrate(sin, -x, 0)$value),
-#'                  x = 1:4, h = 1e-5, report = 2)  # non vec JAc
+#'                  x = 1:4, h = 1e-5, report = 2)  # non-vectorised Jacobian
 checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
                             elementwise = NA, vectorised = NA, multivalued = NA,
-                            deriv.order = 1, acc.order = 2, side = 0, h, report = 1L,
-                            stop.cluster = FALSE, cores = getOption("pnd.cores"),
+                            deriv.order = 1, acc.order = 2, side = 0, h = NULL, report = 1L,
+                            cores = getOption("pnd.cores"),
                             preschedule = getOption("pnd.preschedule"), cl = NULL, ...) {
   if (missing(FUN)) {
     if (is.function(func)) {
@@ -48,12 +46,6 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     }
   }
   if (!is.function(FUN)) stop("'FUN' must be a function.")
-
-  # If the user is careful, nothing is necessary
-  if ((isTRUE(elementwise) || isFALSE(elementwise)) &&
-      (isTRUE(vectorised) || isFALSE(vectorised)) &&
-      (isTRUE(multivalued) || isFALSE(multivalued)))
-    return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
 
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- checkOrCreateCluster(cl = cl, cores = cores)
@@ -67,18 +59,38 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   if (!(isTRUE(multivalued) || isFALSE(multivalued) || identical(multivalued, NA)))
     stop("The 'multivalued' argument must be TRUE, FALSE, or NA.")
 
-  if (isTRUE(multivalued) && isTRUE(vectorised) && !elementwise)
-    stop("Vectorised functions with vector returns cannot be elementwise.")
-  if (isFALSE(multivalued) && isTRUE(vectorised) && isFALSE(elementwise))
-    stop("Scalar functions with multivariate inputs cannot be vectorised.")
+  if (isTRUE(multivalued) && isTRUE(elementwise))
+    stop("Multi-valued functions cannot be elementwise regardless of vectorisation.")
+  if (isFALSE(multivalued) && isFALSE(elementwise) && isTRUE(vectorised))
+    stop("Scalar functions with multi-variate inputs cannot be vectorised.")
+
+  # If the user is careful, nothing is necessary
+  if ((isTRUE(elementwise) || isFALSE(elementwise)) &&
+      (isTRUE(vectorised) || isFALSE(vectorised)) &&
+      (isTRUE(multivalued) || isFALSE(multivalued)))
+    return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
+
+  # Environment set-up
+  dots <- list(...)
+  e <- list2env(dots)
+  FUNe <- FUN
+  environment(FUNe) <- e
+  assign("FUN", FUNe, envir = e)
+  FUN1 <- function(z) safeF(e$FUN, z)
+  if (inherits(cl, "cluster")) parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
+
+  if (is.null(h)) {
+    lttol <- abs(x) < sqrt(.Machine$double.eps)
+    h.default <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1/3) * 2
+    h <- stats::median(h.default)
+  }
 
   # Making one evaluation
   # TODO: do proper timing here
   n <- length(x)
-  FUN1 <- function(z) safeF(FUN, z, ...)
   user.f0 <- !is.null(f0)
   tic0 <- Sys.time()
-  if (!user.f0) {
+  if (!user.f0) {  # Try direct evaluation first
     f0 <- FUN1(x)  # If successful, this estimate is almost free from overhead (only CPU spin-up)
   } # Else, we do not know the run time because we are not experimenting with f0
   tic1 <- Sys.time()
@@ -176,8 +188,6 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     attr(ret, "f") <- c(f0, fhvals)
   }
   attr(ret, "seconds") <- if (user.f0) NA else as.numeric(tic1 - tic0, units = "secs")
-  if (inherits(cl, "cluster") && stop.cluster) tryCatch(parallel::stopCluster(cl), error =
-                                                          function(e) return(NULL))
 
   return(ret)
 }
@@ -278,8 +288,6 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @param cores Integer specifying the number of CPU cores used for parallel computation.
 #' Recommended to be set to the number of physical cores on the machine minus one.
 #' @inheritParams runParallel
-#' @param stop.cluster Logical: should the cluster at the end be stopped? Should be \code{FALSE}
-#'   if an external cluster was used and will be used in the future.
 #' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
 #'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
 #' @param report Integer for the level of detail in the output. If \code{0},
@@ -363,7 +371,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2L,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps),  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 stop.cluster = TRUE, func = NULL, report = 1L, ...) {
+                 func = NULL, report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -417,7 +425,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
       ell[["method"]] <- NULL
     }
     warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
-                   "with more approproate default values and facilities for automatic ",
+                   "with more appropriate default values and facilities for automatic ",
                    "step-size selection. See ?Grad and ?gradstep for more information."))
   }
 
@@ -437,7 +445,15 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (is.null(cl)) cl <- checkOrCreateCluster(cl, cores = cores)
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
-  FUN1 <- function(x) do.call(FUN, c(list(x), ell))
+
+  # Capturing the arguments into an environment
+  dots <- ell
+  e <- list2env(dots)
+  FUNe <- FUN
+  environment(FUNe) <- e
+  assign("FUN", FUNe, envir = e)
+  FUN1 <- function(x) e$FUN(x)
+  if (inherits(cl, "cluster")) parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
 
   # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
   if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
@@ -486,7 +502,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func,
-                           stop.cluster = FALSE, cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule)
   } else {
     chk <- c(elementwise = unname(elementwise), vectorised = unname(vectorised),
              multivalued = unname(multivalued))
@@ -498,12 +514,18 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # TODO: deduplicate, save CPU
   fvals0 <- runParallel(FUN = FUN1, x = grid$x, preschedule = preschedule, cl = cl)
-  okay.f <- sapply(fvals0, is.numeric) | sapply(fvals0, is.finite) | sapply(fvals0, is.na)
-  if (any(!okay.f)) {
+  nonfinite.f   <- !sapply(fvals0, is.finite)
+  horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
+  if (any(horrible.f)) {
     warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-              "returned. Some gradient coordinates can be NA. Possible reason: point at ",
-              "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
-    fvals0[!okay.f] <- NA_real_
+                   "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
+                   "returning character or other type. Check the function output."))
+    fvals0[horrible.f] <- NA_real_
+  } else if (any(nonfinite.f)) {
+    warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
+                   "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
+                   "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
+    fvals0[nonfinite.f] <- NA_real_
   }
 
   # The function can be vector-valued, which is why we ensure that dimensions are not dropped
@@ -535,8 +557,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     }
     if (autostep && report > 1) attr(jac, "step.search") <- h.auto
   }
-  if (inherits(cl, "cluster") && stop.cluster) tryCatch(parallel::stopCluster(cl), error =
-                                                          function(e) return(NULL))
 
   return(jac)
 }
@@ -631,7 +651,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 stop.cluster = TRUE, func = NULL, report = 1L, ...) {
+                 func = NULL, report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -648,7 +668,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func,
-                           stop.cluster = FALSE, cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
@@ -660,10 +680,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
             vectorised = chk["vectorised"], multivalued = chk["multivalued"],
             deriv.order = deriv.order, side = side, acc.order = acc.order,
             h = h, zero.tol = zero.tol, h0 = h0, control = control, f0 = f0, cores = cores, func = func,
-            preschedule = preschedule, cl = cl, stop.cluster = stop.cluster, report = report, ...)
-
-  if (inherits(cl, "cluster") && stop.cluster) tryCatch(parallel::stopCluster(cl), error =
-                                                          function(e) return(NULL))
+            preschedule = preschedule, cl = cl, report = report, ...)
 
   return(d)
 }
@@ -719,7 +736,7 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
                      deriv.order = 1L, side = 0, acc.order = 2,
                      h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL,
                      control = list(), f0 = NULL, cores = 1, preschedule = TRUE,
-                     stop.cluster = TRUE, cl = NULL, func = NULL, report = 1L, ...) {
+                     cl = NULL, func = NULL, report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -737,7 +754,7 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func,
-                           stop.cluster = FALSE, cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
@@ -749,10 +766,7 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
             vectorised = chk["vectorised"], multivalued = chk["multivalued"],
             deriv.order = deriv.order, side = side, acc.order = acc.order, h = h, h0 = h0,
             zero.tol = zero.tol, control = control, f0 = f0, cores = cores, preschedule = preschedule,
-            cl = cl, stop.cluster = stop.cluster, func = func, report = report, ...)
-
-  if (inherits(cl, "cluster") && stop.cluster) tryCatch(parallel::stopCluster(cl), error =
-                                                          function(e) return(NULL))
+            cl = cl, func = func, report = report, ...)
 
   return(d)
 }

@@ -12,7 +12,7 @@ gradstep(
   method = c("plugin", "SW", "CR", "CRm", "DV", "M"),
   diagnostics = FALSE,
   control = NULL,
-  cores = getOption("pnd.cores", 2),
+  cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   ...

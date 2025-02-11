@@ -21,7 +21,6 @@ GenD(
   cores = 1,
   preschedule = TRUE,
   cl = NULL,
-  stop.cluster = TRUE,
   func = NULL,
   report = 1L,
   ...
@@ -91,9 +90,6 @@ of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster}
 the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
 \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
-
-\item{stop.cluster}{Logical: should the cluster at the end be stopped? Should be \code{FALSE}
-if an external cluster was used and will be used in the future.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}

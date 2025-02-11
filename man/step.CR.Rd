@@ -15,7 +15,7 @@ step.CR(
   range = h0/c(1e+05, 1e-05),
   maxit = 20L,
   seq.tol = 1e-04,
-  cores = getOption("pnd.cores", 2),
+  cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   diagnostics = FALSE,
@@ -131,7 +131,7 @@ cl <- makePSOCKcluster(names = 3, outfile = "")
 abc <- 2
 f <- function(x, abc) {Sys.sleep(0.1); prod(abc*sin(x))}
 x <- pi/4
-system.time(step.CR(f, x, h = 1e-4, cores = 1, abc = abc))  # To remove speed-ups
+system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # To remove speed-ups
 system.time(step.CR(f, x, h = 1e-4, cl = cl, abc = abc))
 
 setDefaultCluster(cl)

@@ -13,7 +13,7 @@ step.SW(
   seq.tol = 1e-04,
   max.rel.error = .Machine$double.eps/2,
   maxit = 40L,
-  cores = getOption("pnd.cores", 2),
+  cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
   diagnostics = FALSE,
