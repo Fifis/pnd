@@ -8,8 +8,6 @@ pasteAnd <- function(x) paste0(x, collapse = ", ")
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234
 printE <- function(x, d = 2) sprintf(paste0("%1.", d, "e"), x)
 
-
-
 #' Number of core checks and changes
 #'
 #' @param cores Integer specifying the number of CPU cores used for parallel computation.
@@ -39,7 +37,7 @@ getExpr <- function(i, fun, dots, fname = "FUN") {
       ff <- ff[names(ff) %in% names(dots)]
     else
       ff <- dots
-    if(length(ff)>=1){
+    if(length(ff) >= 1){
       ex <- paste0(ex, ",")
       moreArgs <- paste(lapply(names(ff), function(x) paste0(x, "=", x)), collapse = ", ")
       ex <- paste0(ex, moreArgs)
@@ -47,7 +45,8 @@ getExpr <- function(i, fun, dots, fname = "FUN") {
   }
   fc <- paste0(ex, ")")
 
-  ex <- paste0("local({z <- x[", i, "]; ", fc, "}, envir=e)")
+  # Refer to .GlobalEnv$e so that eval() find the exported environment
+  ex <- paste0("local({z <- x[", i, "]; ", fc, "}, envir = .GlobalEnv$e)")
   parse(text = ex)
 }
 
@@ -112,12 +111,26 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
   return(cl)
 }
 
+setupParallelEnv <- function(FUN, cl, ...) {
+  dots <- list(...)
+  e <- list2env(dots)
+  FUNe <- FUN
+  environment(FUNe) <- e
+  assign("FUN", FUNe, envir = e)
+  if (inherits(cl, "cluster")) {
+    parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
+  } else {
+    assign("e", e, envir = .GlobalEnv)
+  }
+  list(FUN = FUNe, e = e, dots = dots)
+}
 
 #' Run a function in parallel over a list (internal use only)
 #'
 #' @param FUN A function of only one argument. If there are more arguments, use
 #'   the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.
-#' @param x A list to parallelise the evaluation of \code{FUN} over.
+#' @param x A list to parallelise the evaluation of \code{FUN} over: either numbers
+#'   or expressions.
 #' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 #'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 #'   take less than 0.1 s per evaluation.
@@ -140,19 +153,29 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
 #' print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
 #' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
 runParallel <- function(FUN, x, preschedule = FALSE, cl = NULL) {
-  if (identical(cl, "lapply")) {
-    ret <- lapply(x, FUN)
-  } else if (is.character(cl) && grepl("^mclapply ", cl)) {
+  if (identical(cl, "lapply") || is.null(cl)) {
+    if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression"))
+      stop("Internal error: lapply should call the function directly to prevent overhead.")
+    return(lapply(x, FUN))
+  } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
+    if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression"))
+      stop("Internal error: mclapply should call the function directly to prevent overhead.")
     cores <- as.integer(strsplit(cl, " ")[[1]][2])
-    ret <- parallel::mclapply(X = x, FUN = FUN, mc.cores = cores, mc.preschedule = preschedule)
+    return(parallel::mclapply(x, FUN, mc.cores = cores, mc.preschedule = preschedule))
   } else if (inherits(cl, "cluster")) {
-    if (preschedule) {
-      ret <- parallel::parLapply(cl = cl, X = x, fun = FUN)
-    } else {
-      ret <- parallel::parLapplyLB(cl = cl, X = x, fun = FUN)
+    if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression")) {
+      # If the first element of x is an expression, assume that every element is.
+      if (preschedule)
+        return(parallel::parLapply(cl, x, eval))
+      else
+        return(parallel::parLapplyLB(cl, x, eval))
+    } else {  # x contains values for direct application
+      if (preschedule)
+        return(parallel::parLapply(cl, x, FUN))
+      else
+        return(parallel::parLapplyLB(cl, x, FUN))
     }
-  } else {
-    stop("'cl' should be 'lapply', 'mclapply', or a cluster object.")
   }
-  return(ret)
+  stop("'cl' should be 'lapply', 'mclapply', or a cluster object.")
 }
+

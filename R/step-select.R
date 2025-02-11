@@ -3,13 +3,9 @@
 # e.g. from the dots (...) argument, as in the optimParallel package.
 # Returns a generator object: a list with cluster and a function that can run locally.
 parGenCR <- function(FUN, x, vanilla, cl, preschedule, ...) {
-  dots <- list(...)  # Capture the extra arguments to FUN
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)  # To call FUN with dots arguments in the same env
-  if (inherits(cl, "cluster"))
-    parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
+  envData <- setupParallelEnv(FUN, cl, ...)
+  dots <- envData$dots
+  e <- envData$e
 
   # The driver function that does the actual ratio evaluation
   # Similar to how 'evalFG' does exports and calls 'parLapply' in optimParallel.
@@ -21,24 +17,11 @@ parGenCR <- function(FUN, x, vanilla, cl, preschedule, ...) {
     }
 
     FUNsafe <- function(z) safeF(FUN, z, ...)
-
-    exprList <- lapply(seq_along(xgrid), function(i) {
-      getExpr(i, fun = FUN, dots = dots, fname = "FUN")
-    })
-
-    fgrid <- if (identical(cl, "lapply")) {
-      lapply(xgrid, FUNsafe)
-    } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
-      cores <- as.integer(strsplit(cl, "\\s+")[[1]][2])
-      parallel::mclapply(xgrid, FUNsafe, mc.cores = cores, mc.preschedule = preschedule)
-    } else {
-      if (preschedule) {
-        parallel::parLapply(cl, exprList, eval)
-      } else {
-        parallel::parLapplyLB(cl, exprList, eval)
-      }
-    }
-    fgrid <- unlist(fgrid)
+    if (inherits(cl, "cluster"))
+      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
+    else
+      xx <- xgrid
+    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
 
     if (vanilla) {
       fd <- (fgrid[3] - fgrid[2]) / h
@@ -186,6 +169,11 @@ parGenSW <- function(FUN, x, max.rel.error, cl, preschedule, ...) {
   getRatio <- function(x, h, do.f0 = FALSE, ratio.last = NULL, ratio.beforelast = NULL) {
     xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
+    if (inherits(cl, "cluster")) {
+      parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
+      parallel::clusterEvalQ(cl, assign("x", x, envir = e))
+    }
+
     exprList <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
 
     fgrid <- if (identical(cl, "lapply")) {
@@ -318,7 +306,7 @@ parGenSW <- function(FUN, x, max.rel.error, cl, preschedule, ...) {
 #' abc <- 2
 #' f <- function(x, abc) {Sys.sleep(0.1); prod(abc*sin(x))}
 #' x <- pi/4
-#' system.time(step.CR(f, x, h = 1e-4, cores = 1, abc = abc))  # To remove speed-ups
+#' system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # To remove speed-ups
 #' system.time(step.CR(f, x, h = 1e-4, cl = cl, abc = abc))
 #'
 #' setDefaultCluster(cl)
@@ -332,7 +320,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     acc.order = c(2L, 4L),
                     tol = if (version[1] == "original") 10 else 4,
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                    cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, diagnostics = FALSE, ...) {
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
@@ -352,7 +340,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   target <- sort(c(aim / tol, aim * tol))
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)
   gen <- parGenCR(FUN = FUN, x = x, vanilla = vanilla, cl = cl, preschedule = preschedule, ...)
 
@@ -384,8 +372,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
-                  ". Change the range, which is currently [", pasteAnd(range),
-                  "], and/or try a different starting h0, which is currently ", h0, "."))
+                  ".\nChange the range, which is currently [", pasteAnd(range),
+                  "], and/or\ntry a different starting h0, which is currently ", h0, "."))
     }
 
     if (res.i$ratio >= target[1] && res.i$ratio <= target[2]) {
@@ -499,7 +487,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     range = h0 / c(1e6, 1e-6), alpha = 4/3,
                     ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
-                    cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL,  diagnostics = FALSE, ...) {
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
@@ -511,7 +499,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   P <- 2^(log2(.Machine$double.eps/2) / alpha)
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)
   gen <- parGenDV(FUN = FUN, x = x, k = k, P = P, cl = cl, preschedule = preschedule, ...)
 
@@ -659,7 +647,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' step.plugin(x = 0, f, diagnostics = TRUE)  # f''' = 0, setting a large one
 step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                         range = h0 / c(1e4, 1e-4),
-                        cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                        cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                         cl = NULL,  diagnostics = FALSE, ...) {
   # TODO: add zero.tol everywhere
   cores <- checkCores(cores)
@@ -669,7 +657,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   range <- sort(range)
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)
   gen <- parGenPlugin(FUN = FUN, x = x, h = h0, cl = cl, preschedule = preschedule, ...)
 
@@ -802,7 +790,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 0.5, range = h0 / c(1e12, 1e-8),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
-                    cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, diagnostics = FALSE, ...) {
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
@@ -811,7 +799,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   range <- sort(range)
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)
   gen <- parGenSW(FUN = FUN, x = x, max.rel.error = max.rel.error,
                   cl = cl, preschedule = preschedule, ...)
@@ -1021,6 +1009,22 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   return(ret)
 }
 
+# The median of the 3 points with the lowest error
+med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
+  i.min3 <- rank(log2etrunc, ties.method = "first", na.last = "keep") %in% 1:3
+  if (sum(i.min3) >= 3) {
+    hopt0 <- sort(hgrid[i.min3])[2]
+    i.hopt <- which(hopt0 == hgrid)
+    hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
+    exitcode <- 2
+  } else {
+    hopt0 <- hopt <- hnaive  # At least something should be returned
+    i.hopt <- if (sum(i.min3) > 0) min(hgrid[is.finite(log2etrunc)]) else which.min(abs(hgrid-h0))
+    exitcode <- 3
+  }
+  return(list(hopt0 = hopt0, hopt = hopt, i.hopt = i.hopt, exitcode = exitcode))
+}
+
 #' Mathur's AutoDX-like automatic step selection
 #'
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
@@ -1089,7 +1093,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                    min.valid.slopes = 5L, seq.tol = 0.01,
                    correction = TRUE, diagnostics = FALSE, plot = FALSE,
-                   cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                   cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
   cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
@@ -1100,7 +1104,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   inv.sf <- 1 / shrink.factor
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)
 
   if (is.null(range)) {
@@ -1128,12 +1132,13 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   FUNe <- FUN
   environment(FUNe) <- e
   assign("FUN", FUNe, envir = e)
+  assign("safeF", safeF, envir = e)
   if (inherits(cl, "cluster"))
     parallel::clusterExport(cl, varlist = "e", envir = list2env(list(e = e)))
 
   getExpr <- function(i, xval) {
     # This is the same approach used in parGenCR, just inlined
-    bquote(safeF(FUN, .(xval), .(dots)))
+    bquote(e$safeF(FUN, .(xval), .(dots)))
   }
 
   hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
@@ -1220,44 +1225,49 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
     med.slope <- round(stats::median(slopes), 2)
     if (!any(good.slopes)) {
       okay.slopes <- abs(slopes - 2) / 2 <= max(0.1, min(seq.tol * 3, 0.9))
-      okay.slopes <- removeFirstBad(okay.slopes)
+      if (sum(rle(okay.slopes)$values) > 1) okay.slopes <- removeFirstBad(okay.slopes)
       if (any(okay.slopes)) {
         good.slopes <- okay.slopes
         exitcode <- 1
         warning(paste0("The estimated truncation error has a slightly wrong reduction rate (~",
                        med.slope, ", but should be ~2). ", err1))
       } else {
-        stop(paste0("The estimated truncation error has a wrong reduction rate (~", med.slope,
+        warning(paste0("The estimated truncation error has a wrong reduction rate (~", med.slope,
                     ", but should be ~2). ", err1))
       }
       i.okay <- i.increasing[okay.slopes]
     }
     # Finding the smallest step size with a valid slope and correcting it
     hopt0 <- valid.h[which(good.slopes)[1]]
-    i.hopt <- which(hgrid == hopt0)
-    hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
+    if (is.na(hopt0)) {
+      m3 <- med3lowest(hgrid, log2etrunc, tstar, hnaive, h0)
+      i.hopt <- m3$i.hopt
+      hopt0 <- m3$hopt0
+      hopt <- m3$hopt
+      exitcode <- m3$exitcode
+    } else {
+      i.hopt <- which(hgrid == hopt0)
+      hopt <- hopt0 * (1 / tstar)^(1/3) # TODO: any power
+    }
   } else {
-    i.min5 <- rank(log2etrunc, ties.method = "first", na.last = "keep") %in% 1:3
-    if (sum(i.min5) >= 3) {
-      exitcode <- 2
+    m3 <- med3lowest(hgrid, log2etrunc, tstar, hnaive, h0)
+    i.hopt <- m3$i.hopt
+    hopt0 <- m3$hopt0
+    hopt <- m3$hopt
+    exitcode <- m3$exitcode
+
+    if (exitcode == 2)
       warning(paste0("Could not find a sequence of of ", min.valid.slopes, " reductions ",
                      "of the truncation error. Visualise by adding 'plot = TRUE'. ", err1,
                      " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
                      "returning the approximate argmin of the total error."))
-      hopt0 <- sort(hgrid[i.min5])[2]  # The median of the 3 points with the lowest error
-      i.hopt <- which(hopt0 == hgrid)
-      hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
-    } else {
-      warning(paste0("There are ", sum(i.min5), " finite function values on the grid. ",
+    if (exitcode == 3)
+      warning(paste0("There are <3 finite function values on the grid. ",
                      "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
                      "function does not return finite values on the range x+[",
                      pasteAnd(printE(range)), "] with ", n,
                      " exponentially spaced points. Returning a very rough value that may ",
-                     "not even yield a numerical derivative."))
-      exitcode <- 3
-      hopt0 <- hopt <- hnaive  # At least something should be returned
-      i.hopt <- if (sum(i.min5) > 0) min(hgrid[is.finite(log2etrunc)]) else which.min(abs(hgrid-h0))
-    }
+                     "not even yield a finite numerical derivative."))
   }
 
   # !!! If exitcode e, return the last one
@@ -1265,7 +1275,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                 "successfully found the optimal step size",
                 "successfully found the optimal step size but allowed inaccurate slopes",
                 "truncation error reduction rate is too wrong, returning the approximate best step",
-                paste0("only ", sum(i.min5), "finite function values on the grid, returning the naive step"))
+                "Fewer than 3 finite function values on the grid, returning the naive step")
 
   diag.list <- list(h = hgrid, x = matrix(xgrid, ncol = 2), f = matrix(fgrid, ncol = 2),
                     deriv = cd,
@@ -1324,8 +1334,8 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #'
 #' @examples
 #' hgrid <- 10^seq(-8, 3, 0.25)
-#' plotTE(hgrid, etrunc = 2e-12 * hgrid^2 + 2e-12 / hgrid,
-#'        eround = 1e-12 / hgrid, hopt = 2, i.increasing = 33:45, i.good = 35:45)
+#' plotTE(hgrid, etrunc = 2e-12 * hgrid^2 + 1e-14 / hgrid,
+#'        eround = 1e-14 / hgrid, hopt = 0.4, i.increasing = 30:45, i.good = 32:45)
 plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
                    i.increasing = NULL, i.good = NULL, i.okay = NULL,
                    eps = .Machine$double.eps/2, delta = .Machine$double.eps/2, ...) {
@@ -1430,7 +1440,7 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
                      method = c("plugin", "SW", "CR", "CRm", "DV", "M"), diagnostics = FALSE, control = NULL,
-                     cores = getOption("pnd.cores", 2), preschedule = getOption("pnd.preschedule", TRUE),
+                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                      cl = NULL, ...) {
   # TODO: implement "all"
   method <- method[1]
@@ -1447,7 +1457,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   }
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- length(cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   cl <- checkOrCreateCluster(cl, cores)  # Subsumes the 'cores' argument -- using NULL cores and an informative cluster
 
   ell <- list(...)

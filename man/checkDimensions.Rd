@@ -15,9 +15,8 @@ checkDimensions(
   deriv.order = 1,
   acc.order = 2,
   side = 0,
-  h,
+  h = NULL,
   report = 1L,
-  stop.cluster = FALSE,
   cores = getOption("pnd.cores"),
   preschedule = getOption("pnd.preschedule"),
   cl = NULL,
@@ -74,9 +73,6 @@ returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher attaches the full
 diagnostic output as an attribute.}
 
-\item{stop.cluster}{Logical: should the cluster at the end be stopped? Should be \code{FALSE}
-if an external cluster was used and will be used in the future.}
-
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
@@ -124,5 +120,5 @@ checkDimensions(function(x) sum(sin(x)), x = 1:4, h = 1e-5, report = 2)  # Rn ->
 checkDimensions(function(x) c(sin(x), cos(x)), x = 1, h = 1e-5, report = 2)  # R -> Rn, Jacobian
 checkDimensions(function(x) c(sin(x), cos(x)), x = 1:4, h = 1e-5, report = 2)  # vec Jac
 checkDimensions(function(x) c(integrate(sin, 0, x)$value, integrate(sin, -x, 0)$value),
-                 x = 1:4, h = 1e-5, report = 2)  # non vec JAc
+                 x = 1:4, h = 1e-5, report = 2)  # non-vectorised Jacobian
 }

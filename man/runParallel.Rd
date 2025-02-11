@@ -10,7 +10,8 @@ runParallel(FUN, x, preschedule = FALSE, cl = NULL)
 \item{FUN}{A function of only one argument. If there are more arguments, use
 the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.}
 
-\item{x}{A list to parallelise the evaluation of \code{FUN} over.}
+\item{x}{A list to parallelise the evaluation of \code{FUN} over: either numbers
+or expressions.}
 
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
