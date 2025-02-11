@@ -1,4 +1,5 @@
 test_that("Stepleman-Winarsky step selection handles inputs well", {
+  expect_error(step.SW(sin, 1, range = c(0, 1)), "must be a positive vector of length 2")
   f <- function(x) return(NA)
   expect_error(step.SW(x = 2, f), "must be finite")
 
@@ -46,3 +47,13 @@ test_that("SW fails when a large h0 invalidates the est. trunc. error", {
   expect_warning(step.SW(x = pi/4, sin, h0 = 1000, diagnostics = TRUE),
                  "exceeds 1% of |x|")
 })
+
+test_that("Parallelisation in SW works", {
+  expect_equal(step.SW(sin, 1, cores = 1), step.SW(sin, 1, cores = 2))
+  clus <- parallel::makePSOCKcluster(2)
+  expect_equal(step.SW(sin, 1, cores = 1), step.SW(sin, 1, cl = clus))
+  parallel::stopCluster(clus)
+})
+
+
+

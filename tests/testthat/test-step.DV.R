@@ -1,6 +1,7 @@
 test_that("Dumontet-Vignes step selection handles inputs well", {
   f <- function(x) return(NA)
   expect_error(step.DV(x = 2, f), "Could not compute the function value")
+  expect_error(step.DV(sin, 1, range = c(0, 1)), "must be a positive vector of length 2")
 })
 
 test_that("Dumontet-Vignes step selection behaves reasonably", {
@@ -25,9 +26,11 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
 
   s4 <- step.DV(x = 2, f, h0 = 100, maxit = 5)
   expect_equal(s4$exitcode, 5)
+
+  expect_equal(step.DV(x = 2, f, maxit = 1)$exitcode, 6)
 })
 
-test_that("Tweaking the DV algorithm for noisiser functions", {
+test_that("Tweaking the DV algorithm for noisier functions", {
   f <- function(x) x^4
   s.perfect <- step.DV(x = 2, f, h0 = 1e-7, alpha = 1)
   s.noisy <- step.DV(x = 2, f, h0 = 1e-7, alpha = 2)
@@ -42,4 +45,11 @@ test_that("DV for functions with near-zero f''' stops immediately", {
   s2 <- step.DV(function(x) pi*x + exp(1), 1)
   expect_equal(s2$counts, 1)
   expect_equal(s2$exitcode, 1)
+})
+
+test_that("Parallelisation in DV works", {
+  expect_equal(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cores = 2))
+  clus <- parallel::makePSOCKcluster(2)
+  expect_equal(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cl = clus))
+  parallel::stopCluster(clus)
 })
