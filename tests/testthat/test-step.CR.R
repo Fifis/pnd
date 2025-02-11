@@ -57,6 +57,6 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
 test_that("Parallelisation in CR works", {
   expect_equal(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)
-  expect_equal(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cl = clus))
+  expect_equal(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })

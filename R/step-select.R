@@ -1447,7 +1447,7 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   # TODO: test if Mathur accepts the plot
   if (is.null(h0)) {
     lttol <- abs(x) < zero.tol
-    deriv.order <- 1
+    deriv.order <- 1  # TODO: take into account later
     acc.order <- 2
     if (method != "M") {
       h0 <- (abs(x)*(!lttol) + lttol) * 1e-5

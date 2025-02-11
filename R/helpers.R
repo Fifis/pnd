@@ -111,6 +111,14 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
   return(cl)
 }
 
+#' Create an environment for PSOCK parallelisation
+#'
+#' @param FUN A function to be called within an environment.
+#' @param cl A cluster to which the environment is exported.
+#' @param ... Arguments passed to FUN.
+#'
+#' @returns A list with a function, environment, and dot arguments.
+#'
 setupParallelEnv <- function(FUN, cl, ...) {
   dots <- list(...)
   e <- list2env(dots)

@@ -56,3 +56,8 @@ Visualises the estimated truncation error, rounding error, and total error
 used in automatic step-size selection for numerical differentiation.
 The plot follows the approach used in Mathur (2012) and other step-selection methods.
 }
+\examples{
+hgrid <- 10^seq(-8, 3, 0.25)
+plotTE(hgrid, etrunc = 2e-12 * hgrid^2 + 1e-14 / hgrid,
+       eround = 1e-14 / hgrid, hopt = 0.4, i.increasing = 30:45, i.good = 32:45)
+}

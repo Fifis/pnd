@@ -4,7 +4,8 @@
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
 - SYNTAX: Align with the syntax of `optimParallel`, borrow ideas from `forecast::auto.arima`
-- Feature: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
+- FEATURE: make all helper generators use `runParallel` instead of the long if-else
+- FEATURE: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
 - FEATURE: Implement de-duplication in the grid of points; reuse f0 and other precomputed values
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s

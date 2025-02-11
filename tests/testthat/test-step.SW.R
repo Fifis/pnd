@@ -54,6 +54,3 @@ test_that("Parallelisation in SW works", {
   expect_equal(step.SW(sin, 1, cores = 1), step.SW(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })
-
-
-
