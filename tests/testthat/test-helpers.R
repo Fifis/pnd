@@ -28,4 +28,8 @@ test_that("Parallel runs are executed correctly", {
   parallel::stopCluster(cl)
 })
 
+test_that("getExpr returns a valid expression", {
+  e <- getExpr(327, rnorm, dots = list(sd = 0.1), fname = "rnorm")
+  expect_true(grepl("rnorm\\(z, *sd *= *sd\\)", as.character(e)))
+})
 

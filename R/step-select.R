@@ -14,13 +14,12 @@ parGenCR <- function(FUN, x, vanilla, cl, preschedule, ...) {
     if (inherits(cl, "cluster")) {
       parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
       parallel::clusterEvalQ(cl, assign("x", x, envir=e))
+      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
+    } else {
+      xx <- xgrid
     }
 
     FUNsafe <- function(z) safeF(FUN, z, ...)
-    if (inherits(cl, "cluster"))
-      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    else
-      xx <- xgrid
     fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
 
     if (vanilla) {
@@ -47,13 +46,9 @@ parGenCR <- function(FUN, x, vanilla, cl, preschedule, ...) {
 
 # Generator for Dumontet--Vignes
 parGenDV <- function(FUN, x, k, P, cl, preschedule, ...) {
-  dots <- list(...)  # Capture the extra arguments to FUN
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)  # To call FUN with dots arguments in the same env
-  if (inherits(cl, "cluster"))
-    parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
+  envData <- setupParallelEnv(FUN, cl, ...)
+  dots <- envData$dots
+  e <- envData$e
 
   # The driver function that does the actual ratio evaluation
   # Similar to how 'evalFG' does exports and calls 'parLapply' in optimParallel.
@@ -61,29 +56,15 @@ parGenDV <- function(FUN, x, k, P, cl, preschedule, ...) {
     xgrid <- x + c(-2*k, -k, k, 2*k)
     if (inherits(cl, "cluster")) {
       parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir = e))
+      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
+      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
+    } else {
+      xx <- xgrid
     }
 
     FUNsafe <- function(z) safeF(FUN, z, ...)
+    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
 
-    exprList <- lapply(seq_along(xgrid), function(i) {
-      getExpr(i, fun = FUN, dots = dots, fname = "FUN")
-    })
-
-    fgrid <- if (identical(cl, "lapply")) {
-      lapply(xgrid, FUNsafe)
-    } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
-      cores <- as.integer(strsplit(cl, "\\s+")[[1]][2])
-      parallel::mclapply(xgrid, FUNsafe, mc.cores = cores, mc.preschedule = preschedule)
-    } else {
-      if (preschedule) {
-        parallel::parLapply(cl, exprList, eval)
-      } else {
-        parallel::parLapplyLB(cl, exprList, eval)
-      }
-    }
-
-    fgrid <- unlist(fgrid)
     tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
     A <- sum(tgrid[tgrid > 0]) # Only positive terms
     B <- sum(tgrid[tgrid < 0]) # Only negative terms
@@ -102,16 +83,9 @@ parGenDV <- function(FUN, x, k, P, cl, preschedule, ...) {
 
 # Generator for plugin
 parGenPlugin <- function(FUN, x, h, cl, preschedule, ...) {
-  dots <- list(...)
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)
-
-  if (inherits(cl, "cluster"))
-    parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
-
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  envData <- setupParallelEnv(FUN, cl, ...)
+  dots <- envData$dots
+  e <- envData$e
 
   # Сomputes the 1st or 3rd derivative using the step size; 1st stage = f''', 2nd = f'
   getRatio <- function(x, h, stage) {
@@ -121,29 +95,16 @@ parGenPlugin <- function(FUN, x, h, cl, preschedule, ...) {
 
     if (inherits(cl, "cluster")) {
       parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir = e))
-    }
-
-    exprList <- lapply(seq_along(xgrid), function(i) {
-      getExpr(i, fun = FUN, dots = dots, fname = "FUN")
-    })
-
-    fgrid <- if (identical(cl, "lapply")) {
-      lapply(xgrid, FUNsafe)
-    } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
-      cores <- as.integer(strsplit(cl, "\\s+")[[1]][2])
-      parallel::mclapply(xgrid, FUNsafe, mc.cores = cores, mc.preschedule = preschedule)
+      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
+      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
     } else {
-      if (preschedule) {
-        parallel::parLapply(cl, exprList, eval)
-      } else {
-        parallel::parLapplyLB(cl, exprList, eval)
-      }
+      xx <- xgrid
     }
 
-    fgrid <- unlist(fgrid)
-    f0 <- if (stage == 1) mean(fgrid[2:3]) else mean(fgrid)  # An approximation to f(x)
+    FUNsafe <- function(z) safeF(FUN, z, ...)
+    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
 
+    f0 <- if (stage == 1) mean(fgrid[2:3]) else mean(fgrid)  # An approximation to f(x)
     cd <- sum(fgrid * s$weights) / h^pow
 
     list(x = xgrid, f = fgrid, cd = cd, f0 = f0)
@@ -155,40 +116,23 @@ parGenPlugin <- function(FUN, x, h, cl, preschedule, ...) {
 
 # Generator for Stepleman--Winarsky
 parGenSW <- function(FUN, x, max.rel.error, cl, preschedule, ...) {
-  dots <- list(...)
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)
-
-  if (inherits(cl, "cluster"))
-    parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
-
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  envData <- setupParallelEnv(FUN, cl, ...)
+  dots <- envData$dots
+  e <- envData$e
 
   getRatio <- function(x, h, do.f0 = FALSE, ratio.last = NULL, ratio.beforelast = NULL) {
     xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
     if (inherits(cl, "cluster")) {
       parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir = e))
-    }
-
-    exprList <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-
-    fgrid <- if (identical(cl, "lapply")) {
-      lapply(xgrid, FUNsafe)
-    } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
-      cores <- as.integer(strsplit(cl, "\\s+")[[1]][2])
-      parallel::mclapply(xgrid, FUNsafe, mc.cores = cores, mc.preschedule = preschedule)
+      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
+      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
     } else {
-      if (preschedule) {
-        parallel::parLapply(cl, exprList, eval)
-      } else {
-        parallel::parLapplyLB(cl, exprList, eval)
-      }
+      xx <- xgrid
     }
-    fgrid <- unlist(fgrid)
+
+    FUNsafe <- function(z) safeF(FUN, z, ...)
+    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
 
     cd <- (fgrid[length(fgrid)] - fgrid[1]) / (2*h)
 
@@ -215,7 +159,29 @@ parGenSW <- function(FUN, x, max.rel.error, cl, preschedule, ...) {
   return(list(cl = cl, getRatio = getRatio))
 }
 
-# No generator is required for Mathur
+# Generator for Mathur
+parGenM <- function(FUN, x, cl, preschedule, ...) {
+  envData <- setupParallelEnv(FUN, cl, ...)
+  dots <- envData$dots
+  e <- envData$e
+
+  getRatio <- function(x) {
+    if (inherits(cl, "cluster")) {
+      parallel::clusterExport(cl, "x", envir = list2env(list(x = x)))
+      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
+      xx <- lapply(seq_along(x), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
+    } else {
+      xx <- x
+    }
+
+    FUNsafe <- function(z) safeF(FUN, z, ...)
+    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
+
+    matrix(fgrid, ncol = 2)
+  }
+
+  return(list(cl = cl, getRatio = getRatio))
+}
 
 #' Curtis--Reid automatic step selection
 #'
@@ -1126,50 +1092,25 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
             pasteAnd(printE(range)), "] to ensure a large-enough search space.")
   }
 
-  # No need to create an extra helper
-  dots <- list(...)
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)
-  assign("safeF", safeF, envir = e)
-  if (inherits(cl, "cluster"))
-    parallel::clusterExport(cl, varlist = "e", envir = list2env(list(e = e)))
-
-  getExpr <- function(i, xval) {
-    # This is the same approach used in parGenCR, just inlined
-    bquote(e$safeF(FUN, .(xval), .(dots)))
-  }
-
-  hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
-  tstar <- (1 + inv.sf) / (1 - shrink.factor^2)  # TODO: n = 2...
   exitcode <- 0
+
+  # Creating a sequence of step sizes for evaluation
   sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
   range.sugg <- range / c(1024, 1/1024)
   err1 <- paste0("Either increase 'shrink.factor' (e.g. from ", shrink.factor,
                  " to ", sf.sugg, ") to have a finer grid, or increase 'range' (",
                  "from [", pasteAnd(printE(range)), "] to ",
                  "[", pasteAnd(printE(range.sugg)), "]).")
-
+  inv.sf <- 1/shrink.factor
+  hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
+  tstar <- (1 + inv.sf) / (1 - shrink.factor^2)  # TODO: n = 2...
   n <- length(hgrid)
   xgrid <- x + c(-hgrid, hgrid)
 
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  gen <- parGenM(FUN = FUN, x = xgrid, cl = cl, preschedule = preschedule, ...)
+  fgrid <- gen$getRatio(x = xgrid)
 
-  fgrid <- if (identical(cl, "lapply")) {
-    lapply(xgrid, FUNsafe)
-  } else if (is.character(cl) && grepl("^mclapply\\s+\\d+$", cl)) {
-    cores <- as.integer(strsplit(cl, "\\s+")[[1]][2])
-    parallel::mclapply(xgrid, FUNsafe, mc.cores = cores, mc.preschedule = preschedule)
-  } else {
-    exprList <- lapply(seq_along(xgrid), function(i) getExpr(i, xgrid[i]))
-    if (preschedule) {
-      parallel::parLapply(cl, exprList, eval)
-    } else {
-      parallel::parLapplyLB(cl, exprList, eval)
-    }
-  }
-  fgrid <- unlist(fgrid)
+  n <- length(fgrid) / 2
 
   # TODO: instead of subtracting one, add one
   fplus <- fgrid[(n+1):(2*n)]

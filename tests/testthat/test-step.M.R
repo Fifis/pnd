@@ -24,4 +24,9 @@ test_that("Parallelisation in Mathur's algorithm works", {
   clus <- parallel::makePSOCKcluster(2)
   expect_equal(step.M(sin, 1, cores = 1), step.M(sin, 1, cl = clus))
   parallel::stopCluster(clus)
+
+  # Testing a slow function
+  # f <- function(x) {Sys.sleep(0.1); sin(x)}
+  # system.time(step.M(f, 1))
+  # system.time(step.M(f, 1, cores = 12))
 })
