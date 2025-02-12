@@ -72,7 +72,10 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
 
   # Environment set-up
   dots <- list(...)
-  e <- list2env(dots)
+  parent.env <- environment(FUN)
+  if (is.null(parent.env)) parent.env <- baseenv()
+  e <- new.env(parent = parent.env)
+  list2env(dots, envir = e)
   FUNe <- FUN
   environment(FUNe) <- e
   assign("FUN", FUNe, envir = e)
@@ -448,12 +451,14 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Capturing the arguments into an environment
   dots <- ell
-  e <- list2env(dots)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)
-  FUN1 <- function(x) e$FUN(x)
-  if (inherits(cl, "cluster")) parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
+  parent.env <- environment(FUN)
+  if (is.null(parent.env)) parent.env <- baseenv()
+  e <- new.env(parent = parent.env)
+  list2env(dots, envir = e)  # Put the ... arguments into e
+  FUN1 <- FUN
+  environment(FUN1) <- e
+  assign("FUN", FUN1, envir = e)
+  if (inherits(cl, "cluster")) parallel::clusterExport(cl, c("FUN1", "e"), envir = list2env(list(e = e)))
 
   # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
   if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
@@ -465,6 +470,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
+
 
   # TODO: the part where step is compared to step.CR, step.DV etc.
   # TODO: for long vectorised argument, vectorise the check
