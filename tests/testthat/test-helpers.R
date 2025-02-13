@@ -2,7 +2,8 @@ test_that("Cluster creation handles inputs correctly", {
   expect_error(checkOrCreateCluster("rubbish"), "must be either")
   expect_error(checkOrCreateCluster(1:3), "is not a cluster")
 
-  expect_equal(checkOrCreateCluster("mclapply 1"), "mclapply 1")
+  expect_equal(checkOrCreateCluster("lapply"), "lapply")
+  expect_equal(checkOrCreateCluster("mclapply 1"), "lapply")
 
   cl <- parallel::makePSOCKcluster(2)
   expect_true(inherits(checkOrCreateCluster(cl), "cluster"))

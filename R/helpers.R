@@ -69,6 +69,7 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
   if (is.character(cl) && (cl != "lapply") && !grepl("^mclapply \\d+$", cl))
     stop(paste0("The string for the cluster must be either 'lapply' or 'mclapply N' (N being ",
                 "the desired number of cores). On Windows, must be a valid cluster."))
+  if (is.character(cl) && (cl == "mclapply 1")) return("lapply")
   if (cores == 1 || ((is.character(cl) && cl == "lapply"))) return("lapply")
 
   # If it is a valid cluster and not a string, return it
@@ -78,10 +79,10 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
 
   if (is.character(cl) && grepl("^mclapply ", cl)) {
     s <- strsplit(cl, " ")[[1]]
-    cores2 <- as.integer(s[2]) # Ignore cores because the cluster is more important
-    cores <- cores2
+    cores <- as.integer(s[2]) # Ignore cores because the cluster is more important
     if (windows) {  # Skip returning the fork request
-      if (cores > 1) warning("Forking unavailable on Windows; create a PSOCK cluster instead.")
+      if (cores > 1) warning("'mclapply' unavailable on Windows; use 'makeCluster()' instead.")
+      return("lapply")
     } else {
       return(cl)
     }
@@ -111,14 +112,6 @@ checkOrCreateCluster <- function(cl = NULL, cores = 2) {
   return(cl)
 }
 
-#' Create an environment for PSOCK parallelisation
-#'
-#' @param FUN A function to be called within an environment.
-#' @param cl A cluster to which the environment is exported.
-#' @param ... Arguments passed to FUN.
-#'
-#' @returns A list with a function, environment, and dot arguments.
-#'
 setupParallelEnv <- function(FUN, cl, ...) {
   dots <- list(...)
   e <- list2env(dots)

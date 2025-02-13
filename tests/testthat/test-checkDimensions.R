@@ -19,7 +19,7 @@ test_that("checkDimensions works with good inputs", {
 
   f <- function(x) stop("Someone left this debug line here")
   expect_error(checkDimensions(f, 1), "cannot be computed")
-  expect_error(checkDimensions(f, 1:3), "neither directly nor")
+  expect_warning(checkDimensions(f, 1:3), "at least one finite numeric")
 
   expect_equal(unname(noAttr(checkDimensions(sin, 1))), c(TRUE, TRUE, FALSE))
   f <- function(x) c(sin(x), cos(x))

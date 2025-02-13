@@ -108,9 +108,9 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     vector.fail <- if (n > 1) FALSE else NA
   }
   if (all(!is.finite(f0)))
-    stop(paste0("Could not evaluate FUN(x) to at least one finite numeric value ",
+    warning(paste0("Could not evaluate FUN(x) to at least one finite numeric value ",
                 "neither directly nor coordinate-wise. Make sure that the function ",
-                "value at the requested point is a numberic vector or scalar."))
+                "value at the requested point is a numeric vector or scalar."))
 
   l <- length(f0)
 
