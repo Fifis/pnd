@@ -150,11 +150,11 @@ setupParallelEnv <- function(FUN, cl, ...) {
 #' @examples
 #' fslow <- function(x) Sys.sleep(x)
 #' x <- rep(0.05, 6)
-#' cl <- checkOrCreateCluster(cores = 2)
+#' cl <- parallel::makeCluster(2)
 #' print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
 #' print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
+#' parallel::stopCluster(cl)
 #' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
-#' if (inherits(cl, "cluster")) parallel::stopCluster(cl)
 runParallel <- function(FUN, x, preschedule = FALSE, cl = NULL) {
   if (identical(cl, "lapply") || is.null(cl)) {
     if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression"))

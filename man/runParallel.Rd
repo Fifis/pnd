@@ -33,8 +33,9 @@ Run a function in parallel over a list (internal use only)
 \examples{
 fslow <- function(x) Sys.sleep(x)
 x <- rep(0.05, 6)
-cl <- checkOrCreateCluster(cores = 2)
+cl <- parallel::makeCluster(2)
 print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
 print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
+parallel::stopCluster(cl)
 cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "\%\n", sep = "")
 }
