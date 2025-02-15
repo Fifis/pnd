@@ -1451,22 +1451,17 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
     ret <- do.call(autofun, f.args)
   } else {
     f.arg.list <- lapply(seq_along(x), function(i) {
-      x_   <- x
-      i_   <- i
-      FUN_ <- FUN
-      ell_ <- ell
-
-      FUN1 <- function(z) { # This function sees x_, i_, FUN_ in the closure environment.
-        xx <- x_
-        xx[i_] <- z
-        do.call(FUN_, c(list(xx), ...))
+      FUN1 <- function(z) { # Scalar version of FUN
+        xx <- x
+        xx[i] <- z
+        FUN(xx, ...)
       }
       margs1 <- margs
       margs1$h0 <- h0[i]
       margs1$range <- if (!is.null(control$range)) control$range else
         h0[i] / switch(method, plugin = c(1e4, 1e-4), CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
                        DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24))
-      return(c(margs1, x = unname(x_[i_]), FUN = FUN1))
+      return(c(margs1, x = unname(x[i]), FUN = FUN1))
     })
     ret.list <- lapply(f.arg.list, function(arg1) do.call(autofun, arg1))
     ret <- list(par = do.call(c, lapply(ret.list, "[[", "par")),

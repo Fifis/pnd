@@ -4,7 +4,7 @@
 \alias{checkOrCreateCluster}
 \title{Create a cluster inside pnd-specific functions (internal use only)}
 \usage{
-checkOrCreateCluster(cl = NULL, cores = 2)
+checkOrCreateCluster(cl = NULL, cores = 1)
 }
 \arguments{
 \item{cl}{\code{NULL} = return a PSOCK cluster with exported objects on Windows

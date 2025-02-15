@@ -22,7 +22,7 @@ checkCores <- function(cores = NULL) {
   if (is.null(cores)) cores <- max(floor(parallel::detectCores()/2 - 1), 1L)
 
   chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")  # Limit to 2 cores for CRAN checks
-  if (nzchar(chk) && chk == "TRUE") cores <- 2L
+  if (nzchar(chk) && chk == "TRUE") cores <- min(cores, 2L)
   return(cores)
 }
 
@@ -65,15 +65,16 @@ getExpr <- function(i, fun, dots, fname = "FUN") {
 #' cl <- checkOrCreateCluster(cores = 1)  # "lapply"
 #' cl <- tryCatch(checkOrCreateCluster("mclapply 2"), error = function(e) return(NULL))
 #' print(cl)
-checkOrCreateCluster <- function(cl = NULL, cores = 2) {
+checkOrCreateCluster <- function(cl = NULL, cores = 1) {
   if (is.character(cl) && (cl != "lapply") && !grepl("^mclapply \\d+$", cl))
     stop(paste0("The string for the cluster must be either 'lapply' or 'mclapply N' (N being ",
                 "the desired number of cores). On Windows, must be a valid cluster."))
   if (is.character(cl) && (cl == "mclapply 1")) return("lapply")
-  if (cores == 1 || ((is.character(cl) && cl == "lapply"))) return("lapply")
-
+  if (is.character(cl) && cl == "lapply") return("lapply")
   # If it is a valid cluster and not a string, return it
   if (!is.null(cl) && inherits(cl, "cluster")) return(cl)
+  # If 1 core was requested, use lapply
+  if ((!is.null(cores)) && cores == 1) return("lapply")
 
   windows <- .Platform$OS.type == "windows"
 
@@ -153,6 +154,7 @@ setupParallelEnv <- function(FUN, cl, ...) {
 #' print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
 #' print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
 #' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
+#' if (inherits(cl, "cluster")) parallel::stopCluster(cl)
 runParallel <- function(FUN, x, preschedule = FALSE, cl = NULL) {
   if (identical(cl, "lapply") || is.null(cl)) {
     if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression"))

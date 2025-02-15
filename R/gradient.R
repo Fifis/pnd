@@ -35,8 +35,7 @@
 checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
                             elementwise = NA, vectorised = NA, multivalued = NA,
                             deriv.order = 1, acc.order = 2, side = 0, h = NULL, report = 1L,
-                            cores = getOption("pnd.cores"),
-                            preschedule = getOption("pnd.preschedule"), cl = NULL, ...) {
+                            cores = 1, preschedule = TRUE, cl = NULL, ...) {
   if (missing(FUN)) {
     if (is.function(func)) {
       FUN <- func

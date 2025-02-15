@@ -20,7 +20,7 @@
   msg <- paste0(cores, " physical cores for parallelism through mclapply forking are available on Linux.\n")
   if (os == "Windows") msg <- paste0(msg, "Create and register a default cluster first.")
   if (.Platform$OS.type != "unix") {
-    msg <- gsub("mclapply forking on Linux", "PSOCK cluster workers on Windows", msg)
+    msg <- gsub("mclapply forking are available on Linux", "PSOCK cluster workers are available on Windows", msg)
   } else if (os == "Darwin") {
     msg <- gsub("Linux", "Mac", msg)
   }

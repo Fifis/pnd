@@ -17,8 +17,8 @@ checkDimensions(
   side = 0,
   h = NULL,
   report = 1L,
-  cores = getOption("pnd.cores"),
-  preschedule = getOption("pnd.preschedule"),
+  cores = 1,
+  preschedule = TRUE,
   cl = NULL,
   ...
 )
