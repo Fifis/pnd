@@ -3,7 +3,8 @@
 - BUG: Check the example with neural networks where `gr` does not accept the arguments of `f`
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
-- SYNTAX: Align with the syntax of `optimParallel`, borrow ideas from `forecast::auto.arima`
+- BUG: arguments are sometimes not passed to FUN; example: AE98 simulation
+- UX: make the warnings once-per-sessionl; print the first error in runParallel in Grad
 - FEATURE: make all helper generators use `runParallel` instead of the long if-else
 - FEATURE: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
 - FEATURE: Implement de-duplication in the grid of points; reuse f0 and other precomputed values
@@ -33,6 +34,8 @@
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
+
+# pnd 0.0.7 (2025-XX-XX)
 
 # pnd 0.0.6 (2025-01-25)
 - Fix: Derivatives of vectorised functions are working. Example: `Grad(sin, 1:4)`

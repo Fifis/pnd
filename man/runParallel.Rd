@@ -4,7 +4,7 @@
 \alias{runParallel}
 \title{Run a function in parallel over a list (internal use only)}
 \usage{
-runParallel(FUN, x, preschedule = FALSE, cl = NULL)
+runParallel(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE)
 }
 \arguments{
 \item{FUN}{A function of only one argument. If there are more arguments, use
@@ -13,16 +13,17 @@ the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.}
 \item{x}{A list to parallelise the evaluation of \code{FUN} over: either numbers
 or expressions.}
 
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
+
+\item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
+or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
+
 \item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
 or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
-
-\item{cl}{A string \code{"lapply"}, \code{"mclapply X"} (where \code{X} is the number
-of cores, e.g. \code{"mclapply 8"}), or an optional user-supplied \code{cluster} object
-(created by \code{makeCluster} or similar functions). If not \code{NULL},
-the code uses \code{parLapply()} (if \code{preschedule} is \code{TRUE}) or
-\code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
 }
 \value{
 The value that \code{lapply(x, FUN)} would have returned.
@@ -34,8 +35,11 @@ Run a function in parallel over a list (internal use only)
 fslow <- function(x) Sys.sleep(x)
 x <- rep(0.05, 6)
 cl <- parallel::makeCluster(2)
-print(t1 <- system.time(runParallel(fslow, x, cl = "lapply")))
+print(t1 <- system.time(runParallel(fslow, x)))
 print(t2 <- system.time(runParallel(fslow, x, cl = cl)))
+print(t3 <- system.time(runParallel(fslow, x, cores = 2)))
 parallel::stopCluster(cl)
 cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "\%\n", sep = "")
+# Ignore on Windows
+cat("makeCluster() overhead at 2 cores: ", round(100*t2[3]/t3[3]-100), "\%\n", sep = "")
 }

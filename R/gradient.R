@@ -47,7 +47,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- checkOrCreateCluster(cl = cl, cores = cores)
+  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   # Vectorisation checks similar to case1or3 in numDeriv, but better optimised
   # to catch errors and waste fewer evaluations f(x)
@@ -444,7 +444,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Setting up parallel capabilities
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- checkOrCreateCluster(cl, cores = cores)
+  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
@@ -665,7 +665,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   }
 
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- checkOrCreateCluster(cl = cl, cores = cores)
+  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {
@@ -748,12 +748,11 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
     FUN <- x
     x <- x0
   }
-  needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
 
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  cl <- checkOrCreateCluster(cl = cl, cores = cores)
 
+  needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {
     chk <- checkDimensions(FUN = FUN, x = x, f0 = f0, elementwise = elementwise,
                            vectorised = vectorised, multivalued = multivalued,

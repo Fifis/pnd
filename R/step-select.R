@@ -1,186 +1,101 @@
-# Generate a local function to run in a cluster
+# Internal functions to get the quantities used in computing derivatives
 # The idea is based on evaluating expressions in parallel with properly exported variables,
 # e.g. from the dots (...) argument, as in the optimParallel package.
 # Returns a generator object: a list with cluster and a function that can run locally.
-parGenCR <- function(FUN, x, vanilla, cl, preschedule, ...) {
-  envData <- setupParallelEnv(FUN, cl, ...)
-  dots <- envData$dots
-  e <- envData$e
+getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
+  xgrid <- if (vanilla) x + c(-h, 0, h) else x + c(-h, -h/2, h/2, h)
+  FUNsafe <- function(z) safeF(FUN, z, ...)
+  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
 
-  # The driver function that does the actual ratio evaluation
-  # Similar to how 'evalFG' does exports and calls 'parLapply' in optimParallel.
-  getRatio <- function(x, h, vanilla) {
-    xgrid <- if (vanilla) x + c(-h, 0, h) else x + c(-h, -h/2, h/2, h)
-    if (inherits(cl, "cluster")) {
-      parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
-      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    } else {
-      xx <- xgrid
-    }
-
-    FUNsafe <- function(z) safeF(FUN, z, ...)
-    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
-
-    if (vanilla) {
-      fd <- (fgrid[3] - fgrid[2]) / h
-      bd <- (fgrid[2] - fgrid[1]) / h
-      cd <- (fgrid[3] - fgrid[1]) / h * 0.5
-      etrunc <- abs(cd - fd)
-    } else {
-      cd <- (fgrid[4] - fgrid[1]) / h * 0.5
-      cd.half <- (fgrid[3] - fgrid[2]) / h
-      cd4 <- sum(fgrid * c(1, -8, 8, -1)) / h / 6
-      etrunc <- abs(cd - cd.half) * 4 / 3
-    }
-    eround <- 0.5 * max(abs(fgrid)) * .Machine$double.eps / h
-    ratio <- etrunc / eround
-    deriv <- if (vanilla) c(cd = cd, bd = bd, fd = fd) else c(cd = cd, cd.half = cd.half, cd4 = cd4)
-    ret <- list(h = h, x = xgrid, f = fgrid, ratio = ratio, deriv = deriv,
-                est.error = c(trunc = etrunc, round = eround))
-    return(ret)
+  if (vanilla) {
+    fd <- (fgrid[3] - fgrid[2]) / h
+    bd <- (fgrid[2] - fgrid[1]) / h
+    cd <- (fgrid[3] - fgrid[1]) / h * 0.5
+    etrunc <- abs(cd - fd)
+  } else {
+    cd <- (fgrid[4] - fgrid[1]) / h * 0.5
+    cd.half <- (fgrid[3] - fgrid[2]) / h
+    cd4 <- sum(fgrid * c(1, -8, 8, -1)) / h / 6
+    etrunc <- abs(cd - cd.half) * 4 / 3
   }
-
-  list(cl = cl, getRatio = getRatio)
+  eround <- 0.5 * max(abs(fgrid)) * .Machine$double.eps / h
+  ratio <- etrunc / eround
+  deriv <- if (vanilla) c(cd = cd, bd = bd, fd = fd) else c(cd = cd, cd.half = cd.half, cd4 = cd4)
+  ret <- list(h = h, x = xgrid, f = fgrid, ratio = ratio, deriv = deriv,
+              est.error = c(trunc = etrunc, round = eround))
+  return(ret)
 }
 
 # Generator for Dumontet--Vignes
-parGenDV <- function(FUN, x, k, P, cl, preschedule, ...) {
-  envData <- setupParallelEnv(FUN, cl, ...)
-  dots <- envData$dots
-  e <- envData$e
+getValsDV <- function(FUN, x, k, P, cores, cl, preschedule, ...) {
+  xgrid <- x + c(-2*k, -k, k, 2*k)
+  FUNsafe <- function(z) safeF(FUN, z, ...)
+  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
 
-  # The driver function that does the actual ratio evaluation
-  # Similar to how 'evalFG' does exports and calls 'parLapply' in optimParallel.
-  getRatio <- function(x, k, P) {
-    xgrid <- x + c(-2*k, -k, k, 2*k)
-    if (inherits(cl, "cluster")) {
-      parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
-      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    } else {
-      xx <- xgrid
-    }
-
-    FUNsafe <- function(z) safeF(FUN, z, ...)
-    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
-
-    tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
-    A <- sum(tgrid[tgrid > 0]) # Only positive terms
-    B <- sum(tgrid[tgrid < 0]) # Only negative terms
-    # TODO: error if fgrid has different sign
-    f3inf <- (A / (1+P) + B / (1-P)) / k^3
-    f3sup <- (A / (1-P) + B / (1+P)) / k^3
-    f3 <- (f3inf + f3sup) / 2 # Estimate of third derivative
-    L <- f3sup / f3inf
-    ret <- list(k = k, x = xgrid, f = fgrid, ratio = L,
-                deriv = c(f3inf = f3inf, f3 = f3, f3sup = f3sup))
-    return(ret)
-  }
-
-  list(cl = cl, getRatio = getRatio)
+  tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
+  A <- sum(tgrid[tgrid > 0]) # Only positive terms
+  B <- sum(tgrid[tgrid < 0]) # Only negative terms
+  # TODO: error if fgrid has different sign
+  f3inf <- (A / (1+P) + B / (1-P)) / k^3
+  f3sup <- (A / (1-P) + B / (1+P)) / k^3
+  f3 <- (f3inf + f3sup) / 2 # Estimate of third derivative
+  L <- f3sup / f3inf
+  ret <- list(k = k, x = xgrid, f = fgrid, ratio = L,
+              deriv = c(f3inf = f3inf, f3 = f3, f3sup = f3sup))
+  return(ret)
 }
 
 # Generator for plugin
-parGenPlugin <- function(FUN, x, h, cl, preschedule, ...) {
-  envData <- setupParallelEnv(FUN, cl, ...)
-  dots <- envData$dots
-  e <- envData$e
+getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
+  pow <- if (stage == 1) 3 else 1
+  s <- fdCoef(deriv.order = pow)
+  xgrid <- x + s$stencil * h * if (stage == 1) h * .Machine$double.eps^(-2/15) else 1
 
-  # Сomputes the 1st or 3rd derivative using the step size; 1st stage = f''', 2nd = f'
-  getRatio <- function(x, h, stage) {
-    pow <- if (stage == 1) 3 else 1
-    s <- fdCoef(deriv.order = pow)
-    xgrid <- x + s$stencil * h * if (stage == 1) h * .Machine$double.eps^(-2/15) else 1
+  FUNsafe <- function(z) safeF(FUN, z, ...)
+  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
 
-    if (inherits(cl, "cluster")) {
-      parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
-      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    } else {
-      xx <- xgrid
-    }
+  f0 <- if (stage == 1) mean(fgrid[2:3]) else mean(fgrid)  # An approximation to f(x)
+  cd <- sum(fgrid * s$weights) / h^pow
 
-    FUNsafe <- function(z) safeF(FUN, z, ...)
-    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
-
-    f0 <- if (stage == 1) mean(fgrid[2:3]) else mean(fgrid)  # An approximation to f(x)
-    cd <- sum(fgrid * s$weights) / h^pow
-
-    list(x = xgrid, f = fgrid, cd = cd, f0 = f0)
-  }
-
-  return(list(cl = cl, getRatio = getRatio))
+  list(x = xgrid, f = fgrid, cd = cd, f0 = f0)
 }
 
 
 # Generator for Stepleman--Winarsky
-parGenSW <- function(FUN, x, max.rel.error, cl, preschedule, ...) {
-  envData <- setupParallelEnv(FUN, cl, ...)
-  dots <- envData$dots
-  e <- envData$e
+getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
+                      ratio.beforelast = NULL, max.rel.error = .Machine$double.eps/2,
+                      cores, cl, preschedule, ...) {
+  xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
-  getRatio <- function(x, h, do.f0 = FALSE, ratio.last = NULL, ratio.beforelast = NULL) {
-    xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
+  FUNsafe <- function(z) safeF(FUN, z, ...)
+  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
 
-    if (inherits(cl, "cluster")) {
-      parallel::clusterExport(cl, "x", envir = list2env(list(x = xgrid)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
-      xx <- lapply(seq_along(xgrid), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    } else {
-      xx <- xgrid
-    }
+  cd <- (fgrid[length(fgrid)] - fgrid[1]) / (2*h)
 
-    FUNsafe <- function(z) safeF(FUN, z, ...)
-    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
+  # Richardson extrapolation to estimate the truncation error
+  etrunc <- if (is.null(ratio.last)) NA_real_ else abs((cd - ratio.last$deriv) / (1 - (ratio.last$h / h)^2))
+  eround <- max.rel.error * max(abs(fgrid)) / h
 
-    cd <- (fgrid[length(fgrid)] - fgrid[1]) / (2*h)
-
-    # Richardson extrapolation to estimate the truncation error
-    etrunc <- if (is.null(ratio.last)) NA_real_ else abs((cd - ratio.last$deriv) / (1 - (ratio.last$h / h)^2))
-    eround <- max.rel.error * max(abs(fgrid)) / h
-
-    # Check monotonicity of the last three derivatives
-    dlast <- if (!is.null(ratio.last) && !is.null(ratio.beforelast)) {
-      c(ratio.beforelast$deriv, ratio.last$deriv, cd)
-    } else {
-      NULL
-    }
-    # Are derivative changes all positive or all negative?
-    monotone.fp <- if (!is.null(dlast)) prod(diff(dlast)) > 0 else NA
-    monotone.dfp <- if (!is.null(dlast)) abs(dlast[2] - dlast[3]) <= abs(dlast[2] - dlast[1]) else NA
-
-    # Return the needed info for step.SW
-    list(h = h, x = if (do.f0) xgrid[c(1, 3)] else xgrid, f = if (do.f0) fgrid[c(1, 3)] else fgrid,
-      deriv = cd, f0 = if (do.f0) fgrid[2] else NULL, est.error = c(trunc = etrunc, round = eround),
-      monotone = c(monotone.fp, monotone.dfp))
+  # Check monotonicity of the last three derivatives
+  dlast <- if (!is.null(ratio.last) && !is.null(ratio.beforelast)) {
+    c(ratio.beforelast$deriv, ratio.last$deriv, cd)
+  } else {
+    NULL
   }
+  # Are derivative changes all positive or all negative?
+  monotone.fp <- if (!is.null(dlast)) prod(diff(dlast)) > 0 else NA
+  monotone.dfp <- if (!is.null(dlast)) abs(dlast[2] - dlast[3]) <= abs(dlast[2] - dlast[1]) else NA
 
-  return(list(cl = cl, getRatio = getRatio))
+  list(h = h, x = if (do.f0) xgrid[c(1, 3)] else xgrid, f = if (do.f0) fgrid[c(1, 3)] else fgrid,
+       deriv = cd, f0 = if (do.f0) fgrid[2] else NULL, est.error = c(trunc = etrunc, round = eround),
+       monotone = c(monotone.fp, monotone.dfp))
 }
 
 # Generator for Mathur
-parGenM <- function(FUN, x, cl, preschedule, ...) {
-  envData <- setupParallelEnv(FUN, cl, ...)
-  dots <- envData$dots
-  e <- envData$e
-
-  getRatio <- function(x) {
-    if (inherits(cl, "cluster")) {
-      parallel::clusterExport(cl, "x", envir = list2env(list(x = x)))
-      parallel::clusterEvalQ(cl, assign("x", x, envir=e))
-      xx <- lapply(seq_along(x), function(i) getExpr(i, fun = FUN, dots = dots, fname = "FUN"))
-    } else {
-      xx <- x
-    }
-
-    FUNsafe <- function(z) safeF(FUN, z, ...)
-    fgrid <- unlist(runParallel(FUN = FUNsafe, x = xx, preschedule = preschedule, cl = cl))
-
-    matrix(fgrid, ncol = 2)
-  }
-
-  return(list(cl = cl, getRatio = getRatio))
+getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
+  FUNsafe <- function(z) safeF(FUN, z, ...)
+  fgrid <- unlist(runParallel(FUN = FUNsafe, x = x, cores = cores, cl = cl, preschedule = preschedule))
+  return(matrix(fgrid, ncol = 2))
 }
 
 #' Curtis--Reid automatic step selection
@@ -205,7 +120,6 @@ parGenM <- function(FUN, x, cl, preschedule, ...) {
 #'   loops in degenerate cases.
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
-#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -307,8 +221,6 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)
-  gen <- parGenCR(FUN = FUN, x = x, vanilla = vanilla, cl = cl, preschedule = preschedule, ...)
 
   iters <- list()
   i <- 1
@@ -334,7 +246,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       }
     }
 
-    res.i <- gen$getRatio(x = x, h = hnew, vanilla = vanilla)
+    res.i <- getValsCR(FUN = FUN, x = x, h = hnew, vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
@@ -348,7 +260,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     if (res.i$ratio < .Machine$double.eps^(4/5)) {
       exitcode <- 1  # Zero truncation error -> only rounding error
       hnew <- hnew * 16 # For linear or quadratic functions, a large h is preferred
-      iters[[i+1]] <- gen$getRatio(x = x, h = hnew, vanilla = vanilla)
+      iters[[i+1]] <- getValsCR(FUN = FUN, x = x, h = hnew, vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
       break
     }
 
@@ -405,7 +317,6 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops in cases
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
-#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -466,8 +377,6 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)
-  gen <- parGenDV(FUN = FUN, x = x, k = k, P = P, cl = cl, preschedule = preschedule, ...)
 
   iters <- list()
   i <- 1
@@ -476,7 +385,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   while (i <= maxit) {
     if (i == 1) k <- k0
-    res.i <- gen$getRatio(x = x, k = k, P = P)
+    res.i <- getValsDV(FUN = FUN, x = x, k = k, P = P, cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
@@ -624,11 +533,9 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)
-  gen <- parGenPlugin(FUN = FUN, x = x, h = h0, cl = cl, preschedule = preschedule, ...)
 
   iters <- vector("list", 2)
-  iters[[1]] <- gen$getRatio(x = x, h = h0, stage = 1)
+  iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1, cores = cores, cl = cl, preschedule = preschedule, ...)
   cd3 <- iters[[1]]$cd
   f0 <- iters[[1]]$f0
 
@@ -660,7 +567,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
     side <- "right"
   }
 
-  iters[[2]] <- gen$getRatio(x = x, h = h, stage = 2)
+  iters[[2]] <- getValsPlugin(FUN = FUN, x = x, h = h, stage = 2, cores = cores, cl = cl, preschedule = preschedule, ...)
   fgrid <- iters[[2]]$f
 
   msg <- switch(exitcode + 1,
@@ -707,7 +614,6 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops.
 #'   Consider trying some smaller or larger initial step size \code{h0}
 #'   if this limit is reached.
-#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -766,9 +672,6 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)
-  gen <- parGenSW(FUN = FUN, x = x, max.rel.error = max.rel.error,
-                  cl = cl, preschedule = preschedule, ...)
 
   i <- 1
   exitcode <- 0
@@ -779,7 +682,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   while (i <= maxit) {
     if (!main.loop) {
       if (i == 1) {
-        res.i <- gen$getRatio(x = x, h = h0, do.f0 = TRUE, ratio.last = NULL, ratio.beforelast = NULL)
+        res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
+                           ratio.last = NULL, ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
         iters[[i]] <- res.i
         f0 <- res.i$f0
         hnew <- res.i$h
@@ -820,7 +724,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
             if (!rounding.nottoosmall) hnew <- (hold + hnew) / 2 # Bisection
 
             if (hnew > range[2]) hnew <- range[2] # Safeguarding against huge steps
-            res.i <- gen$getRatio(x = x, h = hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ratio.beforelast = NULL)
+            res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
+                               ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
             iters[[i]] <- res.i
             if (abs(hnew/hold - 1) < seq.tol) { # The algorithm is stuck at one range end
               main.loop <- TRUE
@@ -836,7 +741,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                              printE(hnew), " to ", printE(hnew/2), ")."))
               for (i in 1:maxit) {
                 hnew <- hnew/2
-                res.i <- gen$getRatio(x = x, h = hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ratio.beforelast = NULL)
+                res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
+                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
                 iters[[i]] <- res.i
                 if (is.finite(res.i$f)) break
               }
@@ -852,7 +758,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                              "Halving from ", printE(hnew), " to ", printE(hnew/2), ")."))
               for (i in 1:maxit) {
                 hnew <- hnew/2
-                res.i <- gen$getRatio(x = x, h = hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ratio.beforelast = NULL)
+                res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
+                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
                 iters[[i]] <- res.i
                 if (is.finite(res.i$f)) break
               }
@@ -874,8 +781,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
         i <- i + 1
         hnew <- hnew * shrink.factor
         if (hnew < range[1]) hnew <- range[1]
-        res.i <- gen$getRatio(x = x, h = hnew, do.f0 = FALSE, ratio.last = iters[[i-1]],
-                              ratio.beforelast = if (j == 1) NULL else iters[[i-2]])
+        res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
+                           ratio.last = iters[[i-1]], ratio.beforelast = if (j == 1) NULL else iters[[i-2]],
+                           cores = cores, cl = cl, preschedule = preschedule, ...)
 
         iters[[i]] <- res.i
       }
@@ -891,7 +799,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       hnew <- hnew * shrink.factor
       if (hnew < range[1]) hnew <- range[1]
       i <- i + 1
-      res.i <- gen$getRatio(x = x, h = hnew, do.f0 = FALSE, ratio.last = iters[[i-1]], ratio.beforelast = iters[[i-2]])
+      res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
+                         ratio.last = iters[[i-1]], ratio.beforelast = iters[[i-2]], cores = cores, cl = cl, preschedule = preschedule, ...)
       iters[[i]] <- res.i
     }
 
@@ -946,8 +855,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                    "Returning 0.01|x| ."))
     i <- i + 1
     hopt <- 0.01*abs(x)
-    res.i <- gen$getRatio(x = x, h = hopt, do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
-                          ratio.beforelast = if (i > 2) iters[[i-2]] else NULL)
+    res.i <- getValsSW(x = x, h = hopt, do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
+                       ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
+                       cores = cores, cl = cl, preschedule = preschedule, ...)
 
     iters[[i]] <- res.i
   }
@@ -1011,7 +921,6 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
 #'   continuation of the downwards slope of the total error); otherwise, returns
 #'   the grid point that is is lowest in the increasing sequence of valid error
 #'   estimates.
-#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
 #'   including all function evaluations.
@@ -1071,7 +980,6 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)
 
   if (is.null(range)) {
     ends <- log(c(2^36, 2^(-24)), base = inv.sf)
@@ -1107,14 +1015,14 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   n <- length(hgrid)
   xgrid <- x + c(-hgrid, hgrid)
 
-  gen <- parGenM(FUN = FUN, x = xgrid, cl = cl, preschedule = preschedule, ...)
-  fgrid <- gen$getRatio(x = xgrid)
+  fgrid <- getValsM(FUN = FUN, x = xgrid, cores = cores, cl = cl, preschedule = preschedule, ...)
 
-  n <- length(fgrid) / 2
+  n <- nrow(fgrid)
 
   # TODO: instead of subtracting one, add one
-  fplus <- fgrid[(n+1):(2*n)]
-  fminus <- fgrid[1:n]
+  fplus <- fgrid[, 2]
+  fminus <- fgrid[, 1]
+  xgrid <- matrix(xgrid, ncol = 2)
   cd <- (fplus - fminus) / hgrid * 0.5
   fd1 <- cd[-1] # Larger step
   fd2 <- cd[-n] # Small#' @inheritParams runParalleler step
@@ -1218,8 +1126,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                 "truncation error reduction rate is too wrong, returning the approximate best step",
                 "Fewer than 3 finite function values on the grid, returning the naive step")
 
-  diag.list <- list(h = hgrid, x = matrix(xgrid, ncol = 2), f = matrix(fgrid, ncol = 2),
-                    deriv = cd,
+  diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cd,
                     est.error = rbind(NA, cbind(etrunc = etrunc, eround = eround)))
 
   # TODO: remove the first NA from the output
@@ -1332,7 +1239,6 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
 #'   including all function evaluations is returned; different methods have
 #'   slightly different diagnostic outputs.
-#' @inheritParams checkCores
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
 #'
@@ -1399,7 +1305,6 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
-  cl <- checkOrCreateCluster(cl, cores)  # Subsumes the 'cores' argument -- using NULL cores and an informative cluster
 
   ell <- list(...)
   if (any(names(ell) == "method.args"))
@@ -1413,23 +1318,23 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
   # The h0 and range arguments are updated later
   default.args <- list(plugin = list(h0 = h0[1], range = h0[1] / c(1e4, 1e-4),
-                                 cores = NULL, preschedule = preschedule,
+                                 cores = cores, preschedule = preschedule,
                                  cl = cl, diagnostics = diagnostics),
                        CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                 cores = NULL, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
                                   range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                  cores = NULL, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                  cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), alpha = 4/3,
                                  ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
-                                 cores = NULL, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        SW = list(h0 = h0[1], shrink.factor = 0.5, range = h0[1] / c(1e12, 1e-8),
                                  seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
-                                 cores = NULL, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        M = list(h0 = h0[1], range = h0[1] / 2^c(36, -24), shrink.factor = 0.5,
                                 min.valid.slopes = 5L, seq.tol = 0.01, correction = TRUE,
-                                cores = NULL, preschedule = preschedule, cl = cl,
+                                cores = cores, preschedule = preschedule, cl = cl,
                                 diagnostics = diagnostics, plot = FALSE))
   margs <- default.args[[method]]
   if (!is.null(control)) {

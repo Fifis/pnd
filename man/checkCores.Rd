@@ -17,5 +17,7 @@ An integer with the number of cores.
 Number of core checks and changes
 }
 \examples{
-checkCores(100)
+checkCores()
+checkCores(2)
+suppressWarnings(checkCores(1000))
 }
