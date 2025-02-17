@@ -87,7 +87,8 @@ Use `report = 0` to produce just the numerical gradient without any attributes, 
 
 ## Learning resources
 
-- [PDF of an early 2024 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2024-brown-bag-seminar.pdf) *(Some functions might be outdated – check the package vignette for up-to-date examples!)*
+- [PDF of a 2025 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2025-dem-internal-seminar.pdf)
+- [PDF of an early 2024 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2024-brown-bag-seminar.pdf) *(Obsolete – check the one above or the vignettes for up-to-date examples!)*
 
 ## Literature
 
