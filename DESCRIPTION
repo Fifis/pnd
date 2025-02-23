@@ -5,12 +5,12 @@ Version: 0.0.6
 Authors@R: person(given = c("Andreï", "Victorovitch"), family = "Kostyrka",
         role = c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
-Description: Tools for calculation of numerical derivatives through
+Description: 'pnd' enables calculation of numerical derivatives through
     finite-difference approximations with parallel capabilities and optimal
     step-size selection to improve accuracy. These functions facilitate
     efficient computation of derivatives, gradients, Jacobians, and Hessians,
     allowing for more evaluations to reduce the mathematical and machine errors.
-    Designed for compatibility with the numDeriv package,
+    Designed for compatibility with the 'numDeriv' package,
     which has not received updates in several years, it introduces advanced features
     such as computing derivatives of arbitrary order, improving
     the accuracy of Hessian approximations by avoiding repeated differencing,

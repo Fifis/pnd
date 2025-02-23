@@ -115,9 +115,8 @@ to attain higher accuracy faster. Currently, only Mac and Linux are supported
 is under development.
 }
 \examples{
-\dontrun{
-slowFun <- function(x) {Sys.sleep(0.05); print(x, digits = 12); sum(sin(x))}
-slowFunVec <- function(x) {Sys.sleep(0.05); print(x, digits = 12)
+slowFun <- function(x) {Sys.sleep(0.01); sum(sin(x))}
+slowFunVec <- function(x) {Sys.sleep(0.01);
                            c(sin = sum(sin(x)), exp = sum(exp(x)))}
 true.g <- cos(1:4)  # Analytical gradient
 true.j <- rbind(cos(1:4), exp(1:4)) # Analytical Jacobian
@@ -126,19 +125,19 @@ x0 <- c(each = 1, par = 2, is = 3, named = 4)
 # Compare computation times
 system.time(g.slow <- numDeriv::grad(slowFun, x = x0) - true.g)
 system.time(j.slow <- numDeriv::jacobian(slowFunVec, x = x0) - true.j)
-system.time(g.fast <- Grad(slowFun, x = x0, cores = 4) - true.g)
-system.time(j.fast <- Grad(slowFunVec, x = x0, cores = 4) - true.j)
-system.time(j.fast4 <- Grad(slowFunVec, x = x0, acc.order = 4, cores = 4) - true.j)
+system.time(g.fast <- Grad(slowFun, x = x0, cores = 2) - true.g)
+system.time(j.fast <- Jacobian(slowFunVec, x = x0, cores = 2) - true.j)
+system.time(j.fast4 <- Jacobian(slowFunVec, x = x0, acc.order = 4, cores = 2) - true.j)
 
 # Compare accuracy
-rownames(j.slow) <- rep("numDeriv.jac", nrow(j.slow))
+rownames(j.slow) <- paste0("numDeriv.jac.", c("sin", "exp"))
 rownames(j.fast) <- paste0("pnd.jac.order2.", rownames(j.fast))
-rownames(j.fast4) <- paste0("pnd.jac.order.4", rownames(j.fast4))
+rownames(j.fast4) <- paste0("pnd.jac.order4.", rownames(j.fast4))
 # Discrepancy
 print(rbind(numDeriv.grad = g.slow, pnd.Grad = g.fast, j.slow, j.fast, j.fast4), 2)
 # The order-4 derivative is more accurate for functions
 # with non-zero third and higher derivatives -- look at pnd.jac.order.4
-}
+
 
 }
 \seealso{

@@ -69,18 +69,6 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
       (isTRUE(multivalued) || isFALSE(multivalued)))
     return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
 
-  # Environment set-up
-  dots <- list(...)
-  parent.env <- environment(FUN)
-  if (is.null(parent.env)) parent.env <- baseenv()
-  e <- new.env(parent = parent.env)
-  list2env(dots, envir = e)
-  FUNe <- FUN
-  environment(FUNe) <- e
-  assign("FUN", FUNe, envir = e)
-  FUN1 <- function(z) safeF(e$FUN, z)
-  if (inherits(cl, "cluster")) parallel::clusterExport(cl, "e", envir = list2env(list(e = e)))
-
   if (is.null(h)) {
     lttol <- abs(x) < sqrt(.Machine$double.eps)
     h.default <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1/3) * 2
@@ -93,15 +81,15 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   user.f0 <- !is.null(f0)
   tic0 <- Sys.time()
   if (!user.f0) {  # Try direct evaluation first
-    f0 <- FUN1(x)  # If successful, this estimate is almost free from overhead (only CPU spin-up)
+    f0 <- safeF(FUN, x, ...)  # If successful, this estimate is almost free from overhead (only CPU spin-up)
   } # Else, we do not know the run time because we are not experimenting with f0
   tic1 <- Sys.time()
-  if (identical(f0, structure(NA, error = "error"))) {
+  if (checkBadSafeF(f0)) {
     vector.fail <- if (n > 1) TRUE else NA  # Does the function fail on vector input?
     if (is.na(vector.fail))
       stop("Could not evaluate FUN(x) for scalar x. Derivatives or gradients cannot be computed.")
     tic0 <- Sys.time()
-    f0 <- suppressWarnings(unlist(runParallel(FUN = FUN1, x = x, cl = cl, preschedule = preschedule)))
+    f0 <- suppressWarnings(unlist(runParallel(FUN = function(y) safeF(FUN, y, ...), x = x, cl = cl, preschedule = preschedule)))
     tic1 <- Sys.time()
   } else {
     vector.fail <- if (n > 1) FALSE else NA
@@ -152,22 +140,22 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
       s <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1])
       xhvals  <- x + s$stencil[1:2] * h
       # Guaranteed to safely return NA with an attribute in case of failure
-      fhvals <- safeF(FUN1, xhvals)
-      fherr <- identical(fhvals, structure(NA, error = "error"))
+      fhvals <- safeF(FUN, xhvals, ...)
+      fherr <- checkBadSafeF(fhvals)
       # If no error and the output has proper length (should be 2), the function handles vector inputs
       if (!fherr && length(fhvals) == length(xhvals)) vectorised <- TRUE
     } else if (n > 1) {  # Can this Jacobian for vectors handle scalars
       fdim <- l / n  # In vectorised Jacobians, the output length should be an integer multiple of n
       xhvals  <- x[1]
-      fhvals <- safeF(FUN1, xhvals)
-      fherr <- identical(fhvals, structure(NA, error = "error"))
+      fhvals <- safeF(FUN, xhvals, ...)
+      fherr <- checkBadSafeF(fhvals)
       if (!fherr && length(fhvals) == fdim) vectorised <- TRUE  # Integer check is also here
     } else {  # n = 1; can this Jacobian handle vectors
       fdim <- l
       s <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1])
       xhvals  <- x[1] + s$stencil[1:2] * h
-      fhvals <- safeF(FUN1, xhvals)
-      fherr <- identical(fhvals, structure(NA, error = "error"))
+      fhvals <- safeF(FUN, xhvals, ...)
+      fherr <- checkBadSafeF(fhvals)
       # If no error and the output has proper length (should be 2), the function handles vector inputs
       if (!fherr && length(fhvals) == length(xhvals)*fdim) vectorised <- TRUE
     }
@@ -448,17 +436,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
-  # Capturing the arguments into an environment
-  dots <- ell
-  parent.env <- environment(FUN)
-  if (is.null(parent.env)) parent.env <- baseenv()
-  e <- new.env(parent = parent.env)
-  list2env(dots, envir = e)  # Put the ... arguments into e
-  FUN1 <- FUN
-  environment(FUN1) <- e
-  assign("FUN", FUN1, envir = e)
-  if (inherits(cl, "cluster")) parallel::clusterExport(cl, c("FUN1", "e"), envir = list2env(list(e = e)))
-
   # 'side', 'deriv.order', 'acc.order', 'h' must align with the length of x
   if (is.null(side)) side <- numeric(n) # NULL --> default central, 0
   if (length(side) == 1) side <- rep(side, n)
@@ -477,7 +454,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (is.character(h)) {
     method <- h
     if (report > 1) control$diagnostics <- TRUE
-    h.auto <- gradstep(x = x, FUN = FUN1, h0 = h0, method = method, control = control,
+    h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = method, control = control,
                        cores = cores, preschedule = preschedule, cl = cl)
     h <- h.auto$par
     autostep <- TRUE
@@ -518,7 +495,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # TODO: deduplicate, save CPU
-  fvals0 <- runParallel(FUN = FUN1, x = grid$x, preschedule = preschedule, cl = cl)
+  fvals0 <- runParallel(FUN = FUN, x = grid$x, cores = cores, cl = cl, preschedule = preschedule)
   nonfinite.f   <- !sapply(fvals0, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
   if (any(horrible.f)) {
@@ -711,9 +688,8 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' @seealso [GenD()], [Grad()]
 #'
 #' @examples
-#' \dontrun{
-#' slowFun <- function(x) {Sys.sleep(0.05); print(x, digits = 12); sum(sin(x))}
-#' slowFunVec <- function(x) {Sys.sleep(0.05); print(x, digits = 12)
+#' slowFun <- function(x) {Sys.sleep(0.01); sum(sin(x))}
+#' slowFunVec <- function(x) {Sys.sleep(0.01);
 #'                            c(sin = sum(sin(x)), exp = sum(exp(x)))}
 #' true.g <- cos(1:4)  # Analytical gradient
 #' true.j <- rbind(cos(1:4), exp(1:4)) # Analytical Jacobian
@@ -722,19 +698,19 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' # Compare computation times
 #' system.time(g.slow <- numDeriv::grad(slowFun, x = x0) - true.g)
 #' system.time(j.slow <- numDeriv::jacobian(slowFunVec, x = x0) - true.j)
-#' system.time(g.fast <- Grad(slowFun, x = x0, cores = 4) - true.g)
-#' system.time(j.fast <- Grad(slowFunVec, x = x0, cores = 4) - true.j)
-#' system.time(j.fast4 <- Grad(slowFunVec, x = x0, acc.order = 4, cores = 4) - true.j)
+#' system.time(g.fast <- Grad(slowFun, x = x0, cores = 2) - true.g)
+#' system.time(j.fast <- Jacobian(slowFunVec, x = x0, cores = 2) - true.j)
+#' system.time(j.fast4 <- Jacobian(slowFunVec, x = x0, acc.order = 4, cores = 2) - true.j)
 #'
 #' # Compare accuracy
-#' rownames(j.slow) <- rep("numDeriv.jac", nrow(j.slow))
+#' rownames(j.slow) <- paste0("numDeriv.jac.", c("sin", "exp"))
 #' rownames(j.fast) <- paste0("pnd.jac.order2.", rownames(j.fast))
-#' rownames(j.fast4) <- paste0("pnd.jac.order.4", rownames(j.fast4))
+#' rownames(j.fast4) <- paste0("pnd.jac.order4.", rownames(j.fast4))
 #' # Discrepancy
 #' print(rbind(numDeriv.grad = g.slow, pnd.Grad = g.fast, j.slow, j.fast, j.fast4), 2)
 #' # The order-4 derivative is more accurate for functions
 #' # with non-zero third and higher derivatives -- look at pnd.jac.order.4
-#'}
+#'
 #'
 #' @export
 Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,

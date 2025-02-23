@@ -5,7 +5,13 @@
 getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
   xgrid <- if (vanilla) x + c(-h, 0, h) else x + c(-h, -h/2, h/2, h)
   FUNsafe <- function(z) safeF(FUN, z, ...)
-  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
+  fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
+  has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
+  if (has.errors) {
+    first.err.ind <- which(e)[1]
+    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+  }
+  fgrid <- unlist(fp)
 
   if (vanilla) {
     fd <- (fgrid[3] - fgrid[2]) / h
@@ -30,7 +36,13 @@ getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
 getValsDV <- function(FUN, x, k, P, cores, cl, preschedule, ...) {
   xgrid <- x + c(-2*k, -k, k, 2*k)
   FUNsafe <- function(z) safeF(FUN, z, ...)
-  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
+  fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
+  has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
+  if (has.errors) {
+    first.err.ind <- which(e)[1]
+    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+  }
+  fgrid <- unlist(fp)
 
   tgrid <- fgrid * c(-0.5, 1, -1, 0.5) # T1, ..., T4 from the paper
   A <- sum(tgrid[tgrid > 0]) # Only positive terms
@@ -52,7 +64,13 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
   xgrid <- x + s$stencil * h * if (stage == 1) h * .Machine$double.eps^(-2/15) else 1
 
   FUNsafe <- function(z) safeF(FUN, z, ...)
-  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
+  fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
+  has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
+  if (has.errors) {
+    first.err.ind <- which(e)[1]
+    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+  }
+  fgrid <- unlist(fp)
 
   f0 <- if (stage == 1) mean(fgrid[2:3]) else mean(fgrid)  # An approximation to f(x)
   cd <- sum(fgrid * s$weights) / h^pow
@@ -68,7 +86,13 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
   xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
   FUNsafe <- function(z) safeF(FUN, z, ...)
-  fgrid <- unlist(runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule))
+  fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
+  has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
+  if (has.errors) {
+    first.err.ind <- which(e)[1]
+    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+  }
+  fgrid <- unlist(fp)
 
   cd <- (fgrid[length(fgrid)] - fgrid[1]) / (2*h)
 
@@ -94,7 +118,13 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 # Generator for Mathur
 getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
   FUNsafe <- function(z) safeF(FUN, z, ...)
-  fgrid <- unlist(runParallel(FUN = FUNsafe, x = x, cores = cores, cl = cl, preschedule = preschedule))
+  fp <- runParallel(FUN = FUNsafe, x = x, cores = cores, cl = cl, preschedule = preschedule)
+  has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
+  if (has.errors) {
+    first.err.ind <- which(e)[1]
+    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+  }
+  fgrid <- unlist(fp)
   return(matrix(fgrid, ncol = 2))
 }
 
@@ -180,20 +210,17 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
 #' step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
 #'
-#' \dontrun{
 #' library(parallel)
-#' cl <- makePSOCKcluster(names = 3, outfile = "")
+#' cl <- makePSOCKcluster(names = 2, outfile = "")
 #' abc <- 2
-#' f <- function(x, abc) {Sys.sleep(0.1); prod(abc*sin(x))}
+#' f <- function(x, abc) {Sys.sleep(0.02); abc*sin(x)}
 #' x <- pi/4
-#' system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # To remove speed-ups
-#' system.time(step.CR(f, x, h = 1e-4, cl = cl, abc = abc))
-#'
-#' setDefaultCluster(cl)
-#' system.time(step.CR(f, x, h = 1e-4, abc = abc))
-#'
-#' setDefaultCluster(cl=NULL); stopCluster(cl)
-#' }
+#' system.time(step.CR(f, x, h = 1e-4, cores = 1, abc = abc))  # To remove speed-ups
+#' system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # Faster
+#' f2 <- function(x) f(x, abc)
+#' clusterExport(cl, c("f2", "f", "abc"))
+#' system.time(step.CR(f2, x, h = 1e-4, cl = cl))  # Also fast
+#' stopCluster(cl)
 step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     version = c("original", "modified"),
                     aim = if (version[1] == "original") 100 else 1,
@@ -855,7 +882,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                    "Returning 0.01|x| ."))
     i <- i + 1
     hopt <- 0.01*abs(x)
-    res.i <- getValsSW(x = x, h = hopt, do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
+    res.i <- getValsSW(FUN = FUN, x = x, h = hopt, do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
                        ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
                        cores = cores, cl = cl, preschedule = preschedule, ...)
 

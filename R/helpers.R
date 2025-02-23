@@ -1,6 +1,8 @@
 # Some of these internal functions are not exported
 
-safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(structure(NA, error = "error")))
+safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(structure(NA, error = e)))
+
+checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(attributes(x)), "error")
 
 # Concatenate together with a comma between the terms
 pasteAnd <- function(x) paste0(x, collapse = ", ")

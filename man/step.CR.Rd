@@ -123,20 +123,17 @@ step.CR(x = 2, f, version = "modified", acc.order = 4)
 step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range
 step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))  # Problem solved
 
-\dontrun{
 library(parallel)
-cl <- makePSOCKcluster(names = 3, outfile = "")
+cl <- makePSOCKcluster(names = 2, outfile = "")
 abc <- 2
-f <- function(x, abc) {Sys.sleep(0.1); prod(abc*sin(x))}
+f <- function(x, abc) {Sys.sleep(0.02); abc*sin(x)}
 x <- pi/4
-system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # To remove speed-ups
-system.time(step.CR(f, x, h = 1e-4, cl = cl, abc = abc))
-
-setDefaultCluster(cl)
-system.time(step.CR(f, x, h = 1e-4, abc = abc))
-
-setDefaultCluster(cl=NULL); stopCluster(cl)
-}
+system.time(step.CR(f, x, h = 1e-4, cores = 1, abc = abc))  # To remove speed-ups
+system.time(step.CR(f, x, h = 1e-4, cores = 2, abc = abc))  # Faster
+f2 <- function(x) f(x, abc)
+clusterExport(cl, c("f2", "f", "abc"))
+system.time(step.CR(f2, x, h = 1e-4, cl = cl))  # Also fast
+stopCluster(cl)
 }
 \references{
 \insertAllCited{}
