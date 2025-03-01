@@ -1,15 +1,17 @@
 #' @importFrom Rdpack reprompt
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Parallel numerical derivatives v. 0.0.6 (2025-01-23).")
+  packageStartupMessage("Parallel numerical derivatives v. 0.0.7 (2025-03-01).")
 
   # The number of cores is auto-detected based on the OS
   os <- Sys.info()[["sysname"]]
   if (os == "Linux") {
     cores <- sum(!duplicated(grep("^core id", readLines("/proc/cpuinfo"), value = TRUE)))
   } else if (os == "Darwin") {
-    cores <- system("system_profiler SPHardwareDataType | grep -i 'Total Number of Cores'", TRUE)
-    cores <- as.integer(gsub("[^0-9]", "", cores))
+    # Accepting only unambiguous values
+    cores <- tryCatch(as.integer(system("sysctl -n hw.physicalcpu", TRUE)),
+                      warning = function(e) return(NULL),
+                      error = function(e) return(NULL))
   } else {  # Unfortunately one cannot go to system files
     cores <- parallel::detectCores(logical = FALSE)
   }
