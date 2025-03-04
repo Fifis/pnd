@@ -31,7 +31,7 @@ computed. If the function returns a vector, the output will be a Jacobian.}
 \code{FUN(x)} must be finite.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
-to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
+to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}

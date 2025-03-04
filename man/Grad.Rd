@@ -75,7 +75,7 @@ procedure is requested; otherwise, it is absolute.}
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
-to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.}
+to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
