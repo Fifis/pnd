@@ -23,7 +23,8 @@ printE <- function(x, d = 2) sprintf(paste0("%1.", d, "e"), x)
 #' checkCores(2)
 #' suppressWarnings(checkCores(1000))
 checkCores <- function(cores = NULL) {
-  max.cores <- parallel::detectCores()
+  if (identical(cores, 1) || identical(cores, 1L)) return(1)
+  max.cores <- getOption("pnd.max.cores", 2L)
   if (is.null(cores)) cores <- max.cores
 
   if (cores > max.cores)

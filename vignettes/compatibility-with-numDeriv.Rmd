@@ -231,7 +231,7 @@ The case with $f_4$ is the most complicated one, and it is the reason behind the
 It is impossible to claim that $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^n$ is a vectorised $\vec f_1\colon \mathbb{R} \mapsto \mathbb{R}$ solely from the fact that the output has length $n$ for some input of length $n$; multiple lengths should be checked to confirm this.
 
 **Example 1.** Consider a function that computes the quartiles of its input series. Its output always has length 3. `numDeriv::grad` will believe that this function is a vectorised scalar-valued one (i.e. $\vec f_1$) if `length(x) == 3`:
-```{r, error = TRUE}
+```{r examplevec, error = TRUE}
 f <- function(x) quantile(x, 1:3/4)
 grad(f, x = 1:2)
 grad(f, x = 1:4)
@@ -254,7 +254,7 @@ The Jacobian matrix can be created by column, stacking evaluations of $\frac{\pa
 In **R**, matrices can be created by column (default) or by row, which determines the order in which the vector of length $nm$ is wrapped, but the exact method has to be decided by the user or, in case of a package, inferred from the function behaviour. 
 
 **Example 2.** Consider $f(x) := \begin{pmatrix} \sin x \\ \cos x \end{pmatrix}$. Note that the functions `sin()` and `cos()` are vectorised and can handle inputs of arbitrary lengths.
-```{r}
+```{r sincos}
 f <- function(x) c(sin(x), cos(x))
 f(1)
 jacobian(f, 1:2)
@@ -366,15 +366,21 @@ Technical remarks.
 
 # Compatibility implies syntax support, not identical values
 
-## Zero tolerances may cause a discontinuity
+## numDeriv zero handling has a discontinuity
 
-Why using `d*x + (abs(x)<zero.tol) * eps` is confusing
+In `numDeriv`, the default step size -- arguably the most important tuning parameter of numerical differences -- is equal to `d*x + (abs(x)<zero.tol) * eps`, where ` = 1e-4`, `d = 1e-4`, `zero.tol = sqrt(.Machine$double.eps/7e-7)` (approximately `1.8e-5`).
+
+* The manual states, ‘`eps` is used instead of `d` for elements of `x` which are zero’, but the implementation is different: if `x` is just below `zero.tol`, the actual step is not `eps` but `d*zero.tol + eps`.
+* If `x` transitions from being below just `zero.tol` to being just above it, the step size changes from `d*zero.tol + eps` to `d*zero.tol`, i.e. it decreases, which creates a discontinuity and a counter-intuitive result.
+
+In `pnd`, the default step size is either constant (and equal to `zero.tol` for `x < zero.tol`, where the revised value of `zero.tol` is `sqrt(.Machine$epsilon)`, or `1.5e-8`) or proportional to `x`.
+This value is reasonable in many applications in biostatistics and econometrics where non-negativity of certain parameters in optimisation is often achieved via box constraints with a comparable distance from the boundary.
 
 # Richardson extrapolation
 
 To dissect the Richardson extrapolation practically, it suffices to make the function print its input arguments.
 
-```{r, message=FALSE}
+```{r richardsonprint, message=FALSE}
 f <- function(x) {print(x); sin(x)}
 x0 <- 1
 g1 <- numDeriv::grad(f, x0)
@@ -382,7 +388,8 @@ print(g1)
 
 cat("Auto-detected step:", step.SW(sin, x0)$par, "\n")
 hgrid <- 10^seq(-10, -4, 1/32)
-errors <- sapply(hgrid, function(h) Grad(sin, x0, h = h)) - cos(x0)
+errors <- sapply(hgrid, function(h) Grad(sin, x0, h = h, cores = 1,
+            elementwise = TRUE, vectorised = TRUE, multivalued = FALSE)) - cos(x0)
 plot(hgrid, abs(errors), log = "xy", cex = 0.6)
 ```
 
@@ -405,7 +412,7 @@ where $\{w_i\}_{i=1}^4 \approx \{0.608, -0.0997, +0.0031, -0.00002\}$.
 This result can be calculated numerically:
 
 
-```{r}
+```{r stencil}
 fd <- sin(x0 + b$stencil / 8e4) * b$weights
 abs(fd[1:4]) / sum(abs(fd[1:4]))
 ```
@@ -414,7 +421,7 @@ The absolute contribution of each term is proportional to specific terms of a ce
 Practically, it implies that the weights of the summation terms further away from the point of interest decay exponentially (up to a certain constant), and similar accuracy can be achieved with fewer evaluations.
 In this example, 85\% of the sum is defined by the finite difference with $h_4$, and 14\% with $h_3$.
 Therefore, the following function is twice as cheap, and the dis
-```{r}
+```{r richardson}
 g2 <- Grad(f, x0, h = 1.25e-05, acc.order = 4, vectorised = TRUE, report = 0)
 print(g2)
 
