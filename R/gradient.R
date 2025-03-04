@@ -70,13 +70,12 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
 
   if (is.null(h)) {
-    lttol <- abs(x) < sqrt(.Machine$double.eps)
-    h.default <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1/3) * 2
+    stepx <- pmax(abs(x), sqrt(.Machine$double.eps))
+    h.default <- stepx * .Machine$double.eps^(1/3) * 2
     h <- stats::median(h.default)
   }
 
-  # Making one evaluation
-  # TODO: do proper timing here
+  # Making one evaluation and measuring the time
   n <- length(x)
   user.f0 <- !is.null(f0)
   tic0 <- Sys.time()
@@ -177,7 +176,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   } else {
     attr(ret, "f") <- c(f0, fhvals)
   }
-  attr(ret, "seconds") <- if (user.f0) NA else as.numeric(tic1 - tic0, units = "secs")
+  attr(ret, "seconds") <- if (user.f0) NA else as.numeric(difftime(tic1, tic0, units = "secs"))
 
   return(ret)
 }
@@ -271,7 +270,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
 #'   procedure is requested; otherwise, it is absolute.
 #' @param f0 Optional numeric: if provided, used to determine the vectorisation type
-#'   to save time. If FUN(x) must be revaluated (e.g. second derivatives), saves one evaluation.
+#'   to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
@@ -371,8 +370,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   n <- length(x)
 
-  lttol <- abs(x) < zero.tol
-  h.default <- (abs(x)*(!lttol) + lttol) * .Machine$double.eps^(1 / (deriv.order + acc.order))
+  stepx <- pmax(abs(x), sqrt(.Machine$double.eps))
+  h.default <- stepx * .Machine$double.eps^(1 / (deriv.order + acc.order))
   if (is.null(h)) h <- h.default
   # TODO: describe the default step size
 

@@ -1,9 +1,7 @@
 # pnd 0.dev roadmap (2024-XX-XX)
 
-- BUG: Check the example with neural networks where `gr` does not accept the arguments of `f`
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
-- BUG: arguments are sometimes not passed to FUN; example: AE98 simulation
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
 - FEATURE: make all helper generators use `runParallel` instead of the long if-else
 - FEATURE: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
@@ -24,7 +22,6 @@
 - FEATURE: Functions for fast and reliable Hessian computation based on parallel gradient evaluation
 - FEATURE: Return attribute of the estimated absolute error
 - FEATURE: Arbitrary mixed orders
-- DOCUMENTATION: Compare with `stats::numericDeriv`
 - MISC: Write the list of controls on the help page of `gradstep()` explicitly!
 - MISC: Check which packages depend on `numDeriv` and check compatibility with 10 top!
 - MISC: Add links to documentation and tutorials onto the GitHub page.
@@ -34,6 +31,10 @@
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
+
+# pnd 0.0.8 (2025-03-04)
+- Fix: sped up core diagnostics for 1-core operations
+- Fix: Using full paths on Macs
 
 # pnd 0.0.7 (2025-03-01)
 - Fix: removed obsolete environment creation for cluster export
