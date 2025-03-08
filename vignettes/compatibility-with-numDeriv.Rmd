@@ -373,15 +373,38 @@ In `numDeriv`, the default step size -- arguably the most important tuning param
 * The manual states, ‘`eps` is used instead of `d` for elements of `x` which are zero’, but the implementation is different: if `x` is just below `zero.tol`, the actual step is not `eps` but `d*zero.tol + eps`.
 * If `x` transitions from being below just `zero.tol` to being just above it, the step size changes from `d*zero.tol + eps` to `d*zero.tol`, i.e. it decreases, which creates a discontinuity and a counter-intuitive result.
 
-In `pnd`, the default step size is either constant (and equal to `zero.tol` for `x < zero.tol`, where the revised value of `zero.tol` is `sqrt(.Machine$epsilon)`, or `1.5e-8`) or proportional to `x`.
-This value is reasonable in many applications in biostatistics and econometrics where non-negativity of certain parameters in optimisation is often achieved via box constraints with a comparable distance from the boundary.
+The second point can be illustrated with an example where the step size for `x = 1.7e-5` exceeds that for `x = 1.8e-5`, which makes little sense mathematically: 
+```{r}
+f <- function(x) {cat(x, " "); sin(x)}
+grad(f, 1.7e-5, method.args = list(r = 2))  # step 1.0e-4
+grad(f, 1.8e-5, method.args = list(r = 2))  # step 1.8e-9
+```
 
-# Richardson extrapolation
+In `pnd`, the default step size is decided depending on the value of `x`:
 
-To dissect the Richardson extrapolation practically, it suffices to make the function print its input arguments.
+1. For `x < zero.tol`, it is constant and equal to `zero.tol`, where the revised value of `zero.tol` is `sqrt(.Machine$epsilon)`, or `1.5e-8`;
+2. For `x > 1`, the step size is equal to `x` times the machine epsilon to the appropriate power (inverse of the sum of derivative and accuracy orders);
+3. For `zero.tol <= x <= 1`, the step size is interpolated exponentially between `zero.tol` and `macheps^(1 / (deriv.order + acc.order))`.
+
+The chosen value of `zero.tol` is reasonable in many applications in biostatistics and econometrics where non-negativity of certain parameters in optimisation is often achieved via box constraints with a comparable distance from the boundary.
+
+The default step size as a function of `x` is illustrated below.
+```{r}
+xseq <- 10^seq(-10, 2, 0.25)
+sseq2 <- stepx(xseq, acc.order = 2)
+sseq4 <- stepx(xseq, acc.order = 4)
+matplot(xseq, cbind(sseq2, sseq4), lty = 1:2, col = 1, type = "l", bty = "n",
+        log = "xy", main = "Default step size", xlab = "Point", ylab = "Step")
+legend("topleft", c("2nd-order accurate", "4th-order accurate"), lty = 1:2)
+```
+
+## Not all evaluations matter for Richardson extrapolation
+
+A detailed description of the Richardson extrapolation is given in @ridders1982accurate.
+To dissect the internals, it suffices to make the function print its input arguments.
 
 ```{r richardsonprint, message=FALSE}
-f <- function(x) {print(x); sin(x)}
+f <- function(x) {cat(x, " "); sin(x)}
 x0 <- 1
 g1 <- numDeriv::grad(f, x0)
 print(g1)
@@ -393,9 +416,9 @@ errors <- sapply(hgrid, function(h) Grad(sin, x0, h = h, cores = 1,
 plot(hgrid, abs(errors), log = "xy", cex = 0.6)
 ```
 
-Even with 4 Richardson extrapolations from 8 evaluations, the default final step size is `1.25e-5`, which is larger than the optimal step size, which is less than `1e-5` (visible from the plot), the empirically determined step size `5e-6`, or even the rule-of-thumb value `MachEps^(1/3)`.
+Even with 4 Richardson iterations, the default final step size is `1.25e-5`, which is larger than the optimal step size, which is less than `1e-5` (visible from the plot), the empirically determined step size `5e-6`, or even the rule-of-thumb value `MachEps^(1/3)`.
 
-The equivalence between `numDeriv` and `pnd` implementations of the gradient can be established by computing the optimal weights in the finite difference for the points in the iterations of the Richardson extrapolation.
+The equivalence between `numDeriv` and `pnd` implementations of the gradient (the latter being more general) can be established by computing the optimal weights in the finite difference for the points in the iterations of the Richardson extrapolation.
 In this example, the default sequence of steps is $\{h_i\}_{i=1}^4 = 10^{-4} / \{1, 2, 4, 8\}$, and the resulting stencil is $\{\pm h_i\}_{i=1}^4$.
 The respective weights can be calculated via $fdCoef()$:
 
@@ -411,27 +434,28 @@ f'_{\mathrm{Rich,8}} = \frac{f(x-h_1)-168f(x-h_2)+5376f(x-h_3)-32768f(x-h_4)+327
 where $\{w_i\}_{i=1}^4 \approx \{0.608, -0.0997, +0.0031, -0.00002\}$.
 This result can be calculated numerically:
 
-
 ```{r stencil}
-fd <- sin(x0 + b$stencil / 8e4) * b$weights
+fd <- sin(x0 + b$stencil / 8 * 1e-4) * b$weights
 abs(fd[1:4]) / sum(abs(fd[1:4]))
 ```
 
 The absolute contribution of each term is proportional to specific terms of a certain polynomial.
 Practically, it implies that the weights of the summation terms further away from the point of interest decay exponentially (up to a certain constant), and similar accuracy can be achieved with fewer evaluations.
-In this example, 85\% of the sum is defined by the finite difference with $h_4$, and 14\% with $h_3$.
-Therefore, the following function is twice as cheap, and the dis
+In this example, 85.5\% of the sum is defined by the finite difference with $h_4$, and 14.0\% with $h_3$.
+Therefore, the following function is twice as cheap, and the difference between the estimated derivative values is negligible.
 ```{r richardson}
-g2 <- Grad(f, x0, h = 1.25e-05, acc.order = 4, vectorised = TRUE, report = 0)
+g2 <- Grad(f, x0, h = 1.25e-05, acc.order = 4, report = 0,
+           elementwise = TRUE, vectorised = TRUE, multivalued = FALSE)
 print(g2)
 
 c(diff = g1 - g2, Error8 = cos(x0) - g1, Error4 = cos(x0) - g2)
 ```
 
 In this example, the approximation errors from the Richardson extrapolation and a much cheaper weighted sum have the same order of magnitude.
+By not-so-unlikely coincidence, the actual error of `Grad` is less than that of `grad`, which is due to the unpredictable numerical error that is not dominated by the bounded higher-order derivatives truncated in the 4th-order-accurate derivative.
 
-**Conclusion:** choosing a large initial step and subsequently shrinking it is wasteful because similar, if not indistinguishable, accuracy can be achieved with twice as few evaluations with a reasonably chosen bandwidth.
-If the function is to be evaluated many times, selecting the optimal step size via a data-driven procedure not only saves time whilst attaining comparable accuracy but also provides opportunities for speed-up via parallel evaluation of the function on the grid.
+Choosing a large initial step and subsequent shrinking are wasteful because similar, if not practically equivalent, accuracy can be achieved with twice as few evaluations with a reasonably chosen step size.
+If the function is to be evaluated many times, selecting the optimal step size via a data-driven procedure not only saves time whilst attaining comparable accuracy but also provides opportunities for speed-ups via parallel evaluation of the function on a grid.
 Richardson extrapolation, on the other hand, is typically computed in a loop, and since its fully parallelised implementation is fully subsumed by the weighted-sum approach, the new package does not dedicate any special numerical routine to this particular case.
 
 # Diagnostics

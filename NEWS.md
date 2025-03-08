@@ -3,7 +3,6 @@
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
-- FEATURE: make all helper generators use `runParallel` instead of the long if-else
 - FEATURE: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
 - FEATURE: Implement de-duplication in the grid of points; reuse f0 and other precomputed values
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
@@ -32,8 +31,11 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.0.8 (2025-03-04)
-- Fix: sped up core diagnostics for 1-core operations
+# pnd 0.0.9 (2023-03-10)
+- Fix: fixed a regression with the default step size
+
+# pnd 0.0.8 (2025-03-05)
+- Fix: sped up CPU core request diagnostics for 1-core operations
 - Fix: Using full paths on Macs
 
 # pnd 0.0.7 (2025-03-01)
