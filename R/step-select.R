@@ -1,3 +1,38 @@
+#' Default step size at given points
+#'
+#' @inheritParams GenD
+#'
+#' @return A numeric vector of the same length as `x` with positve step sizes.
+#' @export
+#'
+#' @examples
+#' stepx(10^(-10:2))
+#' stepx(10^(-10:2), deriv.order = 2, acc.order = 4)
+stepx <- function(x, deriv.order = 1, acc.order = 2) {
+  x <- abs(x)
+  n <- length(x)
+  i1 <- x < sqrt(.Machine$double.eps)
+  i3 <- x > 1
+  i2 <- (!i1) & (!i3)
+  ret <- rep(sqrt(.Machine$double.eps), length(x))
+
+  if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
+  if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
+  if (length(deriv.order) != n) stop("The argument 'deriv.order' must have length 1 or length(x).")
+  if (length(acc.order) != n) stop("The argument 'acc.order' must have length 1 or length(x).")
+
+  ad <- deriv.order + acc.order
+  if (any(i3)) ret[i3] <- x[i3] * .Machine$double.eps^(1/ad[i3])
+  if (any(i2)) {  # Exponential interpolation via log(y) ~ a + b*log(x)
+    # f(sqrt(macheps)) = macheps^0.5, f(1) = macheps^(1/(a+d))
+    leps <- log(.Machine$double.eps)
+    a <- leps / ad[i2]
+    b <- 1 - a / leps * 2
+    ret[i2] <- exp(a + b * log(x[i2]))
+  }
+  return(ret)
+}
+
 # Internal functions to get the quantities used in computing derivatives
 # The idea is based on evaluating expressions in parallel with properly exported variables,
 # e.g. from the dots (...) argument, as in the optimParallel package.

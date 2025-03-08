@@ -63,7 +63,8 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 
 \item{h}{Numeric or character specifying the step size(s) for the numerical
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
-\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
+\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
+described in \code{?GenD}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
 guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection

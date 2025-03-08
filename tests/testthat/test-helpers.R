@@ -15,3 +15,15 @@ test_that("Parallel runs are executed correctly", {
   expect_error(runParallel(sin, 1:3, cores = -1), "or a cluster object")
 })
 
+
+test_that("step size is valid for various values of x", {
+  h0 <- stepx(10^(-16:3))
+  h <- attr(GenD(sin, x = 10^(-16:3)), "step.size")
+  expect_equal(h0, h)
+  expect_true(all(diff(h) >= 0))
+  expect_equal(h[1], h[2])  # Constant step for small x
+  expect_equal(h[length(h)], 1000*.Machine$double.eps^(1/3))
+
+  expect_true(all(diff(stepx(10^(-16:3), deriv.order = 2, acc.order = 4)) >= 0))
+})
+

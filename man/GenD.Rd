@@ -63,7 +63,8 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 
 \item{h}{Numeric or character specifying the step size(s) for the numerical
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
-\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
+\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
+described in \code{?GenD}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
 guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
@@ -124,6 +125,10 @@ to Mach.eps^(1/3). However, selecting the best step size typically requires know
 of higher-order derivatives, which may not be readily available. Luckily,
 using \code{step = "SW"} invokes a reliable automatic data-driven step-size selection.
 Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
+The step size  defaults to \code{1.5e-8} (the square root of machine epsilon)
+for \code{x} less than \code{1.5e-8},
+\code{(2.2e-16)^(1/(deriv.order + acc.order)) * x} for \code{x > 1}, and interpolates
+exponentially between these values for \code{1.5e-8 < x < 1}.
 
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.

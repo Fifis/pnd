@@ -12,7 +12,8 @@ generateGrid(x, h, stencils, elementwise, vectorised)
 
 \item{h}{Numeric or character specifying the step size(s) for the numerical
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
-\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}).}
+\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
+described in \code{?GenD}.}
 
 \item{stencils}{A list of outputs from \code{\link[=fdCoef]{fdCoef()}} for each coordinate of \code{x}.}
 
