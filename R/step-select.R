@@ -8,7 +8,7 @@
 #' @examples
 #' stepx(10^(-10:2))
 #' stepx(10^(-10:2), deriv.order = 2, acc.order = 4)
-stepx <- function(x, deriv.order = 1, acc.order = 2) {
+stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$double.eps)) {
   x <- abs(x)
   n <- length(x)
   i1 <- x < sqrt(.Machine$double.eps)
