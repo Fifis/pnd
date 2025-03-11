@@ -2,7 +2,7 @@
 % Please edit documentation in R/hessian.R
 \name{Hessian}
 \alias{Hessian}
-\title{Numerical cross-derivatives with parallel capabilities}
+\title{Numerical Hessians}
 \usage{
 Hessian(
   FUN,
@@ -10,12 +10,12 @@ Hessian(
   side = 0,
   acc.order = 2,
   h = NULL,
-  symmetric = TRUE,
   h0 = NULL,
   control = list(),
   f0 = NULL,
   cores = 1,
   preschedule = TRUE,
+  cl = NULL,
   func = NULL,
   report = 1L,
   ...
@@ -43,11 +43,8 @@ calls \code{gradstep()} with the appropriate step-selection method.
 Must be length 1 or match \code{length(x)}. Matrices of step sizes are not
 supported. Suggestions how to handle all pairs of coordinates are welcome.}
 
-\item{symmetric}{Logical: if \code{TRUE}, then, almost halves computation time
-by exploiting Hessian symmetry.}
-
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
-\code{gradstep()}.}
+\code{gradstep()}.Hessian(f, 1:100)}
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
@@ -56,13 +53,17 @@ where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
 to save time.
 TODO: Currently ignored.}
 
-\item{cores}{Integer specifying the number of parallel processes to use. Recommended
-value: the number of physical cores on the machine minus one.}
+\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
+Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
-and disables load balancing with \code{parLapplyLB()}. Minimises overhead at the cost
-of potentially unequal loads at the end of a job. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
+or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
+
+\item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
+or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
+(fork cluster) on everything else.}
 
 \item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
 
@@ -73,15 +74,12 @@ diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).}
 \item{...}{Additional arguments passed to \code{FUN}.}
 }
 \value{
-Depends on the output of \code{FUN}. If \code{FUN} returns a scalar:
-returns a gradient vector matching the length of \code{x}. If \code{FUN} returns a vector:
-returns a Jacobian matrix with dimensions \code{length(FUN(x)), length(x)}.
-Unlike the output of \code{numDeriv::grad} and \code{numDeriv::jacobian},
-this output preserves the names of \code{x} and \code{FUN(x)}.
+A matrix with as many rows and columns as \code{length(x)}. Unlike the output of
+\code{numDeriv::hessian()}, this output preserves the names of \code{x}.
 }
 \description{
-Computes the derivative of a function with respect to two different arguments.
-Arbitrary accuracies and sides for different coordinates
+Computes the second derivatives of a function with respect to all combinations
+of its input coordinates. Arbitrary accuracies and sides for different coordinates
 of the argument vector are supported.
 }
 \details{
@@ -94,6 +92,18 @@ will allow character arguments to invoke automatic data-driven step-size selecti
 
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.
+
+Some numerical packages use the option (or even the default behaviour) of computing
+not only the \code{i < j} cross-partials for the Hessian, but all pairs of \code{i}
+and \code{j}. The upper and lower triangular matrices are filled, and the matrix is
+averaged with its transpose to obtain a Hessian -- this is the behaviour of \code{optimHess()}.
+However, it can be shown that \code{H[i, j]} and \code{H[j, i]} use the same evaluation
+grid, and with a single parallelisable evaluation of the function on that grid, no
+symmetrisation is necessary because the result is mathematically and computationally identical.
+In \code{pnd}, only the upper triangular matrix is computed, saving time and ensuring
+unambiguous results owing to the interchangeability of summation terms (ignoring the numerical
+error in summation as there is nothing that can be done apart from compensation summation, e.g.
+via Kahan's algorithm).
 }
 \examples{
 f <- function(x) prod(sin(x))
@@ -104,5 +114,5 @@ Hessian(f, 1:4)
 }
 }
 \seealso{
-\code{\link[=gradstep]{gradstep()}} for automatic step-size selection.
+\code{\link[=Grad]{Grad()}} for gradients, \code{\link[=GenD]{GenD()}} for generalised numerical differences.
 }

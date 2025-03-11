@@ -4,7 +4,7 @@ test_that("compatibility with numDeriv", {
   expect_match(w[2], "Use the argument")
   expect_warning(Grad(x = 1:3, FUN = sum, method = "simple"), "numDeriv-like syntax")
   expect_equal(suppressWarnings(Grad(x = 1:3, FUN = sum, method = "simple", report = 0)),
-               Grad(x = 1:3, sum, h = 1:3 * 2 * sqrt(.Machine$double.eps), report = 0),
+               Grad(x = 1:3, sum, side = 1, acc.order = 1, h = 1e-5 * .Machine$double.eps^(1/12), report = 0),
                tolerance = 1e-15)
   expect_error(suppressWarnings(Grad(x = 1:4, func = sum, method = "complex")),
                "Complex derivatives not implemented")

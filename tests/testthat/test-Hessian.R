@@ -1,3 +1,14 @@
+test_that("compatibility with numDeriv", {
+  f <- function(x) prod(sin(x))
+  expect_warning(Hessian(x = 1:4, func = f), "Use the argument")
+  expect_warning(Hessian(x = 1:3, FUN = f, method = "simple"), "numDeriv-like syntax")
+  expect_equal(suppressWarnings(Hessian(x = 1:3, FUN = f, method = "simple", report = 0)),
+               Hessian(x = 1:3, f, side = 1, acc.order = 1, h = 1e-4 * .Machine$double.eps^(1/4 - 1/5), report = 0),
+               tolerance = 1e-15)
+  expect_error(suppressWarnings(Hessian(x = 1:4, func = f, method = "complex")),
+               "Complex Hessians not implemented")
+})
+
 test_that("Hessians are correct", {
   x <- 1:4
   f <- function(x) prod(sin(x))
@@ -73,18 +84,23 @@ test_that("input check works", {
 
   expect_error(Hessian(x = 1:3, FUN = "sin"), "must be a function")
   expect_error(Hessian(f, 1:4, side = 2), "'side' argument")
-  expect_error(Hessian(as.character, 1:3), "numeric values only")
+  expect_warning(Hessian(as.character, 1:3), "numeric values only")
   expect_error(Hessian(f, 1:3, h = "SW"), "algorithms not implemented")
   expect_error(Hessian(f, 1:3, h = -1), "must be positive")
   expect_error(suppressWarnings(Hessian(as.character, 1:3, acc.order = 1:2)),
                "'acc.order' must have length")
   expect_error(suppressWarnings(Hessian(as.character, 1:3, h = 1:2)),
                "must have length")
-  expect_error(Hessian(1:4, f), "argument order")
+  expect_warning(Hessian(1:4, f), "argument order")
 })
 
 test_that("compatibility with numDeriv", {
   expect_warning(Hessian(x = 1:4, func = sum), "Use the argument")
 })
 
-# TODO: parallelisation
+test_that("parallelisation of Hessian works", {
+  f <- function(x) mean(x^2)
+  expect_equal(Hessian(x = 1:10, FUN = f, cores = 1),
+               Hessian(x = 1:10, FUN = f, cores = 2))
+})
+

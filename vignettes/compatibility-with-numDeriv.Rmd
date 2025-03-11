@@ -7,7 +7,7 @@ output:
     number_sections: true
 bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: "Created: 2024-10-01, last modified: 2024-10-01, compiled: `r Sys.Date()`"
+date: "Created: 2024-10-01, last modified: 2025-03-08, compiled: `r Sys.Date()`"
 abstract: "We describe the syntax of the widely popular `numDeriv` package and show how the functions from the `pnd` package recognise and handle the parameters related to numerical difference computation. We draw parallels between the two, examine the differences, and provide recommendations for new users."
 keywords: "numerical differentiation, finite differences, backwards compatibility"
 vignette: >
@@ -417,10 +417,10 @@ plot(hgrid, abs(errors), log = "xy", cex = 0.6)
 ```
 
 Even with 4 Richardson iterations, the default final step size is `1.25e-5`, which is larger than the optimal step size, which is less than `1e-5` (visible from the plot), the empirically determined step size `5e-6`, or even the rule-of-thumb value `MachEps^(1/3)`.
-
 The equivalence between `numDeriv` and `pnd` implementations of the gradient (the latter being more general) can be established by computing the optimal weights in the finite difference for the points in the iterations of the Richardson extrapolation.
+
 In this example, the default sequence of steps is $\{h_i\}_{i=1}^4 = 10^{-4} / \{1, 2, 4, 8\}$, and the resulting stencil is $\{\pm h_i\}_{i=1}^4$.
-The respective weights can be calculated via $fdCoef()$:
+The respective weights can be calculated via `fdCoef()`:
 
 ```{r}
 b <- fdCoef(stencil = c(-(2^(3:0)), 2^(0:3)))
@@ -428,11 +428,11 @@ print(b)
 ```
 
 Here, the weights on the outermost points -- the first step of the iteration with $h_1$ -- are minuscule (`2.2e-5`). The relative importance of each iteration for this specific function at this specific point can be found from the equation
-\[
-f'_{\mathrm{Rich,8}} = \frac{f(x-h_1)-168f(x-h_2)+5376f(x-h_3)-32768f(x-h_4)+32768f(x+h_4)-5376f(x+h_3)+168f(x+h_3)-1f(x+h_4)}{45360h} = \sum_{i=1}^4 w_{i}[f(x + h_i) - f(x + h_i)],
-\]
-where $\{w_i\}_{i=1}^4 \approx \{0.608, -0.0997, +0.0031, -0.00002\}$.
-This result can be calculated numerically:
+\begin{multline*}
+f'_{\mathrm{Rich,8}} = \sum_{i=1}^4 w_{i}[f(x + h_i) - f(x + h_i)],
+\end{multline*}
+where $\{w_i\}_{i=1}^4 \approx \{+0.608, -0.0997, +0.0031, -0.00002\}$.
+These values are available as a length analytical expression with denominator 45360, but in this case, they were calculated numerically:
 
 ```{r stencil}
 fd <- sin(x0 + b$stencil / 8 * 1e-4) * b$weights
@@ -457,6 +457,11 @@ By not-so-unlikely coincidence, the actual error of `Grad` is less than that of 
 Choosing a large initial step and subsequent shrinking are wasteful because similar, if not practically equivalent, accuracy can be achieved with twice as few evaluations with a reasonably chosen step size.
 If the function is to be evaluated many times, selecting the optimal step size via a data-driven procedure not only saves time whilst attaining comparable accuracy but also provides opportunities for speed-ups via parallel evaluation of the function on a grid.
 Richardson extrapolation, on the other hand, is typically computed in a loop, and since its fully parallelised implementation is fully subsumed by the weighted-sum approach, the new package does not dedicate any special numerical routine to this particular case.
+
+Finally, the choice of an optimal non-uniform evaluation grid for a specific function at a specific point remains an open question.
+One short answer would be ‘the higher the curvature, the smaller the step’, which is the principle used in plotting software to trace the most accurate paths with the fewest evaluations.
+Another answer comes from the field of optimal polynomial approximation and involves such solutions as Chebyshev polynomials, Padé approximants, and most importantly, the Remez algorithm.
+Applying these methods to numerical derivatives requires careful handling of differences because the goal is approximating an unknown function that is evaluated with a rounding error, therefore, at least an arbitrary-precision numerical tool must be used in evaluating the derivatives.
 
 # Diagnostics
 

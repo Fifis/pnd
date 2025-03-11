@@ -17,6 +17,7 @@ checkDimensions(
   side = 0,
   h = NULL,
   report = 1L,
+  zero.tol = sqrt(.Machine$double.eps),
   cores = 1,
   preschedule = TRUE,
   cl = NULL,
@@ -73,6 +74,10 @@ described in \code{?GenD}.}
 returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher attaches the full
 diagnostic output as an attribute.}
+
+\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
+guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
+procedure is requested; otherwise, it is absolute.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}

@@ -2,7 +2,16 @@
 % Please edit documentation in R/gradient.R
 \name{Jacobian}
 \alias{Jacobian}
-\title{Jacobian matrix computation with parallel capabilities}
+\title{Jacobian matrix computation with parallel capabilities
+s
+Computes the numerical Jacobian for vector-valued functions. Its columns are
+partial derivatives of the function with respect to the input elements.
+This function supports both two-sided (central, symmetric) and
+one-sided (forward or backward) derivatives. It can utilise parallel processing
+to accelerate computation of gradients for slow functions or
+to attain higher accuracy faster. Currently, only Mac and Linux are supported
+\code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
+is under development.}
 \usage{
 Jacobian(
   FUN,
@@ -106,6 +115,8 @@ to an input coordinate. For scalar-valued functions, a warning is issued and
 the output is returned as a row matrix.
 }
 \description{
+Jacobian matrix computation with parallel capabilities
+s
 Computes the numerical Jacobian for vector-valued functions. Its columns are
 partial derivatives of the function with respect to the input elements.
 This function supports both two-sided (central, symmetric) and

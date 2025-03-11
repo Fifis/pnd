@@ -27,3 +27,7 @@ test_that("step size is valid for various values of x", {
   expect_true(all(diff(stepx(10^(-16:3), deriv.order = 2, acc.order = 4)) >= 0))
 })
 
+
+test_that("duplicated row indices are correct", {
+  expect_equal(dupRowInds(mtcars[rep(1:10, 10), rep(1:10, 10)]), rep(1:10, 10))
+})
