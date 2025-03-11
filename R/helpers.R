@@ -102,3 +102,37 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
   stop("'cl' should be 'lapply', 'mclapply', or a cluster object; 'cores' must be >= 1.")
 }
 
+#' Repeated indices of the first unique value
+#'
+#' @param m A matrix or a data frame.
+#'
+#' This function is an inverse function to such operations as
+#' \code{m[c(1:3, 1, 1, 2), ]}: the matrix with potentially duplicated rows is
+#' taken as input, and repeated indices of the first occurrence of each row
+#' are returned.
+#'
+#' @returns A vector of row indices corresponding to the first ocurrence of a given row.
+#' @export
+#'
+#' @examples
+#' dupRowInds(mtcars[rep(1:10, 10), rep(1:10, 10)])
+#' dupRowInds(matrix(rnorm(1000), ncol = 10))
+dupRowInds <- function(m) {
+  if (is.data.frame(m)) m <- as.matrix(m)
+  tm <- t(m)
+  d <- duplicated(m)
+  di <- which(d)
+  if (length(di) == 0) return(1:nrow(m))
+  mdup  <- m[di, , drop = FALSE]
+  tmuniq <- t(m[-di, , drop = FALSE])
+  mudup  <- unique(mdup)  # Unique duplicates
+
+  ret <- rep(NA, nrow(m))
+  ret[!d] <- 1:sum(!d)
+  for (i in 1:nrow(mudup)) {
+    muniq.match <- which(apply(tm == mudup[i, ], 2, all))
+    ret[muniq.match[-1]] <- ret[muniq.match[1]]
+  }
+  return(ret)
+}
+
