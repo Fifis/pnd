@@ -83,7 +83,7 @@ pnd::Grad(f, x, h = "SW")
 
 Extensive diagnostics and error estimates can be requested at any time:
 `pnd::Grad(f, x, h = "SW", report = 2)` will contain the step-search path for each coordinate of `x`.
-Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad` would.
+Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad()` would.
 
 ## Learning resources
 

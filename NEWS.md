@@ -31,8 +31,10 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.0.9 (2023-03-10)
+# pnd 0.0.9 (2025-03-10)
 - Fix: fixed a regression with the default step size
+- Fix: parallelised Hessians in the same manner as gradients
+- Feature: compatibility of `Hessian()` with the arguments for methods `"Richardson"` and `"simple"` from `numDeriv`
 
 # pnd 0.0.8 (2025-03-05)
 - Fix: sped up CPU core request diagnostics for 1-core operations
