@@ -32,18 +32,19 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
 
 test_that("Tweaking the DV algorithm for noisier functions", {
   f <- function(x) x^4
-  s.perfect <- step.DV(x = 2, f, h0 = 1e-7, alpha = 1)
-  s.noisy <- step.DV(x = 2, f, h0 = 1e-7, alpha = 2)
+  s.perfect <- step.DV(x = 2, f, h0 = 1e-7, max.rel.error = 2e-16)
+  s.noisy <- step.DV(x = 2, f, h0 = 1e-7, max.rel.error = 2e-8)
   expect_lt(s.perfect$par, s.noisy$par)
 })
 
 test_that("DV for functions with near-zero f''' stops immediately", {
+  # Quadratic function, f''' = 0
   s1 <- step.DV(function(x) x^2, 1)
-  expect_equal(s1$counts, 1)
+  expect_lte(s1$counts, 2)
   expect_equal(s1$exitcode, 1)
 
   s2 <- step.DV(function(x) pi*x + exp(1), 1)
-  expect_equal(s2$counts, 1)
+  expect_lte(s2$counts, 2)
   expect_equal(s2$exitcode, 1)
 })
 

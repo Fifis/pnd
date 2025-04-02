@@ -32,7 +32,7 @@ test_that("the range is correctly reversed", {
 test_that("for unfortunate inputs, the search may hit the boundary", {
   s.sw <- suppressWarnings(gradstep(x = 1e10, FUN = sin, h0 = 1e-20, method = "SW"))
   expect_equal(s.sw$exitcode, 3)
-  expect_true(is.finite(s.sw$abs.error))
+  expect_true(is.finite(s.sw$abs.err))
 
   s.dv <- gradstep(x = 1, FUN = sin, method = "DV", control = list(range = c(1e-20, 1e-22)))
   expect_equal(s.dv$exitcode, 3)
@@ -42,7 +42,7 @@ test_that("for unfortunate inputs, the search may hit the boundary", {
 #   f <- function(x) sum(sin(x))
 #   s.grad <- gradstep(x = 1:4, FUN = f, method = "SW", cores = 1, cl = NULL)
 #   expect_equal(s.grad$exitcode, rep(0, 4))
-#   
+#
 #   f1 <- function(x) sin(x) + sum(sin(2:4))
 #   s1 <- step.SW(f1, 1, diagnostics = TRUE)
 #   r <- s.grad$par[1] / s1$par

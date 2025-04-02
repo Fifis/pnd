@@ -68,7 +68,7 @@ getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
 }
 
 # Generator for Dumontet--Vignes
-getValsDV <- function(FUN, x, k, P, cores, cl, preschedule, ...) {
+getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
   xgrid <- x + c(-2*k, -k, k, 2*k)
   FUNsafe <- function(z) safeF(FUN, z, ...)
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
@@ -83,10 +83,11 @@ getValsDV <- function(FUN, x, k, P, cores, cl, preschedule, ...) {
   A <- sum(tgrid[tgrid > 0]) # Only positive terms
   B <- sum(tgrid[tgrid < 0]) # Only negative terms
   # TODO: error if fgrid has different sign
-  f3inf <- (A / (1+P) + B / (1-P)) / k^3
-  f3sup <- (A / (1-P) + B / (1+P)) / k^3
-  f3 <- (f3inf + f3sup) / 2 # Estimate of third derivative
+  f3sup <- (A / (1-max.rel.error) + B / (1+max.rel.error)) / k^3
+  f3inf <- (A / (1+max.rel.error) + B / (1-max.rel.error)) / k^3
+  f3 <- sum(tgrid) / k^3 # Estimate of third derivative
   L <- f3sup / f3inf
+  L <- max(abs(L), abs(1/L))
   ret <- list(k = k, x = xgrid, f = fgrid, ratio = L,
               deriv = c(f3inf = f3inf, f3 = f3, f3sup = f3sup))
   return(ret)
@@ -290,7 +291,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   while (i <= maxit) {
     hold <- if (i > 1) hnew else NA
-    hnew <- if (i > 1) hold * (aim / max(iters[[i-1]]$ratio, 1))^(1/3) else h0
+    hnew <- if (i > 1) hold * (aim / max(iters[[i-1]]$ratio, 1))^(if (vanilla) 1/2 else 1/3) else h0
 
     # Check the relative change of the step size, which is possible at
     # the 2nd iteration even before the 2nd error calculation
@@ -366,16 +367,15 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #'   size for first derivarives is internallt translated into the initial step size for third
 #'   derivatives by multiplying it by the machine epsilon raised to the power -2/15.
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
-#' @param alpha Numeric scalar >= 1 indicating the relative reduction in the
-#'   number of accurate bits due to the calculation of \code{FUN}. A value of \code{1}
-#'   implies that \code{FUN(x)} is assumed to have all bits accurate with maximum relative
-#'   error of \code{.Machine$double.eps/2}. A value of \code{2} indicates that the number of
-#'   accurate bits is half the mantissa length, \code{4} if it is quarter etc. The algorithm authors
-#'   recommend \code{4/3} even for highly accurate functions.
-#' @param ratio.limits Numeric vector of length 4 defining the acceptable ranges
+#' @param max.rel.error Positive numeric scalar > 0 indicating the maximum relative
+#'   error of function evaluation. For highly accurate functions with all accurate bits
+#'   is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+#'   output of optimisation routines etc.), it is higher, typically
+#'   \code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
+#'   \code{.Machine$double.eps^(3/4) = 2e-12} for common functions.
+#' @param ratio.limits Numeric vector of length 2 defining the acceptable ranges
 #'   for step size: the algorithm stops if the relative perturbation of the third derivative by
-#'   amplified rounding errors falls either between the 1st and 2nd elements or between
-#'   the 3rd and 4th elements.
+#'   amplified rounding errors falls within this range.
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops in cases
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
@@ -424,8 +424,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' # Plug-in estimator with only one evaluation of f'''
 #' step.DV(x = 2, f, maxit = 1)
 step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
-                    range = h0 / c(1e6, 1e-6), alpha = 4/3,
-                    ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
+                    range = h0 / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(3/4),
+                    ratio.limits = c(2, 15), maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL,  diagnostics = FALSE, ...) {
   cores <- checkCores(cores)
@@ -435,7 +435,6 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   range <- sort(range)
   range3 <- range * .Machine$double.eps^(-2/15)
-  P <- 2^(log2(.Machine$double.eps/2) / alpha)
 
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
@@ -447,7 +446,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   while (i <= maxit) {
     if (i == 1) k <- k0
-    res.i <- getValsDV(FUN = FUN, x = x, k = k, P = P, cores = cores, cl = cl, preschedule = preschedule, ...)
+    res.i <- getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error, cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
@@ -468,14 +467,17 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       break
     }
 
-    # TODO: find an improvement for the ratios of opposite signs
+    # If the function sign fluctuates, the step size is too wide
+    f.opposite.sign    <- !all(diff(sign(res.i$f)) == c(0, 0, 0))
+    # If the numerically contaminated derivative estimates blow up, the step size is too small
+    flim.opposite.sign <- !all(diff(sign(res.i$deriv)) == c(0, 0))
 
-    if (res.i$ratio < ratio.limits[1] || res.i$ratio > ratio.limits[4]) {
-      # The numerical error is too high
+    if (res.i$ratio > ratio.limits[2] || flim.opposite.sign) {
+      # The rounding error is too high; the step size must be increased
       range3[1] <- k
     } else {
-      if (res.i$ratio > ratio.limits[2] && res.i$ratio < ratio.limits[3]) {
-        # The numerical error is too small
+      if (res.i$ratio < ratio.limits[1] || f.opposite.sign) {
+        # The rounding error is too small; the step size must be decreased
         range3[2] <- k
         ndownwards <- ndownwards + 1
       } else {
@@ -490,7 +492,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   f3 <- if (exitcode != 1) sum(res.i$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
   f0 <- mean(res.i$f[2:3]) # Approximately f(x); the error is small for small h
-  h <- (1.67 * P * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
+  h <- (1.68 * max.rel.error * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
 
   if (h < range[1]) {
     h <- range[1]
@@ -514,7 +516,8 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   xgrid <- c(x-h, x+h)
   fgrid <- vapply(xgrid, FUN, ..., FUN.VALUE = numeric(1))
   cd <- (fgrid[2] - fgrid[1]) / h / 2
-  err <- P*abs(f0)/h/3 + (exitcode != 1) * (h^5*f3^2/36/P/abs(f0) - h^8*abs(f3)^3/648/P^2/f0^2)
+  err <- max.rel.error*abs(f0)/h/3 +
+    (exitcode != 1) * (h^5*f3^2/36/max.rel.error/abs(f0) - h^8*abs(f3)^3/648/max.rel.error^2/f0^2)
 
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
@@ -1071,7 +1074,6 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
                  " to ", sf.sugg, ") to have a finer grid, or increase 'range' (",
                  "from [", pasteAnd(printE(range)), "] to ",
                  "[", pasteAnd(printE(range.sugg)), "]).")
-  inv.sf <- 1/shrink.factor
   hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
   tstar <- (1 + inv.sf) / (1 - shrink.factor^2)  # TODO: n = 2...
   n <- length(hgrid)
@@ -1087,7 +1089,7 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   xgrid <- matrix(xgrid, ncol = 2)
   cd <- (fplus - fminus) / hgrid * 0.5
   fd1 <- cd[-1] # Larger step
-  fd2 <- cd[-n] # Small#' @inheritParams runParalleler step
+  fd2 <- cd[-n] # Smaller step
   # Formula 3.7 from Mathur (2012) or (25) from Mathur (2013)
   # Cn*h1^2 = abs((fd2 - fd1) / (1 - (h2/h1)^2), but h2/h1 = const = 1 / shrink.factor
   etrunc <- c(NA, abs((fd2 - fd1) / (1 - shrink.factor^2)))
@@ -1252,7 +1254,8 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
   etotal <- etrunc + eround
   evec <- c(etotal, etrunc, eround)
   yl <- range(evec[is.finite(evec) & evec != 0])
-  min.trunc <- min(etrunc[etrunc > 0], na.rm = TRUE)
+  etrunc.good <- etrunc[is.finite(etrunc)]
+  min.trunc <- if (any(etrunc.good > 0)) min(etrunc.good[etrunc.good > 0]) else yl[1]
   # If the rounding error is too steep, cut the plot to 1/3 of it below min(etrunc)
   if (log10(yl[1]) - log10(min.trunc) < -4) yl[1] <- min.trunc^(2/3) * yl[1]^(1/3)
   plot(hgrid[etotal != 0], etotal[etotal != 0], log = "xy", bty = "n",
@@ -1388,8 +1391,8 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
                        CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
                                   range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                                   cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
-                       DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), alpha = 4/3,
-                                 ratio.limits = c(1/15, 1/2, 2, 15), maxit = 40L,
+                       DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(3/4),
+                                 ratio.limits = c(2, 15), maxit = 40L,
                                  cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
                        SW = list(h0 = h0[1], shrink.factor = 0.5, range = h0[1] / c(1e12, 1e-8),
                                  seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
@@ -1413,34 +1416,31 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
            "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
            "incorporate the '...' explicitly."))
   autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV, SW = step.SW, M = step.M)
-  if (length(x) == 1) {
-    f.args <- c(margs, x = x, FUN = FUN)
-    ret <- do.call(autofun, f.args)
-  } else {
-    f.arg.list <- lapply(seq_along(x), function(i) {
-      FUN1 <- function(z) { # Scalar version of FUN
-        xx <- x
-        xx[i] <- z
-        FUN(xx, ...)
-      }
-      margs1 <- margs
-      margs1$h0 <- h0[i]
-      margs1$range <- if (!is.null(control$range)) control$range else
-        h0[i] / switch(method, plugin = c(1e4, 1e-4), CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
-                       DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24))
-      return(c(margs1, x = unname(x[i]), FUN = FUN1))
-    })
-    ret.list <- lapply(f.arg.list, function(arg1) do.call(autofun, arg1))
-    ret <- list(par = do.call(c, lapply(ret.list, "[[", "par")),
-                value = do.call(c, lapply(ret.list, "[[", "value")),
-                counts = do.call(rbind, lapply(ret.list, "[[", "counts")),
-                exitcode = do.call(c, lapply(ret.list, "[[", "exitcode")),
-                message = do.call(c, lapply(ret.list, "[[", "message")),
-                abs.err = do.call(c, lapply(ret.list, "[[", "abs.error")),
-                iterations = lapply(ret.list, "[[", "iterations"))
-    ret[names(ret) != "counts"] <- lapply(ret[names(ret) != "counts"],
-                                          function(z) structure(z, names = names(x)))
-    if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
-  }
+
+  f.arg.list <- lapply(seq_along(x), function(i) {
+    FUN1 <- function(z) { # Scalar version of FUN
+      xx <- x
+      xx[i] <- z
+      FUN(xx, ...)
+    }
+    margs1 <- margs
+    margs1$h0 <- h0[i]
+    margs1$range <- if (!is.null(control$range)) control$range else
+      h0[i] / switch(method, plugin = c(1e4, 1e-4), CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
+                     DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24))
+    return(c(margs1, x = unname(x[i]), FUN = FUN1))
+  })
+  ret.list <- lapply(f.arg.list, function(arg1) do.call(autofun, arg1))
+  ret <- list(par = do.call(c, lapply(ret.list, "[[", "par")),
+              value = do.call(c, lapply(ret.list, "[[", "value")),
+              counts = do.call(rbind, lapply(ret.list, "[[", "counts")),
+              exitcode = do.call(c, lapply(ret.list, "[[", "exitcode")),
+              message = do.call(c, lapply(ret.list, "[[", "message")),
+              abs.err = do.call(c, lapply(ret.list, "[[", "abs.error")),
+              iterations = lapply(ret.list, "[[", "iterations"))
+  ret[names(ret) != "counts"] <- lapply(ret[names(ret) != "counts"],
+                                        function(z) structure(z, names = names(x)))
+  if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
+
   return(ret)
 }

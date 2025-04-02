@@ -9,8 +9,8 @@ step.DV(
   x,
   h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
   range = h0/c(1e+06, 1e-06),
-  alpha = 4/3,
-  ratio.limits = c(1/15, 1/2, 2, 15),
+  max.rel.error = .Machine$double.eps^(3/4),
+  ratio.limits = c(2, 15),
   maxit = 40L,
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
@@ -31,17 +31,16 @@ derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
-\item{alpha}{Numeric scalar >= 1 indicating the relative reduction in the
-number of accurate bits due to the calculation of \code{FUN}. A value of \code{1}
-implies that \code{FUN(x)} is assumed to have all bits accurate with maximum relative
-error of \code{.Machine$double.eps/2}. A value of \code{2} indicates that the number of
-accurate bits is half the mantissa length, \code{4} if it is quarter etc. The algorithm authors
-recommend \code{4/3} even for highly accurate functions.}
+\item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
+error of function evaluation. For highly accurate functions with all accurate bits
+is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+output of optimisation routines etc.), it is higher, typically
+\code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
+\code{.Machine$double.eps^(3/4) = 2e-12} for common functions.}
 
-\item{ratio.limits}{Numeric vector of length 4 defining the acceptable ranges
+\item{ratio.limits}{Numeric vector of length 2 defining the acceptable ranges
 for step size: the algorithm stops if the relative perturbation of the third derivative by
-amplified rounding errors falls either between the 1st and 2nd elements or between
-the 3rd and 4th elements.}
+amplified rounding errors falls within this range.}
 
 \item{maxit}{Maximum number of algorithm iterations to avoid infinite loops in cases
 the desired relative perturbation factor cannot be achieved within the given \code{range}.
