@@ -22,6 +22,8 @@ Grad(
   preschedule = TRUE,
   cl = NULL,
   func = NULL,
+  method = NULL,
+  method.args = list(),
   report = 1L,
   ...
 )
@@ -93,12 +95,22 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
 
+\item{method}{For compatibility with \code{numDeriv::grad()} only. Supported values:
+\code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.}
+
+\item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
+\code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
+
 \item{report}{Integer for the level of detail in the output. If \code{0},
 returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher attaches the full
 diagnostic output as an attribute.}
 
-\item{...}{Additional arguments passed to \code{FUN}.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 }
 \value{
 Numeric vector of the gradient. If \code{FUN} returns a vector,
@@ -109,15 +121,15 @@ Computes numerical derivatives and gradients of scalar-valued functions using
 finite differences. This function supports both two-sided (central, symmetric) and
 one-sided (forward or backward) derivatives. It can utilise parallel processing
 to accelerate computation of gradients for slow functions or
-to attain higher accuracy faster. Currently, only Mac and Linux are supported
-\code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
-is under development.
+to attain higher accuracy faster.
 }
 \details{
-This function aims to be 100\% compatible with the syntax of \code{numDeriv::Grad()}.
+This function aims to be 100\% compatible with the syntax of \code{numDeriv::Grad()},
+but there might be differences in the step size because some choices made in
+\code{numDeriv} are not consistent with theory.
 
 There is one feature of the default step size in \code{numDeriv} that deserves
-an explanation.
+an explanation. In that package (but not in \code{pnd}),
 
 \itemize{
 \item If \code{method = "simple"}, then, simple forward differences are used with

@@ -15,6 +15,18 @@ test_that("function dimension check works", {
   expect_error(Jacobian(sum, 1:3), "for scalar-valued functions")
 })
 
+test_that("Jacobian works with automatic step sizes", {
+  f <- function(x) c(x^2 - 2*x + 2, exp(x))
+  expect_error(Jacobian(f, x = 0.75, h = "CR", report = 0), "step selection works only when")
+})
+
+test_that("Jacobian can accept dot arguments", {
+  # ... must be accepted and used by checkDimensions() and gradstep()
+  f <- function(x, a0) c(sin(x + a0), cos(x + a0))
+  f1 <- function(x) c(sin(x + 1), cos(x + 1))
+  expect_equal(Jacobian(f, x = 1, a0 = 1, h = 1e-5), Jacobian(f1, x = 1, h = 1e-5))
+})
+
 
 # TODO: compatibility with numDeriv
 

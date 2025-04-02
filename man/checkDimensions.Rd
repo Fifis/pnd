@@ -91,7 +91,11 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{...}{Additional arguments passed to \code{FUN}.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 }
 \value{
 A named logical vector indicating if a function is element-wise or not,

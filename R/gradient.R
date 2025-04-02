@@ -69,7 +69,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
       (isTRUE(multivalued) || isFALSE(multivalued)))
     return(c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued))
 
-  if (is.null(h)) {
+  if (is.null(h) || is.character(h)) {
     h.default <- stepx(x, deriv.order = deriv.order, acc.order = acc.order, zero.tol = zero.tol)
     h <- stats::median(h.default)
   }
@@ -277,11 +277,19 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @inheritParams runParallel
 #' @param func For compatibility with \code{numDeriv::grad()} only. If instead of
 #'   \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.
+#' @param method For compatibility with \code{numDeriv::grad()} only. Supported values:
+#'   \code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.
+#' @param method.args For compatibility with \code{numDeriv::grad()} only. Check
+#'   \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.
 #' @param report Integer for the level of detail in the output. If \code{0},
 #'   returns a gradient without any attributes; if \code{1},
 #'   attaches the step size and its selection method: \code{2} or higher attaches the full
 #'   diagnostic output as an attribute.
-#' @param ... Additional arguments passed to \code{FUN}.
+#' @param ... Additional arguments passed to \code{FUN}. Important! Since R does partial
+#'   matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+#'   to [GenD()], [Grad()], or [Jacobian()] will result in the interpretation \code{acc.order = 1}
+#'   because the latter is a named argument of these functions. Either supply the full names of all
+#'   similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).
 #'
 #' @details
 #'
@@ -362,7 +370,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2L,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps),  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 func = NULL, report = 1L, ...) {
+                 func = NULL, method = NULL, method.args = list(),
+                 report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -389,28 +398,24 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   #########################################
   # BEGIN compatibility with numDeriv::grad
-  # Detecting numDeriv named arguments (e.g. method.args) in ... first, and handling them
-  ell <- list(...)
+  # Detecting numDeriv named arguments in 'method.args'
   compat <- FALSE
   # TODO: check method.args as well
-  nd.method <- ell[["method"]]
-  nd.method.args <- ell[["method.args"]]
-  has.nd.args <- any(names(nd.method.args) %in% c("eps", "d", "zero.tol", "r", "v", "show.details"))
-  if ((!is.null(nd.method)) || has.nd.args) {
+  has.nd.args <- any(names(method.args) %in% c("eps", "d", "zero.tol", "r", "v", "show.details"))
+  if ((!is.null(method)) || has.nd.args) {
     compat <- TRUE
-    if (is.null(nd.method) && has.nd.args) nd.method <- "Richardson"
-    if (length(nd.method) == 1 && nd.method %in% c("simple", "complex", "Richardson")) {
-      margs <- ell$method.args
+    if (is.null(method) && has.nd.args) method <- "Richardson"
+    if (length(method) == 1 && method %in% c("simple", "complex", "Richardson")) {
       ma <- list(eps = 1e-5, d = NA, zero.tol = 1e-5, r = 4, show.details = FALSE)
       # Using a better step size for one-sided differences
-      if (nd.method == "simple") ma$eps <- ma$eps * .Machine$double.eps^(1/3 - 1/4)
-      ma[intersect(names(margs), names(ma))] <- margs[intersect(names(margs), names(ma))]
+      if (method == "simple") ma$eps <- ma$eps * .Machine$double.eps^(1/3 - 1/4)
+      ma[intersect(names(method.args), names(ma))] <- method.args[intersect(names(method.args), names(ma))]
       if (identical(unname(h), unname(h.default))) h <- ma$eps
-      if (nd.method == "simple") {
+      if (method == "simple") {
         side <- acc.order <- rep(1L, n)
-      } else if (nd.method == "complex") {
+      } else if (method == "complex") {
         stop("Complex derivatives not implemented yet.")
-      } else if (nd.method == "Richardson") {
+      } else if (method == "Richardson") {
         side <- numeric(n)
         acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) 2*ma$r else 8
         if (is.na(ma$d)) ma$d <- .Machine$double.eps^(1 / (1 + acc.order))
@@ -422,7 +427,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
         is.small <- abs(x) < ma$zero.tol
         h <- ma$d * abs(x) + ma$eps * is.small
       }
-      ell[["method"]] <- NULL
     }
     warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
                    "with more appropriate default values and facilities for automatic ",
@@ -451,10 +455,10 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   # TODO: for long vectorised argument, vectorise the check
   autostep <- FALSE
   if (is.character(h)) {
-    method <- h
+    hmethod <- h
     if (report > 1) control$diagnostics <- TRUE
-    h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = method, control = control,
-                       cores = cores, preschedule = preschedule, cl = cl)
+    h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = hmethod, control = control,
+                       cores = cores, preschedule = preschedule, cl = cl, ...)
     h <- h.auto$par
     autostep <- TRUE
     # TODO: use this gradient already
@@ -481,7 +485,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
-                           cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = unname(elementwise), vectorised = unname(vectorised),
              multivalued = unname(multivalued))
@@ -492,7 +496,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # TODO: deduplicate, save CPU
-  fvals0 <- runParallel(FUN = FUN, x = grid$x, cores = cores, cl = cl, preschedule = preschedule)
+  fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x, cores = cores, cl = cl, preschedule = preschedule)
   nonfinite.f   <- !sapply(fvals0, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
   if (any(horrible.f)) {
@@ -526,7 +530,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (report > 0) {
     attr(jac, "step.size") <- h
     if (autostep) {
-      attr(jac, "step.size.method") <- method
+      attr(jac, "step.size.method") <- hmethod
     } else if (all(h == h.default)) {
       attr(jac, "step.size.method") <- "default"
     } else if (compat) {
@@ -547,17 +551,17 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' finite differences. This function supports both two-sided (central, symmetric) and
 #' one-sided (forward or backward) derivatives. It can utilise parallel processing
 #' to accelerate computation of gradients for slow functions or
-#' to attain higher accuracy faster. Currently, only Mac and Linux are supported
-#' \code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
-#' is under development.
+#' to attain higher accuracy faster.
 #'
 #' @inheritParams GenD
 #'
 #' @details
-#' This function aims to be 100% compatible with the syntax of \code{numDeriv::Grad()}.
+#' This function aims to be 100% compatible with the syntax of \code{numDeriv::Grad()},
+#' but there might be differences in the step size because some choices made in
+#' \code{numDeriv} are not consistent with theory.
 #'
 #' There is one feature of the default step size in \code{numDeriv} that deserves
-#' an explanation.
+#' an explanation. In that package (but not in \code{pnd}),
 #'
 #' \itemize{
 #'   \item If \code{method = "simple"}, then, simple forward differences are used with
@@ -630,7 +634,8 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 func = NULL, report = 1L, ...) {
+                 func = NULL, method = NULL, method.args = list(),
+                 report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -647,7 +652,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
-                           cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
@@ -655,11 +660,13 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     stop(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
                 "to obtain a matrix of derivatives."))
 
-  d <- GenD(FUN = FUN, x = x, elementwise = chk["elementwise"],
-            vectorised = chk["vectorised"], multivalued = chk["multivalued"],
+  d <- GenD(FUN = FUN, x = x,
+            elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],
             deriv.order = deriv.order, side = side, acc.order = acc.order,
-            h = h, zero.tol = zero.tol, h0 = h0, control = control, f0 = f0, cores = cores, func = func,
-            preschedule = preschedule, cl = cl, report = report, ...)
+            h = h, zero.tol = zero.tol, h0 = h0, control = control, f0 = f0,
+            cores = cores, preschedule = preschedule, cl = cl,
+            func = func, method = method, method.args = method.args,
+            report = report, ...)
 
   return(d)
 }
@@ -713,8 +720,10 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                      deriv.order = 1L, side = 0, acc.order = 2,
                      h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL,
-                     control = list(), f0 = NULL, cores = 1, preschedule = TRUE,
-                     cl = NULL, func = NULL, report = 1L, ...) {
+                     control = list(), f0 = NULL,
+                     cores = 1, preschedule = TRUE, cl = NULL,
+                     func = NULL, method = NULL, method.args = list(),
+                     report = 1L, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -727,11 +736,11 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
 
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {
-    chk <- checkDimensions(FUN = FUN, x = x, f0 = f0, elementwise = elementwise,
-                           vectorised = vectorised, multivalued = multivalued,
+    chk <- checkDimensions(FUN = FUN, x = x, f0 = f0,
+                           elementwise = elementwise, vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
                            side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
-                           cores = cores, preschedule = preschedule)
+                           cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
@@ -739,11 +748,13 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
     stop(paste0("Use 'Grad()' instead of 'Jacobian()' for scalar-valued functions ",
                 "to obtain a vector of derivatives."))
 
-  d <- GenD(FUN = FUN, x = x, elementwise = chk["elementwise"],
-            vectorised = chk["vectorised"], multivalued = chk["multivalued"],
+  d <- GenD(FUN = FUN, x = x,
+            elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],
             deriv.order = deriv.order, side = side, acc.order = acc.order, h = h, h0 = h0,
-            zero.tol = zero.tol, control = control, f0 = f0, cores = cores, preschedule = preschedule,
-            cl = cl, func = func, report = report, ...)
+            zero.tol = zero.tol, control = control, f0 = f0,
+            cores = cores, preschedule = preschedule, cl = cl,
+            func = func, method = method, method.args = method.args,
+            report = report, ...)
 
   return(d)
 }

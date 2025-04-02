@@ -31,6 +31,8 @@ Jacobian(
   preschedule = TRUE,
   cl = NULL,
   func = NULL,
+  method = NULL,
+  method.args = list(),
   report = 1L,
   ...
 )
@@ -102,12 +104,22 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
 
+\item{method}{For compatibility with \code{numDeriv::grad()} only. Supported values:
+\code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.}
+
+\item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
+\code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
+
 \item{report}{Integer for the level of detail in the output. If \code{0},
 returns a gradient without any attributes; if \code{1},
 attaches the step size and its selection method: \code{2} or higher attaches the full
 diagnostic output as an attribute.}
 
-\item{...}{Additional arguments passed to \code{FUN}.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 }
 \value{
 Matrix where each row corresponds to a function output and each column

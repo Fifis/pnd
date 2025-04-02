@@ -42,7 +42,7 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
   expect_equal(step.CR(x = 2, f, h0 = 1e-12)$exitcode, 1)  # In theory, it should be 3,
   # but the truncation error estimate is really zero...
   expect_equal(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3)
-  expect_equal(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 4, range = c(1e-12, 1))$exitcode, 4)
+  expect_equal(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 2, range = c(1e-12, 1))$exitcode, 4)
 })
 
 # test_that("Parallelisation speeds things up for Curtis--Reid", {

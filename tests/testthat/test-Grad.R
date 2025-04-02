@@ -44,3 +44,17 @@ test_that("function dimension check works", {
   expect_error(Grad(f, 1:3), "for vector-valued functions")
   expect_error(Grad(f, 1:3, h = "SW"), "for vector-valued functions")
 })
+
+test_that("Grad works with automatic step sizes", {
+  f <- function(x) x^2 - 2*x + 2
+  expect_equal(Grad(f, x = 0.75, h = "CR", report = 0), -0.5, tolerance = 1e-8)
+})
+
+test_that("Grad can accept dot arguments", {
+  # These dot arguments must be accepted and used by checkDimensions()
+  # and gradstep()
+  f <- function(x, a0) sin(x + a0)
+  expect_equal(Grad(f, x = 0, a0 = 1, h = 1e-5), Grad(sin, x = 1, h = 1e-5))
+  expect_equal(attr(suppressMessages(Grad(f, x = 0, a0 = 1, h = "CR", report = 2)),
+                    "step.search")$exitcode, 0)
+})
