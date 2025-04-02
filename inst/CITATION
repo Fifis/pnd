@@ -1,47 +1,45 @@
 citHeader("Please cite this material in publications as:")
 
 bibentry(
-  bibtype="Manual",
+  bibtype = "Manual",
   title = "pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
-  note = "R package version 0.0.9",
+  note = "R package version 0.0.10",
   organization = "University of Luxembourg",
-  textVersion = "Kostyrka, Andreï V. (2025). pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order. R package version 0.0.9. https://github.com/Fifis/pnd",
-  url = "https://github.com/Fifis/pnd"
+  textVersion = "Kostyrka, Andreï V. (2025). pnd: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order. R package version 0.0.10. https://CRAN.R-project.org/package=pnd",
+  url = "https://CRAN.R-project.org/package=pnd"
 )
 
 bibentry(
-  bibtype="Misc",
+  bibtype = "Misc",
   title = "Fast and accurate parallel numerical derivatives in R",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.9.",
-  textVersion = "Kostyrka, Andreï V. (2025). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.9.",
+  note = "Vignette for the R package pnd 0.0.10.",
+  textVersion = "Kostyrka, Andreï V. (2025). Fast and accurate parallel numerical derivatives in R. Vignette for the R package pnd 0.0.10.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
 
 bibentry(
-  bibtype="Misc",
+  bibtype = "Misc",
   title = "Step-size-selection algorithm benchmark",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.9.",
-  textVersion = "Kostyrka, Andreï V. (2025). Step-size-selection algorithm benchmark. Vignette for the R package pnd 0.0.9.",
+  note = "Vignette for the R package pnd 0.0.10.",
+  textVersion = "Kostyrka, Andreï V. (2025). Step-size-selection algorithm benchmark. Vignette for the R package pnd 0.0.10.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
 
 bibentry(
-  bibtype="Misc",
+  bibtype = "Misc",
   title = "Compatilibility of pnd with the syntax of numDeriv",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
-  note = "Vignette for the R package pnd 0.0.9.",
-  textVersion = "Kostyrka, Andreï V. (2025). Compatilibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.0.9.",
+  note = "Vignette for the R package pnd 0.0.10.",
+  textVersion = "Kostyrka, Andreï V. (2025). Compatilibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.0.10.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )
-
-

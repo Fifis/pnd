@@ -1,7 +1,7 @@
 Package: pnd
 Type: Package
 Title: Parallel Numerical Derivatives, Gradients, Jacobians, and Hessians of Arbitrary Accuracy Order
-Version: 0.0.9
+Version: 0.0.10
 Authors@R: person(given = c("Andreï", "Victorovitch"), family = "Kostyrka",
         role = c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
