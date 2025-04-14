@@ -13,6 +13,7 @@ Grad(
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
+  stencil = NULL,
   h = NULL,
   zero.tol = sqrt(.Machine$double.eps),
   h0 = NULL,
@@ -24,7 +25,6 @@ Grad(
   func = NULL,
   method = NULL,
   method.args = list(),
-  report = 1L,
   ...
 )
 }
@@ -100,11 +100,6 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 
 \item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
 \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
-
-\item{report}{Integer for the level of detail in the output. If \code{0},
-returns a gradient without any attributes; if \code{1},
-attaches the step size and its selection method: \code{2} or higher attaches the full
-diagnostic output as an attribute.}
 
 \item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
 matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
@@ -184,9 +179,8 @@ g1 <- Grad(FUN = f, x = 1:4)
 g2 <- Grad(FUN = f, x = 1:4, h = 7e-6)
 g2 - g1  # Tiny differences due to different step sizes
 g.auto <- Grad(FUN = f, x = 1:4, h = "SW")
-g3.full <- Grad(FUN = f, x = 1:4, h = "SW", report = 2)
-print(g3.full)
-attr(g3.full, "step.search")$exitcode  # Success
+print(g.auto)
+attr(g.auto, "step.search")$exitcode  # Success
 
 # Gradients for vectorised functions -- e.g. leaky ReLU
 LReLU <- function(x) ifelse(x > 0, x, 0.01*x)

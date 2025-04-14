@@ -22,6 +22,7 @@ Jacobian(
   deriv.order = 1L,
   side = 0,
   acc.order = 2,
+  stencil = NULL,
   h = NULL,
   zero.tol = sqrt(.Machine$double.eps),
   h0 = NULL,
@@ -33,7 +34,6 @@ Jacobian(
   func = NULL,
   method = NULL,
   method.args = list(),
-  report = 1L,
   ...
 )
 }
@@ -109,11 +109,6 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 
 \item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
 \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
-
-\item{report}{Integer for the level of detail in the output. If \code{0},
-returns a gradient without any attributes; if \code{1},
-attaches the step size and its selection method: \code{2} or higher attaches the full
-diagnostic output as an attribute.}
 
 \item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
 matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}

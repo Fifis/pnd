@@ -17,7 +17,6 @@ Hessian(
   preschedule = TRUE,
   cl = NULL,
   func = NULL,
-  report = 1L,
   ...
 )
 }
@@ -66,10 +65,6 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 (fork cluster) on everything else.}
 
 \item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
-
-\item{report}{Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
-attaches the step size and its selection method: \code{2} or higher, attaches the full
-diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).}
 
 \item{...}{Additional arguments passed to \code{FUN}.}
 }

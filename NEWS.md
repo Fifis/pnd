@@ -3,8 +3,10 @@
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
-- UX: add a pretty print method for the gradient, Jacobian, and step size
-- FEATURE: add an algorithm where the two lines intersect; should fix `sin'(pi/2)` with two branches
+- FEATURE: check that all derivative-search methods return a truncation and a rounding error
+- FEATURE: add a plotting method for all step-size searches
+- FEATURE: add options for default accuracy (maybe 4?)
+- FEATURE: write tests for print methods
 - FEATURE: Implement de-duplication in the grid of points; reuse f0 and other precomputed values
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
@@ -31,6 +33,17 @@
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
+
+# pnd 0.1.0 (2015-XX-XX)
+- Feature: original kink-based algorithm for step size selection `step.K()`
+- Feature: added printing methods for derivatives and step sizes
+- Feature: removed the `diagnostics` and `report` arguments; the iteration information is always saved, but not printed
+- Feature: added support for `max.rel.error` for all step-selection methods
+- Fix: corrected the wrong formula for the plug-in step size
+
+# pnd 0.0.10 (2025-04-02)
+- Fix: GitHub issue #2 -- `checkDimensions` could not handle character `h` passed for auto-selection
+- Fix: GitHub issue #1 -- function arguments in `...` did non propagate properly to `step...` functions
 
 # pnd 0.0.9 (2025-03-10)
 - Fix: fixed a regression with the default step size

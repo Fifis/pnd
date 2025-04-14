@@ -122,9 +122,6 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
 #' @inheritParams runParallel
 #' @param func Deprecated; for \code{numDeriv::grad()} compatibility only.
-#' @param report Integer: if \code{0}, returns a gradient without any attributes; if \code{1},
-#'   attaches the step size and its selection method: \code{2} or higher, attaches the full
-#'   diagnostic output (overrides \code{diagnostics = FALSE} in \code{control}).
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
@@ -168,7 +165,7 @@ generateGrid2 <- function(x, side, acc.order, h) {
 Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
                     h0 = NULL, control = list(), f0 = NULL,
                     cores = 1, preschedule = TRUE, cl = NULL,
-                    func = NULL, report = 1L, ...) {
+                    func = NULL, ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -304,17 +301,16 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
 
   if (!is.null(names(x))) colnames(hes) <- rownames(hes) <- names(x)
 
-  if (report > 0) {
-    attr(hes, "step.size") <- h
+  attr(hes, "step.size") <- h
     # TODO: After implementing autosteps, return the syntax here from Grad
-    if (all(h == h.default)) {
-      attr(hes, "step.size.method") <- "default"
-    } else if (compat) {
-      attr(hes, "step.size.method") <- "numDeriv-like"
-    } else {
-      attr(hes, "step.size.method") <- "user-supplied"
-    }
+  if (all(h == h.default)) {
+    attr(hes, "step.size.method") <- "default"
+  } else if (compat) {
+    attr(hes, "step.size.method") <- "numDeriv-like"
+  } else {
+    attr(hes, "step.size.method") <- "user-supplied"
   }
 
+  class(hes) <- "hessian"
   return(hes)
 }

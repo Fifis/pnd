@@ -25,16 +25,16 @@
 #' @export
 #'
 #' @examples
-#' checkDimensions(sin, x = 1:4, h = 1e-5, report = 2)  # Rn -> Rn vectorised
-#' checkDimensions(function(x) integrate(sin, 0, x)$value, x = 1:4, h = 1e-5, report = 2)  # non vec
-#' checkDimensions(function(x) sum(sin(x)), x = 1:4, h = 1e-5, report = 2)  # Rn -> R, gradient
-#' checkDimensions(function(x) c(sin(x), cos(x)), x = 1, h = 1e-5, report = 2)  # R -> Rn, Jacobian
-#' checkDimensions(function(x) c(sin(x), cos(x)), x = 1:4, h = 1e-5, report = 2)  # vec Jac
+#' checkDimensions(sin, x = 1:4, h = 1e-5)  # Rn -> Rn vectorised
+#' checkDimensions(function(x) integrate(sin, 0, x)$value, x = 1:4, h = 1e-5)  # non vec
+#' checkDimensions(function(x) sum(sin(x)), x = 1:4, h = 1e-5)  # Rn -> R, gradient
+#' checkDimensions(function(x) c(sin(x), cos(x)), x = 1, h = 1e-5)  # R -> Rn, Jacobian
+#' checkDimensions(function(x) c(sin(x), cos(x)), x = 1:4, h = 1e-5)  # vec Jac
 #' checkDimensions(function(x) c(integrate(sin, 0, x)$value, integrate(sin, -x, 0)$value),
-#'                  x = 1:4, h = 1e-5, report = 2)  # non-vectorised Jacobian
+#'                  x = 1:4, h = 1e-5)  # non-vectorised Jacobian
 checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
                             elementwise = NA, vectorised = NA, multivalued = NA,
-                            deriv.order = 1, acc.order = 2, side = 0, h = NULL, report = 1L,
+                            deriv.order = 1, acc.order = 2, side = 0, h = NULL,
                             zero.tol = sqrt(.Machine$double.eps), cores = 1, preschedule = TRUE, cl = NULL, ...) {
   if (missing(FUN)) {
     if (is.function(func)) {
@@ -164,8 +164,6 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   msg <- paste0("FUN maps R^", n0, " -> R^", l0, " and can", if (!vectorised) "not" else "",
                 " process vector inputs. Use 'elementwise = ", elementwise, "', 'vectorised = ",
                 vectorised, "', 'multivalued = ", multivalued, "' to skip the checks and save time.")
-  if (report > 1)
-    message(msg)
 
   ret <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   attr(ret, "x") <- c(x, xhvals)
@@ -177,6 +175,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   }
   attr(ret, "seconds") <- if (user.f0) NA else as.numeric(difftime(tic1, tic0, units = "secs"))
 
+  class(ret) <- "checkDimensions"
   return(ret)
 }
 
@@ -281,10 +280,6 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   \code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.
 #' @param method.args For compatibility with \code{numDeriv::grad()} only. Check
 #'   \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.
-#' @param report Integer for the level of detail in the output. If \code{0},
-#'   returns a gradient without any attributes; if \code{1},
-#'   attaches the step size and its selection method: \code{2} or higher attaches the full
-#'   diagnostic output as an attribute.
 #' @param ... Additional arguments passed to \code{FUN}. Important! Since R does partial
 #'   matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
 #'   to [GenD()], [Grad()], or [Jacobian()] will result in the interpretation \code{acc.order = 1}
@@ -314,8 +309,6 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 #' and \code{f.upper} in \code{uniroot()}.
 #'
-#' For convenience, \code{report = 2} overrides \code{diagnostics = FALSE} in the
-#' \code{control}) list.
 #'
 #' Unlike \code{numDeriv::grad()} and \code{numDeriv::jacobian()}, this function
 #' fully preserves the names of \code{x} and \code{FUN(x)}.
@@ -342,8 +335,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' g2.h2 <- Grad(FUN = f2, x = 1:4, h = 7e-6)
 #' g2 - g2.h2  # Tiny differences due to different step sizes
 #' g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW")
-#' g2.full <- Grad(FUN = f2, x = 1:4, h = "SW", report = 2)
-#' print(attr(g2.full, "step.search")$exitcode)  # Success
+#' print(attr(g2.auto, "step.search")$exitcode)  # Success
 #'
 #' # Case 3: vector input, vector argument of different length
 #' f3 <- function(x) c(sum(sin(x)), prod(cos(x)))
@@ -367,11 +359,10 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' # Now, with extra checks, it will be slower
 #' system.time(GenD(fslow, x, side = 1, acc.order = 2))
 GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
-                 deriv.order = 1L, side = 0, acc.order = 2L,
+                 deriv.order = 1L, side = 0, acc.order = 2L, stencil = NULL,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps),  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 func = NULL, method = NULL, method.args = list(),
-                 report = 1L, ...) {
+                 func = NULL, method = NULL, method.args = list(), ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -456,7 +447,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   autostep <- FALSE
   if (is.character(h)) {
     hmethod <- h
-    if (report > 1) control$diagnostics <- TRUE
     h.auto <- gradstep(x = x, FUN = FUN, h0 = h0, method = hmethod, control = control,
                        cores = cores, preschedule = preschedule, cl = cl, ...)
     h <- h.auto$par
@@ -469,9 +459,13 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (length(h) != n) stop("The argument 'h' (step size) must have length 1 or length(x).")
 
   # If all deriv.order, acc.order, side are the same, invert Vandermonde matrices only once
-  if (length(unique(deriv.order)) == 1 && length(unique(acc.order)) == 1 &&
-      length(unique(side)) == 1) {
-    stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1])
+  if ((length(unique(deriv.order)) == 1 && length(unique(acc.order)) == 1 &&
+      length(unique(side)) == 1) || !is.null(stencil)) {
+    if (is.null(stencil)) {
+      stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1])
+    } else {
+      stencil1 <- stencil
+    }
     stencils <- replicate(n, stencil1, simplify = FALSE)
   } else {
     stencils <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i],
@@ -484,7 +478,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     chk <- checkDimensions(FUN = FUN, x = x, f0 = f0, elementwise = elementwise,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
-                           side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
+                           side = side, h = h, cl = cl, func = func, zero.tol = zero.tol,
                            cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = unname(elementwise), vectorised = unname(vectorised),
@@ -527,20 +521,20 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     if (!is.null(colnames(fvals))) rownames(jac) <- colnames(fvals)
   }
 
-  if (report > 0) {
-    attr(jac, "step.size") <- h
-    if (autostep) {
-      attr(jac, "step.size.method") <- hmethod
-    } else if (all(h == h.default)) {
-      attr(jac, "step.size.method") <- "default"
-    } else if (compat) {
-      attr(jac, "step.size.method") <- "numDeriv-like"
-    } else {
-      attr(jac, "step.size.method") <- "user-supplied"
-    }
-    if (autostep && report > 1) attr(jac, "step.search") <- h.auto
+  attr(jac, "step.size") <- h
+  if (autostep) {
+    attr(jac, "step.size.method") <- hmethod
+  } else if (all(h == h.default)) {
+    attr(jac, "step.size.method") <- "default"
+  } else if (compat) {
+    attr(jac, "step.size.method") <- "numDeriv-like"
+  } else {
+    attr(jac, "step.size.method") <- "user-supplied"
   }
+  # TODO: use in printing
+  if (autostep) attr(jac, "step.search") <- h.auto
 
+  class(jac) <- "GenD"
   return(jac)
 }
 
@@ -623,19 +617,17 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' g2 <- Grad(FUN = f, x = 1:4, h = 7e-6)
 #' g2 - g1  # Tiny differences due to different step sizes
 #' g.auto <- Grad(FUN = f, x = 1:4, h = "SW")
-#' g3.full <- Grad(FUN = f, x = 1:4, h = "SW", report = 2)
-#' print(g3.full)
-#' attr(g3.full, "step.search")$exitcode  # Success
+#' print(g.auto)
+#' attr(g.auto, "step.search")$exitcode  # Success
 #'
 #' # Gradients for vectorised functions -- e.g. leaky ReLU
 #' LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
 #' Grad(LReLU, seq(-1, 1, 0.1))
 Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
-                 deriv.order = 1L, side = 0, acc.order = 2,
+                 deriv.order = 1L, side = 0, acc.order = 2, stencil = NULL,
                  h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
-                 func = NULL, method = NULL, method.args = list(),
-                 report = 1L, ...) {
+                 func = NULL, method = NULL, method.args = list(), ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -651,7 +643,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     chk <- checkDimensions(FUN = FUN, x = x, f0 = f0, elementwise = elementwise,
                            vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
-                           side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
+                           side = side, h = h, cl = cl, func = func, zero.tol = zero.tol,
                            cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
@@ -662,11 +654,10 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   d <- GenD(FUN = FUN, x = x,
             elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],
-            deriv.order = deriv.order, side = side, acc.order = acc.order,
+            deriv.order = deriv.order, side = side, acc.order = acc.order, stencil = stencil,
             h = h, zero.tol = zero.tol, h0 = h0, control = control, f0 = f0,
             cores = cores, preschedule = preschedule, cl = cl,
-            func = func, method = method, method.args = method.args,
-            report = report, ...)
+            func = func, method = method, method.args = method.args, ...)
 
   return(d)
 }
@@ -718,12 +709,11 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #'
 #' @export
 Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
-                     deriv.order = 1L, side = 0, acc.order = 2,
+                     deriv.order = 1L, side = 0, acc.order = 2, stencil = NULL,
                      h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL,
                      control = list(), f0 = NULL,
                      cores = 1, preschedule = TRUE, cl = NULL,
-                     func = NULL, method = NULL, method.args = list(),
-                     report = 1L, ...) {
+                     func = NULL, method = NULL, method.args = list(), ...) {
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -739,7 +729,7 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
     chk <- checkDimensions(FUN = FUN, x = x, f0 = f0,
                            elementwise = elementwise, vectorised = vectorised, multivalued = multivalued,
                            deriv.order = deriv.order, acc.order = acc.order,
-                           side = side, h = h, report = report, cl = cl, func = func, zero.tol = zero.tol,
+                           side = side, h = h, cl = cl, func = func, zero.tol = zero.tol,
                            cores = cores, preschedule = preschedule, ...)
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
@@ -750,11 +740,10 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
 
   d <- GenD(FUN = FUN, x = x,
             elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],
-            deriv.order = deriv.order, side = side, acc.order = acc.order, h = h, h0 = h0,
-            zero.tol = zero.tol, control = control, f0 = f0,
+            deriv.order = deriv.order, side = side, acc.order = acc.order, stencil = stencil,
+            h = h, h0 = h0, zero.tol = zero.tol, control = control, f0 = f0,
             cores = cores, preschedule = preschedule, cl = cl,
-            func = func, method = method, method.args = method.args,
-            report = report, ...)
+            func = func, method = method, method.args = method.args, ...)
 
   return(d)
 }
