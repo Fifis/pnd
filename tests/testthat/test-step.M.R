@@ -4,7 +4,7 @@ test_that("Mathur's AutoDX handles inputs well", {
 })
 
 test_that("Mathur's step selection behaves reasonably", {
-  s <- step.M(x = pi/4, sin, diagnostics = TRUE, plot = TRUE, cores = 1)
+  s <- step.M(x = pi/4, sin, plot = TRUE, cores = 1)
   expect_equal(s$exitcode, 0)
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-8)
   if (file.exists("Rplot.pdf")) unlink("Rplot.pdf")

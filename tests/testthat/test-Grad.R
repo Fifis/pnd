@@ -3,18 +3,18 @@ test_that("compatibility with numDeriv", {
   expect_match(w[1], "Use the argument")
   expect_match(w[2], "Use the argument")
   expect_warning(Grad(x = 1:3, FUN = sum, method = "simple"), "numDeriv-like syntax")
-  expect_equal(suppressWarnings(Grad(x = 1:3, FUN = sum, method = "simple", report = 0)),
-               Grad(x = 1:3, sum, side = 1, acc.order = 1, h = 1e-5 * .Machine$double.eps^(1/12), report = 0),
-               tolerance = 1e-15)
+  s1 <- suppressWarnings(Grad(x = 1:3, FUN = sum, method = "simple"))
+  s2 <- Grad(x = 1:3, sum, side = 1, acc.order = 1, h = 1e-5 * .Machine$double.eps^(1/12))
+  expect_equal(as.numeric(s1), as.numeric(s2), tolerance = 1e-15)
   expect_error(suppressWarnings(Grad(x = 1:4, func = sum, method = "complex")),
                "Complex derivatives not implemented")
-  expect_equal(Grad(x = 1:4, FUN = sum, side = NULL, report = 0), rep(1, 4), tolerance = 1e-10)
+  expect_equal(as.numeric(Grad(x = 1:4, FUN = sum, side = NULL)), rep(1, 4), tolerance = 1e-10)
   # TODO: Richardson
 })
 
 test_that("gradients are correct", {
   f <- function(x) sum(sin(x))
-  expect_equal(Grad(x = 1:4, f, report = 0), cos(1:4), tolerance = 1e-10)
+  expect_equal(as.numeric(Grad(x = 1:4, f)), cos(1:4), tolerance = 1e-10)
 
   x <- structure(1:3, names = c("A", "B", "C"))
   g <- Grad(f, x, h = 0.01)
@@ -29,7 +29,7 @@ test_that("Gradient step is auto-selected well", {
   expect_equal(attr(Grad(x = 1:3, f, h = "CR"), "step.size.method"), "CR")
   expect_equal(attr(Grad(x = 1:3, f, h = "SW"), "step.size.method"), "SW")
   g <- Grad(x = 1:3, FUN = f, h = "SW", elementwise = FALSE,
-            vectorised = FALSE, multivalued = FALSE, report = 2)
+            vectorised = FALSE, multivalued = FALSE)
   expect_equal(attr(g, "step.search")[["exitcode"]], rep(0, 3), tolerance = 1e-15)
   expect_length(attr(g, "step.search")[["iterations"]], 3)
 })
@@ -47,7 +47,7 @@ test_that("function dimension check works", {
 
 test_that("Grad works with automatic step sizes", {
   f <- function(x) x^2 - 2*x + 2
-  expect_equal(Grad(f, x = 0.75, h = "CR", report = 0), -0.5, tolerance = 1e-8)
+  expect_equal(as.numeric(Grad(f, x = 0.75, h = "CR")), -0.5, tolerance = 1e-8)
 })
 
 test_that("Grad can accept dot arguments", {
@@ -55,6 +55,6 @@ test_that("Grad can accept dot arguments", {
   # and gradstep()
   f <- function(x, a0) sin(x + a0)
   expect_equal(Grad(f, x = 0, a0 = 1, h = 1e-5), Grad(sin, x = 1, h = 1e-5))
-  expect_equal(attr(suppressMessages(Grad(f, x = 0, a0 = 1, h = "CR", report = 2)),
+  expect_equal(attr(suppressMessages(Grad(f, x = 0, a0 = 1, h = "CR")),
                     "step.search")$exitcode, 0)
 })

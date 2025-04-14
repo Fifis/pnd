@@ -6,9 +6,9 @@ test_that("Dumontet-Vignes step selection handles inputs well", {
 
 test_that("Dumontet-Vignes step selection behaves reasonably", {
   f <- function(x) x^4
-  s <- step.DV(x = 2, f, diagnostics = TRUE)
+  s <- step.DV(x = 2, f)
   expect_equal(s$exitcode, 0)
-  expect_lt(s$abs.error, 1e-6)
+  expect_lt(sum(s$abs.error), 1e-6)
   expect_equal(s$value, 32, tolerance = 1e-8)
   u <- s$iterations$ratio[length(s$iterations$ratio)]
   u <- max(u, 1/u)

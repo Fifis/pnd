@@ -1,6 +1,6 @@
 test_that("Jacobians are correct", {
   f <- function(x) c(sine = sum(sin(x)), expon = sum(exp(x)))
-  expect_equal(Jacobian(x = 1:3, f, report = 0), rbind(sine = cos(1:3), expon = exp(1:3)),
+  expect_equal(as.numeric(Jacobian(x = 1:3, f)), as.numeric(rbind(sine = cos(1:3), expon = exp(1:3))),
                tolerance = 1e-9)
 
   x <- structure(1:3, names = c("A", "B", "C"))
@@ -17,7 +17,7 @@ test_that("function dimension check works", {
 
 test_that("Jacobian works with automatic step sizes", {
   f <- function(x) c(x^2 - 2*x + 2, exp(x))
-  expect_error(Jacobian(f, x = 0.75, h = "CR", report = 0), "step selection works only when")
+  expect_error(Jacobian(f, x = 0.75, h = "CR"), "step selection works only when")
 })
 
 test_that("Jacobian can accept dot arguments", {

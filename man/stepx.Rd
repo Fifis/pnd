@@ -22,10 +22,13 @@ guessed step size is relative (\code{x} multiplied by the step), unless an auto-
 procedure is requested; otherwise, it is absolute.}
 }
 \value{
-A numeric vector of the same length as \code{x} with positve step sizes.
+A numeric vector of the same length as \code{x} with positive step sizes.
 }
 \description{
-Default step size at given points
+Compute an appropriate finite-difference step size based on the magnitude of x,
+derivation order, and accuracy order. If the function and its higher derivatives
+belong to the same order of magnitude, this step is near-optimal. For small x,
+returns a hard bound to prevent large machine-rounding errors.
 }
 \examples{
 stepx(10^(-10:2))
