@@ -16,7 +16,6 @@ step.SW(
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
-  diagnostics = FALSE,
   ...
 )
 }
@@ -58,27 +57,27 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
-including all function evaluations.}
-
 \item{...}{Passed to FUN.}
 }
 \value{
-A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-step size found, \code{value} -- the estimated numerical first derivative (central
-differences), \code{counts} -- the number of iterations (each iteration includes
-four function evaluations), \code{abs.error} -- an estimate of the total
-approximation error (sum of truncation and rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates optimal termination within tolerance,
-\code{2} is returned if there is no change in step size within tolerance,
-\code{3} indicates a solution at the boundary of the allowed value range,
-\code{4} signals that the maximum number of iterations was reached.
-\code{message} is a summary message of the exit status.
-If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-including the full step size search path,
-argument grids, function values on those grids, estimated derivative values,
-estimated error values, and monotonicity check results.
+A list similar to the one returned by \code{optim()}:
+\itemize{
+\item \code{par} – the optimal step size found.
+\item \code{value} – the estimated numerical first derivative (using central differences).
+\item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{exitcode} – an integer code indicating the termination status:
+\itemize{
+\item \code{0} – Optimal termination within tolerance.
+\item \code{2} – No change in step size within tolerance.
+\item \code{3} – Solution lies at the boundary of the allowed value range.
+\item \code{4} – Maximum number of iterations reached.
+}
+\item \code{message} – A summary message of the exit status.
+\item \code{iterations} – A list including the full step size search path, argument grids,
+function values on those grids, estimated derivative values, estimated error values,
+and monotonicity check results.
+}
 }
 \description{
 Stepleman--Winarsky automatic step selection
@@ -90,18 +89,18 @@ This function computes the optimal step size for central differences using the
 \examples{
 f <- function(x) x^4  # The derivative at 1 is 4
 step.SW(x = 1, f)
-step.SW(x = 1, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
+step.SW(x = 1, f, h0 = 1e-9) # Starting too low
 # Starting somewhat high leads to too many preliminary iterations
-step.SW(x = 1, f, h0 = 10, diagnostics = TRUE)
-step.SW(x = 1, f, h0 = 1000, diagnostics = TRUE) # Starting absurdly high
+step.SW(x = 1, f, h0 = 10)
+step.SW(x = 1, f, h0 = 1000) # Starting absurdly high
 
 f <- sin  # The derivative at pi/4 is sqrt(2)/2
 step.SW(x = pi/4, f)
-step.SW(x = pi/4, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
-step.SW(x = pi/4, f, h0 = 0.1, diagnostics = TRUE) # Starting slightly high
+step.SW(x = pi/4, f, h0 = 1e-9) # Starting too low
+step.SW(x = pi/4, f, h0 = 0.1) # Starting slightly high
 # The following two example fail because the truncation error estimate is invalid
-step.SW(x = pi/4, f, h0 = 10, diagnostics = TRUE)   # Warning
-step.SW(x = pi/4, f, h0 = 1000, diagnostics = TRUE) # Warning
+step.SW(x = pi/4, f, h0 = 10)   # Warning
+step.SW(x = pi/4, f, h0 = 1000) # Warning
 }
 \references{
 \insertAllCited{}

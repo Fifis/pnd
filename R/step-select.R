@@ -1,8 +1,13 @@
 #' Default step size at given points
 #'
+#' Compute an appropriate finite-difference step size based on the magnitude of x,
+#' derivation order, and accuracy order. If the function and its higher derivatives
+#' belong to the same order of magnitude, this step is near-optimal. For small x,
+#' returns a hard bound to prevent large machine-rounding errors.
+#'
 #' @inheritParams GenD
 #'
-#' @return A numeric vector of the same length as `x` with positve step sizes.
+#' @return A numeric vector of the same length as `x` with positive step sizes.
 #' @export
 #'
 #' @examples
@@ -11,10 +16,10 @@
 stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$double.eps)) {
   x <- abs(x)
   n <- length(x)
-  i1 <- x < sqrt(.Machine$double.eps)
+  i1 <- x < zero.tol
   i3 <- x > 1
   i2 <- (!i1) & (!i3)
-  ret <- rep(sqrt(.Machine$double.eps), length(x))
+  ret <- rep(zero.tol, length(x))
 
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
@@ -37,7 +42,7 @@ stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$do
 # The idea is based on evaluating expressions in parallel with properly exported variables,
 # e.g. from the dots (...) argument, as in the optimParallel package.
 # Returns a generator object: a list with cluster and a function that can run locally.
-getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
+getValsCR <- function(FUN, x, h, max.rel.error, vanilla, cores, cl, preschedule, ...) {
   xgrid <- if (vanilla) x + c(-h, 0, h) else x + c(-h, -h/2, h/2, h)
   FUNsafe <- function(z) safeF(FUN, z, ...)
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
@@ -59,7 +64,7 @@ getValsCR <- function(FUN, x, h, vanilla, cores, cl, preschedule, ...) {
     cd4 <- sum(fgrid * c(1, -8, 8, -1)) / h / 6
     etrunc <- abs(cd - cd.half) * 4 / 3
   }
-  eround <- 0.5 * max(abs(fgrid)) * .Machine$double.eps / h
+  eround <- max(abs(fgrid)) * max.rel.error / h
   ratio <- etrunc / eround
   deriv <- if (vanilla) c(cd = cd, bd = bd, fd = fd) else c(cd = cd, cd.half = cd.half, cd4 = cd4)
   ret <- list(h = h, x = xgrid, f = fgrid, ratio = ratio, deriv = deriv,
@@ -117,7 +122,7 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
 
 # Generator for Stepleman--Winarsky
 getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
-                      ratio.beforelast = NULL, max.rel.error = .Machine$double.eps/2,
+                      ratio.beforelast = NULL, max.rel.error,
                       cores, cl, preschedule, ...) {
   xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
@@ -187,8 +192,6 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
 #' @inheritParams runParallel
-#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
-#'   including all function evaluations.
 #' @param ... Passed to \code{FUN}.
 #'
 #' @details
@@ -207,21 +210,25 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #'
 #' TODO: mention that f must be one-dimensional
 #'
-#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-#'   step size found, \code{value} -- the estimated numerical first derivative (central differences;
-#'   very useful for computationally expensive functions), \code{counts} -- the number of
-#'   iterations (each iteration includes three function evaluations), \code{abs.error} --
-#'   an estimate of the total approximation error (sum of truncation and rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates optimal termination within tolerance,
-#'   \code{1} means that the third derivative is zero (large step size preferred),
-#'   \code{2} is returned if there is no change in step size within tolerance,
-#'   \code{3} indicates a solution at the boundary of the allowed value range,
-#'   \code{4} signals that the maximum number of iterations was reached.
-#'   \code{message} -- a summary message of the exit status.
-#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-#'   including the full step size search path, argument grids, function values on
-#'   those grids, estimated error ratios, and estimated derivative values.
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences;
+#'       especially useful for computationally expensive functions).
+#'     \item \code{counts} – the number of iterations (each iteration includes three function evaluations).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Optimal termination within tolerance.
+#'         \item \code{1} – Third derivative is zero; large step size preferred.
+#'         \item \code{2} – No change in step size within tolerance.
+#'         \item \code{3} – Solution lies at the boundary of the allowed value range.
+#'         \item \code{4} – Maximum number of iterations reached.
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the full step size search path, argument grids,
+#'       function values on those grids, estimated error ratios, and estimated derivative values.
+#'   }
 #' @export
 #'
 #' @details
@@ -238,7 +245,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' @examples
 #' f <- function(x) x^4
 #' step.CR(x = 2, f)
-#' step.CR(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
+#' step.CR(x = 2, f, h0 = 1e-3)
 #' step.CR(x = 2, f, version = "modified")
 #' step.CR(x = 2, f, version = "modified", acc.order = 4)
 #'
@@ -258,13 +265,14 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' system.time(step.CR(f2, x, h = 1e-4, cl = cl))  # Also fast
 #' stopCluster(cl)
 step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
-                    version = c("original", "modified"),
+                    max.rel.error = .Machine$double.eps^(7/8), version = c("original", "modified"),
                     aim = if (version[1] == "original") 100 else 1,
                     acc.order = c(2L, 4L),
                     tol = if (version[1] == "original") 10 else 4,
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
-                    cl = NULL, diagnostics = FALSE, ...) {
+                    cl = NULL, ...) {
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   version <- match.arg(version)
@@ -273,7 +281,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   cores <- min(cores, if (vanilla) 3 else 4)
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   range <- sort(range)
-  if (range[1] < 2*.Machine$double.eps) range[1] <- 2*.Machine$double.eps
+  if (range[1] < 2*.Machine$double.eps) range[1] <- 2*.Machine$double.eps  # Avoiding zeros
   if (tol <= 1) stop("The tolerance 'tol' must be >=1 (e.g. 4).")
   if (acc.order == 4 && vanilla) {
     warning("The 'original' Curtis--Reid 1974 algorithm does not support 4th-order accuracy. Using acc.order = 2.")
@@ -309,7 +317,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       }
     }
 
-    res.i <- getValsCR(FUN = FUN, x = x, h = hnew, vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
+    res.i <- getValsCR(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error,
+                       vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
@@ -323,7 +332,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     if (res.i$ratio < .Machine$double.eps^(4/5)) {
       exitcode <- 1  # Zero truncation error -> only rounding error
       hnew <- hnew * 16 # For linear or quadratic functions, a large h is preferred
-      iters[[i+1]] <- getValsCR(FUN = FUN, x = x, h = hnew, vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
+      iters[[i+1]] <- getValsCR(FUN = FUN, x = x, h = hnew,  max.rel.error = max.rel.error,
+                                vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
       break
     }
 
@@ -340,20 +350,21 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                 paste0("step size landed on the range ", if (res.i$h == range[1]) "left" else
                          "right", " end; consider extending the range"),
                 "maximum number of iterations reached")
-  if (diagnostics) {
-    diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
-                      x = do.call(rbind, lapply(iters, "[[", "x")),
-                      f = do.call(rbind, lapply(iters, "[[", "f")),
-                      deriv = do.call(rbind, lapply(iters, "[[", "deriv")),
-                      est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
-                      ratio = do.call(c, lapply(iters, "[[", "ratio")))
-  }
+
+  diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
+                    x = do.call(rbind, lapply(iters, "[[", "x")),
+                    f = do.call(rbind, lapply(iters, "[[", "f")),
+                    deriv = do.call(rbind, lapply(iters, "[[", "deriv")),
+                    est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
+                    ratio = do.call(c, lapply(iters, "[[", "ratio")))
+
   ret <- list(par = res.i$h,
               value = if (acc.order == 4) unname(res.i$deriv["cd4"]) else unname(res.i$deriv["cd"]),
               counts = i, exitcode = exitcode, message = msg,
-              abs.error = sum(res.i$est.error),
-              # TODO: return both error estimates
-              iterations = if (diagnostics) diag.list else NULL)
+              abs.error = res.i$est.error,
+              method = if (vanilla) "Curtis--Reid" else "Modified Curtis--Reid",
+              iterations = diag.list)
+  class(ret) <- "stepsize"
   return(ret)
 }
 
@@ -380,9 +391,6 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #'   the desired relative perturbation factor cannot be achieved within the given \code{range}.
 #'   Consider extending the range if this limit is reached.
 #' @inheritParams runParallel
-#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
-#'   including all function evaluations.
-#'   Note: the history tracks the third derivative, not the first.
 #' @param ... Passed to FUN.
 #'
 #' @details
@@ -391,26 +399,27 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' If the estimated third derivative is exactly zero, the function assumes a third
 #' derivative of 1 to prevent division-by-zero errors.
 #'
+#' Note: the iteration history tracks the third derivative, not the first.
 #'
-#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-#'   step size found, \code{value} -- the estimated numerical first derivative (central
-#'   differences), \code{counts} -- the number of iterations (each iteration includes
-#'   four function evaluations), \code{abs.error} -- an estimate of the total
-#'   approximation error (sum of truncation and rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates optimal termination within tolerance,
-#'   \code{1} means that the third derivative is zero (large step size preferred),
-#'   \code{3} indicates a solution at the boundary of the allowed value range,
-#'   \code{4} signals that the maximum number of iterations was reached and the
-#'   found optimal step size belongs to the allowed range,
-#'   \code{5} occurs when the maximum number of iterations was reached and the
-#'   found optimal step size did belong to the allowed range and had to be snapped
-#'   to one end.
-#'   \code{6} is used when \code{maxit = 1} and no search was performed.
-#'   \code{message} is a summary message of the exit status.
-#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-#'   including the full step size search path (NB: for the 3rd derivative),
-#'   argument grids, function values on those grids, and estimated 3rd derivative values.
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences).
+#'     \item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Optimal termination within tolerance.
+#'         \item \code{1} – Third derivative is zero; large step size preferred.
+#'         \item \code{3} – Solution lies at the boundary of the allowed value range.
+#'         \item \code{4} – Maximum number of iterations reached; optimal step size is within the allowed range.
+#'         \item \code{5} – Maximum number of iterations reached; optimal step size was outside allowed range and had to be snapped to a boundary.
+#'         \item \code{6} – No search was performed (used when \code{maxit = 1}).
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the full step size search path (note: for the third derivative),
+#'       argument grids, function values on those grids, and estimated third derivative values.
+#'   }
 #' @export
 #'
 #' @references
@@ -419,15 +428,17 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' @examples
 #' f <- function(x) x^4
 #' step.DV(x = 2, f)
-#' step.DV(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
+#' step.DV(x = 2, f, h0 = 1e-3)
 #'
 #' # Plug-in estimator with only one evaluation of f'''
 #' step.DV(x = 2, f, maxit = 1)
+#' step.plugin(x = 2, f)
 step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
-                    range = h0 / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(3/4),
+                    range = h0 / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(7/8),
                     ratio.limits = c(2, 15), maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
-                    cl = NULL,  diagnostics = FALSE, ...) {
+                    cl = NULL, ...) {
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -460,8 +471,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       break
     }
 
-    # If the estimate of f''' is near-zero, then, f_inf and f_sup will have opposite signs
-    # The algorithm must therefore stop
+    # If the estimate of f''' is near-zero, then, the algorithm must stop to avoid division by near-0
     if (abs(res.i$deriv["f3"]) < 8 * .Machine$double.eps) {
       exitcode <- 1
       break
@@ -516,8 +526,11 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   xgrid <- c(x-h, x+h)
   fgrid <- vapply(xgrid, FUN, ..., FUN.VALUE = numeric(1))
   cd <- (fgrid[2] - fgrid[1]) / h / 2
-  err <- max.rel.error*abs(f0)/h/3 +
-    (exitcode != 1) * (h^5*f3^2/36/max.rel.error/abs(f0) - h^8*abs(f3)^3/648/max.rel.error^2/f0^2)
+  etrunc <- unname(abs(res.i$deriv["f3"])) * h^2 / 6     # Formula for 'em' from Dumontet (1973), 1.4.2 (p. 37)
+  eround <- max.rel.error * max(abs(fgrid)) / h  # Formula for 'ed' ibid.
+  # err <- max.rel.error*abs(f0)/h/3 +
+  #   (exitcode != 1) * (h^5*f3^2/36/max.rel.error/abs(f0) - h^8*abs(f3)^3/648/max.rel.error^2/f0^2)
+  # We are not interested in the aggregate error, we need a decomposition
 
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
@@ -532,17 +545,17 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                        printE(range[2]), "]; consider expanding it"),
                 "only one iteration requested; rough values returned")
 
-  if (diagnostics) {
-    diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
-                      x = do.call(rbind, lapply(iters, "[[", "x")),
-                      f = do.call(rbind, lapply(iters, "[[", "f")),
-                      ratio = do.call(c, lapply(iters, "[[", "ratio")),
-                      deriv3 = do.call(rbind, lapply(iters, "[[", "deriv")))
-  }
+  diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
+                    x = do.call(rbind, lapply(iters, "[[", "x")),
+                    f = do.call(rbind, lapply(iters, "[[", "f")),
+                    ratio = do.call(c, lapply(iters, "[[", "ratio")),
+                    deriv3 = do.call(rbind, lapply(iters, "[[", "deriv")))
 
   ret <- list(par = h, value = cd, counts = i, exitcode = exitcode,
-              message = msg, abs.error = err,
-              iterations = if (diagnostics) diag.list else NULL)
+              message = msg, abs.error = c(trunc = etrunc, round = eround),
+              method = "Dumontet--Vignes",
+              iterations = diag.list)
+  class(ret) <- "stepsize"
   return(ret)
 
 }
@@ -558,24 +571,27 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' plug-in approach.
 #' The optimal step size is determined as the minimiser of the total error, which for central
 #' finite differences is (assuming minimal bounds for relative rounding errors)
-#' \deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x) \epsilon_{\mathrm{mach}}}}}{[(1.5 mach.eps * f' / f''')^(1/3)]}
+#' \deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x)} \epsilon_{\mathrm{mach}}}.}{(1.5 mach.eps * f' / f''')^(1/3).}
 #' If the estimated third derivative is too small, the function assumes a third
 #' derivative of 1 to prevent division-by-zero errors.
 #'
-#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-#'   step size found, \code{value} -- the estimated numerical first derivative (central
-#'   differences), \code{counts} -- the number of iterations (here, it is 2),
-#'   \code{abs.error} -- an estimate of the total approximation error (sum of truncation and
-#'   rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates termination with checks passed tolerance,
-#'   \code{1} means that the third derivative is exactly zero (large step size preferred),
-#'   \code{2} signals that the third derivative is too close to zero (large step size preferred),
-#'   \code{3} indicates a solution at the boundary of the allowed value range.
-#'   \code{message} is a summary message of the exit status.
-#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-#'   including the two-step size search path, argument grids, function values on those grids,
-#'   and estimated 3rd derivative values.
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences).
+#'     \item \code{counts} – the number of iterations (in this case, it is 2).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Termination with checks passed tolerance.
+#'         \item \code{1} – Third derivative is exactly zero; large step size preferred.
+#'         \item \code{2} – Third derivative is too close to zero; large step size preferred.
+#'         \item \code{3} – Solution lies at the boundary of the allowed value range.
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the two-step size search path, argument grids,
+#'       function values on those grids, and estimated third derivative values.
+#'   }
 #' @export
 #'
 #' @references
@@ -584,12 +600,13 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #' @examples
 #' f <- function(x) x^4
 #' step.plugin(x = 2, f)
-#' step.plugin(x = 0, f, diagnostics = TRUE)  # f''' = 0, setting a large one
+#' step.plugin(x = 0, f)  # f''' = 0, setting a large one
 step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
-                        range = h0 / c(1e4, 1e-4),
+                        max.rel.error = .Machine$double.eps^(7/8), range = h0 / c(1e4, 1e-4),
                         cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
-                        cl = NULL,  diagnostics = FALSE, ...) {
+                        cl = NULL, ...) {
   # TODO: add zero.tol everywhere
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -607,19 +624,19 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   exitcode <- 0
   # If the estimate of f''' is near-zero, the step-size estimate may be too large --
   # only the modified one needs not be saved
-  me13 <- .Machine$double.eps^(1/3)  # 6e-06 in IEEE754
-  if (abs(cd3) == 0) {
+  me13 <- max.rel.error^(1/3)
+  if (abs(cd3) == 0) {#' Plug-in step selection
     exitcode <- 1
     h <- pmax(me13, abs(x) / 128)
     cd3 <- me13^2 * abs(x)
-  } else if (max(abs(f0), me13^2) / abs(cd3) > sqrt(1/.Machine$double.eps)) {
+  } else if (max(abs(f0), me13^2) / abs(cd3) > sqrt(1/max.rel.error)) {
     # The ratio of f' to f''' is too large -- safeguard against large steps
     # small values of f0 are truncated to macheps^(2/3) ~ 4e-11
-    cd3 <- sqrt(.Machine$double.eps) * max(abs(f0), me13^2)
+    cd3 <- sqrt(max.rel.error) * max(abs(f0), me13^2)
     h <- pmax(me13, abs(x) / 256)
     exitcode <- 2
   } else {  # Everything is OK
-    h <- abs(1.5 * f0/cd3 * me13)
+    h <- abs(1.5 * f0/cd3 * max.rel.error)^(1/3)
   }
 
   if (h < range[1]) {
@@ -643,18 +660,18 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
                        " end of the reasonable range [", printE(range[1]), ", ",
                        printE(range[2]), "]"))
 
-  if (diagnostics) {
-    diag.list <- list(h = c(f3 = h0 * .Machine$double.eps^(-2/15), f1 = h),
-                      x = do.call(rbind, lapply(iters, "[[", "x")),
-                      f = do.call(rbind, lapply(iters, "[[", "f")),
-                      deriv = c(cd3 = cd3, cd = iters[[2]]$cd))
-  }
+  diag.list <- list(h = c(f3 = h0 * .Machine$double.eps^(-2/15), f1 = h),
+                    x = do.call(rbind, lapply(iters, "[[", "x")),
+                    f = do.call(rbind, lapply(iters, "[[", "f")),
+                    deriv = c(cd3 = cd3, cd = iters[[2]]$cd))
 
-  etrunc <- (mean(fgrid)^2 * abs(cd3) * .Machine$double.eps^2 / 96)^(1/3)
-  eround <- max(2*etrunc, (abs(mean(fgrid)) * .Machine$double.eps)^(2/3))
+  etrunc <- abs(cd3) / 6 * h^2
+  eround <- 0.5 * .Machine$double.eps * max(abs(iters[[2]]$f)) / h
   ret <- list(par = h, value = iters[[2]]$cd, counts = 2, exitcode = exitcode,
               message = msg, abs.error = c(trunc = etrunc, round = eround),
-              iterations = if (diagnostics) diag.list else NULL)
+              method = "plug-in",
+              iterations = diag.list)
+  class(ret) <- "stepsize"
   return(ret)
 
 }
@@ -680,8 +697,6 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 #'   Consider trying some smaller or larger initial step size \code{h0}
 #'   if this limit is reached.
 #' @inheritParams runParallel
-#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
-#'   including all function evaluations.
 #' @param ... Passed to FUN.
 #'
 #' @details
@@ -689,21 +704,24 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 #' \insertCite{stepleman1979adaptive}{pnd} algorithm.
 #'
 #'
-#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-#'   step size found, \code{value} -- the estimated numerical first derivative (central
-#'   differences), \code{counts} -- the number of iterations (each iteration includes
-#'   four function evaluations), \code{abs.error} -- an estimate of the total
-#'   approximation error (sum of truncation and rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates optimal termination within tolerance,
-#'   \code{2} is returned if there is no change in step size within tolerance,
-#'   \code{3} indicates a solution at the boundary of the allowed value range,
-#'   \code{4} signals that the maximum number of iterations was reached.
-#'   \code{message} is a summary message of the exit status.
-#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-#'   including the full step size search path,
-#'   argument grids, function values on those grids, estimated derivative values,
-#'   estimated error values, and monotonicity check results.
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences).
+#'     \item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Optimal termination within tolerance.
+#'         \item \code{2} – No change in step size within tolerance.
+#'         \item \code{3} – Solution lies at the boundary of the allowed value range.
+#'         \item \code{4} – Maximum number of iterations reached.
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the full step size search path, argument grids,
+#'       function values on those grids, estimated derivative values, estimated error values,
+#'       and monotonicity check results.
+#'   }
 #' @export
 #'
 #' @references
@@ -712,23 +730,24 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
 #' @examples
 #' f <- function(x) x^4  # The derivative at 1 is 4
 #' step.SW(x = 1, f)
-#' step.SW(x = 1, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
+#' step.SW(x = 1, f, h0 = 1e-9) # Starting too low
 #' # Starting somewhat high leads to too many preliminary iterations
-#' step.SW(x = 1, f, h0 = 10, diagnostics = TRUE)
-#' step.SW(x = 1, f, h0 = 1000, diagnostics = TRUE) # Starting absurdly high
+#' step.SW(x = 1, f, h0 = 10)
+#' step.SW(x = 1, f, h0 = 1000) # Starting absurdly high
 #'
 #' f <- sin  # The derivative at pi/4 is sqrt(2)/2
 #' step.SW(x = pi/4, f)
-#' step.SW(x = pi/4, f, h0 = 1e-9, diagnostics = TRUE) # Starting too low
-#' step.SW(x = pi/4, f, h0 = 0.1, diagnostics = TRUE) # Starting slightly high
+#' step.SW(x = pi/4, f, h0 = 1e-9) # Starting too low
+#' step.SW(x = pi/4, f, h0 = 0.1) # Starting slightly high
 #' # The following two example fail because the truncation error estimate is invalid
-#' step.SW(x = pi/4, f, h0 = 10, diagnostics = TRUE)   # Warning
-#' step.SW(x = pi/4, f, h0 = 1000, diagnostics = TRUE) # Warning
+#' step.SW(x = pi/4, f, h0 = 10)   # Warning
+#' step.SW(x = pi/4, f, h0 = 1000) # Warning
 step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     shrink.factor = 0.5, range = h0 / c(1e12, 1e-8),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
-                    cl = NULL, diagnostics = FALSE, ...) {
+                    cl = NULL, ...) {
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
@@ -920,21 +939,20 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                    "Returning 0.01|x| ."))
     i <- i + 1
     hopt <- 0.01*abs(x)
-    res.i <- getValsSW(FUN = FUN, x = x, h = hopt, do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
+    res.i <- getValsSW(FUN = FUN, x = x, h = hopt, max.rel.error = max.rel.error,
+                       do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
                        ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
                        cores = cores, cl = cl, preschedule = preschedule, ...)
 
     iters[[i]] <- res.i
   }
 
-  if (diagnostics) {
-    diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
-                      x = do.call(rbind, lapply(iters, "[[", "x")),
-                      f = do.call(rbind, lapply(iters, "[[", "f")),
-                      deriv = do.call(c, lapply(iters, "[[", "deriv")),
-                      est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
-                      monotone = do.call(rbind, lapply(iters, "[[", "monotone")))
-  }
+  diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
+                    x = do.call(rbind, lapply(iters, "[[", "x")),
+                    f = do.call(rbind, lapply(iters, "[[", "f")),
+                    deriv = do.call(c, lapply(iters, "[[", "deriv")),
+                    est.error = do.call(rbind, lapply(iters, "[[", "est.error")),
+                    monotone = do.call(rbind, lapply(iters, "[[", "monotone")))
 
 
   best.i <- if (exitcode == 3 && !close.left) i-2 else i-1
@@ -942,15 +960,14 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
               value = iters[[best.i]]$deriv,
               counts = c(preliminary = i.prelim, main = i - i.prelim),
               exitcode = exitcode, message = msg,
-              abs.error = sum(iters[[best.i]]$est.error),
-              iterations = if (diagnostics) diag.list else NULL)
-
-
-
+              abs.error = iters[[best.i]]$est.error,
+              method = "Stepleman--Winarsky",
+              iterations = diag.list)
+  class(ret) <- "stepsize"
   return(ret)
 }
 
-# The median of the 3 points with the lowest error
+# The median of the 3 points with the lowest error -- fail-safe return
 med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
   i.min3 <- rank(log2etrunc, ties.method = "first", na.last = "keep") %in% 1:3
   if (sum(i.min3) >= 3) {
@@ -987,8 +1004,6 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
 #'   the grid point that is is lowest in the increasing sequence of valid error
 #'   estimates.
 #' @inheritParams runParallel
-#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
-#'   including all function evaluations.
 #' @param plot Logical: if \code{TRUE}, plots the estimated truncation and round-off
 #'   errors.
 #' @param ... Passed to FUN.
@@ -998,21 +1013,23 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
 #' \insertCite{mathur2012analytical}{pnd} algorithm.
 #'
 #'
-#' @return A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-#'   step size found, \code{value} -- the estimated numerical first derivative (central
-#'   differences), \code{counts} -- the number of iterations (each iteration includes
-#'   two function evaluations), \code{abs.error} -- an estimate of the total
-#'   approximation error (sum of truncation and rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates optimal termination due to a sequence of correct reductions,
-#'   \code{1} indicates that the reductions are slightly not within tolerance,
-#'   \code{2} indicates that the tolerances are so wrong, an approximate minimum is returned,
-#'   \code{3} signals that there are not enough finite function values and the rule of thumb is returned.
-#'   \code{message} is a summary message of the exit status.
-#'   If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-#'   including the full step size search path,
-#'   argument grids, function values on those grids, estimated derivative values,
-#'   estimated error values, and monotonicity check results.
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences).
+#'     \item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Optimal termination due to a sequence of correct reductions.
+#'         \item \code{1} – Reductions are slightly outside the tolerance.
+#'         \item \code{2} – Tolerances are significantly violated; an approximate minimum is returned.
+#'         \item \code{3} – Not enough finite function values; a rule-of-thumb value is returned.
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the step and argument grids,
+#'       function values on those grids, estimated derivative values, and estimated error values.
+#'   }
 #' @export
 #'
 #' @references
@@ -1030,14 +1047,15 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
 #' step.M(x = pi/4, f, h0 = 1e-9) # Starting low
 #' step.M(x = pi/4, f, h0 = 1000) # Starting high
 #' # where the truncation error estimate is invalid
-step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
-                   min.valid.slopes = 5L, seq.tol = 0.01,
-                   correction = TRUE, diagnostics = FALSE, plot = FALSE,
+step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8), range = NULL,
+                   shrink.factor = 0.5, min.valid.slopes = 5L, seq.tol = 0.01,
+                   correction = TRUE, plot = FALSE,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
-    h0 <- 0.01 * (abs(x) + (x == 0))
+    h0 <- 0.01 * max(abs(x), 1)
     h0 <- 2^round(log2(h0))
   }
   h0 <- unname(h0)
@@ -1081,8 +1099,6 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 
   fgrid <- getValsM(FUN = FUN, x = xgrid, cores = cores, cl = cl, preschedule = preschedule, ...)
 
-  n <- nrow(fgrid)
-
   # TODO: instead of subtracting one, add one
   fplus <- fgrid[, 2]
   fminus <- fgrid[, 1]
@@ -1100,11 +1116,10 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   signs.rle <- do.call(data.frame, rle(signs))
 
   # Rounding error for later
-  eps <- .Machine$double.eps / 2
   delta <- .Machine$double.eps / 2 # Error of h|f'(x)true - f'(x)| / |f(x)true|
   fmax <- pmax(abs(fplus), abs(fminus))
   fw <- fdCoef(deriv.order = 1, side = 0, acc.order = 2)  # TODO: generalise later
-  f.eps <- eps * (abs(fw$weights[1]*fminus) + abs(fw$weights[2]*fplus))
+  f.eps <- max.rel.error * (abs(fw$weights[1]*fminus) + abs(fw$weights[2]*fplus))
   f.delta <- delta*fmax
   eround <- (f.eps + f.delta) / hgrid
 
@@ -1197,7 +1212,8 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
   ret <- list(par = if (correction) hopt else hopt0, value = cd[i.hopt], counts = n,
               exitcode = exitcode, message = msg,
               abs.error = diag.list$est.error[i.hopt, ],
-              iterations = if (diagnostics) diag.list else NULL)
+              method = "Mathur",
+              iterations = diag.list)
 
   if (plot) {
     if (!exists("slopes")) i.increasing <- NULL
@@ -1205,16 +1221,381 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
       i.good <- if (!is.null(i.increasing) && exists("good.slopes")) i.increasing[good.slopes] else NULL
     if (!exists("i.okay"))
       i.okay <- if (!is.null(i.increasing) && exists("okay.slopes")) i.increasing[okay.slopes] else NULL
-    plotTE(hgrid = hgrid, hopt = hopt, etrunc = etrunc, eround = eround,
-           i.increasing = i.increasing, i.good = i.good, i.okay = i.okay,
-           eps = eps, delta = delta)
-  }
+    i.round <- 1:min(i.hopt, i.good, i.okay, i.increasing)
+    elabels <- rep("b", n)
+    elabels[i.round] <- "r"
+    elabels[i.good] <- "g"
+    elabels[i.okay] <- "o"
+    elabels[i.increasing] <- "i"
 
+    plotTE(hgrid = hgrid, etotal = etrunc, eround = eround, hopt = hopt,
+           elabels = elabels, epsilon = max.rel.error)
+  }
+  class(ret) <- "stepsize"
   return(ret)
 }
 
+#' Kink-based step selection (experimental!)
+#'
+#' Optimal step-size search using the full range of practical error estimates and
+#' numerical optimisation to find the spot where the theoretical total-error shape
+#' is best described by the data, and finds the step size where the ratio of
+#' rounding-to-truncation error is optimal.
+#'
+#' @inheritParams step.M
+#' @inheritParams GenD
+#' @param epsilon Error bound for the relative function-evaluation error
+#' (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+#' If the function is relying on numerical optimisation routines, consider setting to
+#' \code{sqrt(.Machine$double.eps)}.
+#' If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.
+#'
+#' @details
+#' This function computes the optimal step size for central differences using the statistical
+#' kink-search approach.
+#' The optimal step size is determined as the minimiser of the total error, which for central
+#' differences is V-shaped with the left-branch slope equal to the negative derivation order
+#' and the right-branch slope equal to the accuracy order. For standard simple central
+#' differences, the slopes are -1 and 2, respectively. The algorithm uses the
+#' least-median-of-squares (LMS) penalty and searches for the optimal position of the check
+#' that fits the data the best on a bounded 2D rectangle using derivative-free (Nelder--Mead)
+#' optimisation.
+#' Unlike other algorithms, if the estimated third derivative is too small, the function shape
+#' will be different, and two checks are made for the existence of two branches.
+#'
+#' @return A list similar to the one returned by \code{optim()}:
+#'   \itemize{
+#'     \item \code{par} – the optimal step size found.
+#'     \item \code{value} – the estimated numerical first derivative (using central differences).
+#'     \item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+#'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
+#'     \item \code{exitcode} – an integer code indicating the termination status:
+#'       \itemize{
+#'         \item \code{0} – Optimal termination; a minimum of the V-shaped function was found.
+#'         \item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
+#'         \item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
+#'       }
+#'     \item \code{message} – A summary message of the exit status.
+#'     \item \code{iterations} – A list including the step and argument grids,
+#'       function values on those grids, estimated derivative values, estimated error values,
+#'       and predicted model-based errors.
+#'   }
+#' @export
+#'
+#' @references
+#' \insertAllCited{}
+#'
+#' @examples
+#' step.K(sin, 1, plot = TRUE)
+#' step.K(exp, 1, range = c(1e-12, 1e-0), plot = TRUE)
+#' step.K(atan, 1, plot = TRUE)
+#'
+#' # Edge case 1: function symmetric around x0, zero truncation error
+#' step.K(sin, pi/2, plot = TRUE)
+#' step.K(sin, pi/2, shrink.factor = 0.8, plot = TRUE)
+#'
+#' # Edge case 1: the truncation error is always zero and f(x0) = 0
+#' suppressWarnings(step.K(function(x) x^2, 0, plot = TRUE))
+#' # Edge case 2: the truncation error is always zero
+#' step.K(function(x) x^2, 1, plot = TRUE)
+#' step.K(function(x) x^4, 0, plot = TRUE)
+#' step.K(function(x) x^4, 0.1, plot = TRUE)
+#' step.K(function(x) x^6 - x^4, 0.1, plot = TRUE)
+#' step.K(atan, 3/4, plot = TRUE)
+#' step.K(exp, 2, plot = TRUE, range = c(1e-16, 1e+1))
+step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
+                   range = NULL, shrink.factor = 0.5,
+                   max.rel.error = .Machine$double.eps^(7/8), plot = FALSE,
+                   cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
+                   cl = NULL, ...) {
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (acc.order %% 2 != 0) stop("acc.order must be even because the differences are central.")
+  if (!is.numeric(shrink.factor) || shrink.factor <= 0 || shrink.factor >= 1)
+    stop("'shrink.factor' must be strictly greater than 0 and less than 1. Recommended: 0.5.")
+  if (acc.order %% 2 != 0)
+    stop("'acc.order' must be even for central differences.")
 
-#' Estimated total error plot as in Mathur (2012)
+  cores <- checkCores(cores)
+  if (is.null(h0)) { # Setting the initial step to a reasonably large power of 2
+    h0 <- 0.001 * max(abs(x), 1)
+    h0 <- 2^round(log2(h0))
+  }
+  h0 <- unname(h0)
+  inv.sf <- 1 / shrink.factor
+
+  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
+
+  if (is.null(range)) {
+    ends <- log(c(2^36, 2^(-24)), base = inv.sf)
+    ends <- c(floor(ends[1]), ceiling(ends[2]))
+    ends <- inv.sf^ends
+    range <- h0 / ends
+  }
+  if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
+  range <- sort(range)
+  # Safety checks for the range size
+  hnaive <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1/(deriv.order + acc.order))
+  spans <- c(hnaive/range[1], range[2]/hnaive)
+  if (min(spans) < 2^16) {
+    range.old <- range
+    if (spans[1] < 2^16) range[1] <- hnaive / 2^16
+    if (spans[2] < 2^16) range[2] <- hnaive * 2^16
+    warning("The initial range [", pasteAnd(printE(range.old)), "] was extended to [",
+            pasteAnd(printE(range)), "] to ensure a large-enough search space.")
+  }
+
+  exitcode <- 0
+  hat.check <- NULL
+
+  # Creating a sequence of step sizes for evaluation
+  sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
+  range.sugg <- range / c(1024, 1/1024)
+  err1 <- paste0("Either increase 'shrink.factor' (e.g. from ", shrink.factor,
+                 " to ", sf.sugg, ") to have a finer grid, or increase 'range' (",
+                 "from [", pasteAnd(printE(range)), "] to ",
+                 "[", pasteAnd(printE(range.sugg)), "]).")
+  hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
+  n <- length(hgrid)
+  xgrid <- x + c(-hgrid, hgrid)
+
+  fgrid <- getValsM(FUN = FUN, x = xgrid, cores = cores, cl = cl, preschedule = preschedule, ...)
+  xgrid <- matrix(xgrid, ncol = 2)
+  fplus <- fgrid[, 2]
+  fminus <- fgrid[, 1]
+
+  s <- 2^(0:(acc.order/2-1))
+  s <- c(-rev(s), s)  # Stencil of powers of 2 because h is halved
+
+  s2 <- 2^(0:(acc.order/2+1))
+  s2 <- c(-rev(s2), s2)
+  stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order, stencil = s)
+  # A higher derivative for an alternative estimate of the truncation term
+  # because it is the next acc.order-th derivative in the Taylor expansion
+  stcd  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = 4, stencil = s2)
+
+  stc.list <- list(stc, stcd)
+  do <- c(deriv.order, deriv.order+acc.order)
+  cds <- vector("list", 2)
+  for (i in 1:2) {
+    i.spos <- stc.list[[i]]$stencil > 0
+    i.sneg <- stc.list[[i]]$stencil < 0
+    wpos  <- stc.list[[i]]$weights[i.spos]  # Weights for f(xplus) starting at x+h, x+2h, ...
+    wneg  <- rev(stc.list[[i]]$weights[i.sneg]) # Weights for f(xplus) starting at x-h, x-2h, ...
+    fmpos <- sapply(1:sum(i.spos), function(i) c(fplus[i:n], rep(NA, i-1)))
+    fmneg <- sapply(1:sum(i.spos), function(i) c(fminus[i:n], rep(NA, i-1)))
+    if (i == 1) {  # Saving f+ and f- for round-off-error analysis
+      fmp <- fmpos
+      fmn <- fmneg
+    }
+    colnames(fmpos) <- names(wpos)
+    colnames(fmneg) <- names(wneg)
+    # Estimated derivative times h^acc.order
+    cds[[i]] <- (colSums(t(fmpos) * wpos) + colSums(t(fmneg) * wneg)) / hgrid
+  }
+  etrunc <- (cds[[1]] - c(cds[[1]][2:n], NA)) / (1 - shrink.factor^acc.order)
+  etrunc2 <- cds[[2]]
+  bad.etrunc <- (!is.finite(etrunc)) | (etrunc == 0)
+  etrunc[bad.etrunc] <- etrunc2[bad.etrunc]
+  etrunc <- abs(etrunc)
+
+  # A value to compare to the threshold for Zero Truncation Error
+  zte.cond <- etrunc != 0 & is.finite(etrunc)
+  zte <- if (any(zte.cond)) median(etrunc[zte.cond]) else .Machine$double.eps
+
+
+  # Rounding error
+  # epsilon = relative error of evaluation of f(x), e.g. maximum noise
+  # delta = Error of h|f'(x)true - f'(x)| / |f(x)true|
+  fmax <- apply(abs(cbind(fmp, fmn)), 1, max)
+  i.neg <- grep("-", names(stc$weights))
+  i.pos <- grep("\\+", names(stc$weights))
+  if (length(stc$stencil) == 2) {
+    f.eps <- max.rel.error * (abs(stc$weights[i.neg]*fmn) + abs(stc$weights[i.pos]*fmp))
+  } else {
+    f.eps <- max.rel.error * colSums(abs(rbind(stc$weights[i.neg]*t(fmn), stc$weights[i.pos]*t(fmp))))
+  }
+  f.delta <- 0.5 * .Machine$double.eps * fmax
+  eround <- (drop(f.eps) + f.delta) / hgrid^deriv.order
+  # plot(hgrid, eround, log = "xy")
+
+  # Initial value:
+  log2h <- log2(hgrid)
+  log2e <- suppressWarnings(log2(etrunc))
+  log2e[log2e == -Inf] <- NA
+  # plot(log2h, log2e)
+
+  # If the function is symmetric / low-degree polynomial, the truncation error is always zero -- return
+  # the safe option; otherwise, carry out a search
+  is.finite.etrunc <- is.finite(log2e)
+  n.good <- sum(is.finite.etrunc)
+  if (n.good >= 3) {
+    # Identifying regions of rounding, valid truncation, and invalid truncation
+    # whilst also safeguarding against noisiness; define the slope at a point as
+    # the average right and left slope
+    i.etrunc.finite <- which(is.finite.etrunc)
+    local.slopes0 <- c(NA, sapply(2:n.good, function(i) {  # Backwards-looking slopes
+      ii  <- i.etrunc.finite[i-1:0]
+      diff(log2e[ii]) / diff(log2h[ii])
+    }))
+    local.slopes1 <- (local.slopes0 + c(local.slopes0[-1], NA)) * 0.5
+    local.slopes1[c(1, n.good)] <- local.slopes0[c(2, n.good)]
+    # Aligning the slopes with the original points
+    local.slopes <- rep(NA, n)
+    local.slopes[i.etrunc.finite] <- local.slopes1
+    # text(log2h[i.etrunc.finite], log2e[i.etrunc.finite], labels = round(local.slopes[i.etrunc.finite], 2), cex = 0.75, col = "#BB0000")
+
+    # Estimated minimum: where the slope changes from negative to positive
+    i.trunc.valid <- which(abs((local.slopes - acc.order) / acc.order) < 0.1)
+    if (length(i.trunc.valid) > 0) {
+      zero.trunc <- FALSE
+      # Extending it because the local regression used +-1 points at the ends
+      i.trunc.valid <- sort(unique(c(i.trunc.valid-1, i.trunc.valid, i.trunc.valid+1)))
+      # If there are more than 1 run, pick the longest one
+      # However, if it is shorter than 5 (2 points were added artificially; we want a length-3 run), discard it
+      itv.runs <- splitRuns(i.trunc.valid)
+      itv.len <- sapply(itv.runs, length)
+      if (length(itv.runs) > 1)
+        i.trunc.valid <- itv.runs[[which.max(itv.len)]]
+      if (length(i.trunc.valid) >= 5) {
+        i.round <- seq(1, (min(i.trunc.valid)-1))
+      } else {  # If the truncation error is too erratic, treat everything as a rounding error
+        zero.trunc <- zte < max.rel.error
+        i.round <- which(etrunc != 0 & is.finite(etrunc))
+      }
+    } else {  # Maybe the higher-order derivatives are close to zero compared to the function noise?
+      zero.trunc <- zte < max.rel.error
+      # If the truncation error is zero, treat everything as a rounding error
+      i.round <- which(etrunc != 0 & is.finite(etrunc))
+    }
+
+    if ((!zero.trunc) && length(i.trunc.valid) >= 3) {  # It makes sense to equate the two errors
+      # Check-like function of two parameters: horizontal and vertical location
+      checkFit <- function (theta, x, a, m) {
+        (theta[2]-m*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
+      }
+      # Pseudo-Huber loss with knee radius
+      phuber <- function(x, r) r^2 * (sqrt(1 + (x/r)^2) - 1)
+      penalty <- function(theta, a, m, subset) {
+        ehat <- checkFit(theta = theta, x = log2h, a, m)
+        resid <- log2e - ehat
+        rmad <- median(abs(resid), na.rm = TRUE)
+        mean(phuber(resid, r = rmad)[subset], na.rm = TRUE)
+      }
+      # Objective function of the two parameters only
+      sbst <- sort(unique(c(i.trunc.valid, i.round)))
+      fobj <- function (theta) penalty(theta, a = acc.order, m = deriv.order, subset = sbst)
+
+      # Constrained optimisation on a reasonable range
+      # Initial value: median of 3 lowest points
+      theta0 <- c(median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e, na.rm = TRUE))
+      ui <- rbind(diag(2), -diag(2))
+      ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
+               -c(max(log2h), unname(quantile(log2e, 0.75, na.rm = TRUE))))
+      opt <- constrOptim(theta = theta0, f = fobj, grad = NULL, ui = ui, ci = ci, control = list(reltol = 1e-6))
+      # Left branch: t2 - m*(x-t1), right branch: t2 + a*(x-t1)
+      # Working in logarithms: the difference between the two at hopt must be log(a)
+      # (a+m) * (x-hopt0) = -log(a) --> hopt = hopt0 / a^(1/(m+a))
+      # This ensures that etrunc/eround = 1/a
+      hopt0   <- if (!zero.trunc) 2^opt$par[1] else 0.001 * max(1, abs(x))
+      hopt <- hopt0 / (acc.order^(1/(deriv.order + acc.order)))
+      hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, m = deriv.order)
+    } else {  # Zero truncation --> choosing the smallest error that yields a non-zero total-error estimate
+      hopt <- hgrid[min(i.etrunc.finite)]
+    }
+    log2hopt <- log2(hopt)
+    # points(log2h[sbst], log2e[sbst], pch = 16)
+    # lines(log2h, log2(hat.check), lty = 2)
+
+    if (length(i.trunc.valid) < 5) {
+      warning("Fewer than 3 observations in the truncation branch! Resorting to a safe option.")
+      # At the optimum, the rounding error should be approx. |(e^(2/3) f^(2/3) f'''^(1/3))/(2^(2/3) 3^(1/3))|
+      # However, if f''' ~ 0, we use only the rounding branch and compare it to the optimal value
+      # if f''' ~ 1
+      exitcode <- 1
+    }
+  } else {
+    zero.trunc <- TRUE
+    exitcode <- 2
+  }
+
+  if (exitcode > 0) {
+    complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
+    f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
+    if (f0 < .Machine$double.eps) f0 <- .Machine$double.eps
+    expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
+    # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
+    # which implies that a large fail-safe step can be chosen
+    mean.sign <- mean(sign(diff(eround[is.finite(eround)])))
+    if (mean.sign > 0.5) {  # Preferring a slightly larger step size
+      hopt <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order,
+                        zero.tol = .Machine$double.eps^(1/3))
+    } else {
+      # Otherwise, for an eround that does not grow convincingly, find the step that approximates
+      # the theoretical expected value
+      hopt  <- hgrid[which.min(abs(eround - expected.eround))]
+    }
+    log2hopt <- log2(hopt)
+    # TODO: generalise; do the theory!
+  }
+
+  if (plot) {
+    if (any(is.finite.etrunc)) {
+      elabels <- rep("b", n)
+      elabels[i.round] <- "r"
+      elabels[i.trunc.valid] <- "g"
+      slope.rel.err <- (local.slopes - acc.order) / acc.order
+      i.trunc.okay <- which(slope.rel.err > 0 & abs(slope.rel.err) <= 0.5)
+      i.trunc.okay <- setdiff(i.trunc.okay, i.trunc.valid)
+      i.trunc.okay <- i.trunc.okay[i.trunc.okay > (max(i.round)-3)]  # To avoid random jumps in the rounding part
+      elabels[i.trunc.okay] <- "o"
+      i.trunc.increasing <- (c(NA, diff(etrunc)) > 0) | (c(diff(etrunc), NA) > 0)
+      i.trunc.increasing <- setdiff(which(i.trunc.increasing), c(i.trunc.okay, i.trunc.valid))
+      if (length(i.trunc.increasing) > 0) i.trunc.increasing <- i.trunc.increasing[i.trunc.increasing >= (max(i.round)-2)]
+      if (length(i.trunc.increasing) > 0 & length(c(i.trunc.valid, i.trunc.okay)) > 0)
+        i.trunc.increasing <- i.trunc.increasing[i.trunc.increasing <= (max(i.trunc.valid, i.trunc.okay)-2)]
+      elabels[i.trunc.increasing] <- "i"
+
+      etrunc0 <- etrunc
+      etrunc0[etrunc0 == 0] <- NA
+      plotTE(hgrid = hgrid, etotal = etrunc0, eround = eround, elabels = elabels,
+             hopt = hopt, echeck = hat.check, epsilon = max.rel.error, xlim = range)
+    } else {
+      warning("Cannot plot: there are no reliable non-zero error estimates.")
+    }
+  }
+
+  # Approximating f'(hopt) by linear interpolation between 2 closest points
+  i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
+  h.closest <- hgrid[i.closest]
+  cd.closest <- cds[[1]][i.closest]
+  cd <- approx(x = h.closest, y = cd.closest, xout = hopt)$y
+  if (!zero.trunc) {
+    et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
+  } else {
+    et <- zte
+  }
+  er <- if (!zero.trunc) et * acc.order else mean(eround[i.closest])
+
+  msg <- switch(exitcode + 1,
+                "target error ratio reached within tolerance",
+                "truncation branch slope is close to zero, relying on the expected rounding error",
+                "truncation error is near-zero, relying on the expected rounding error"
+  )
+
+  diag.list <- list(h = hgrid, x = xgrid, f = fgrid,
+                    deriv = cbind(f = cds[[1]], fhigher = cds[[2]]),
+                    est.error = cbind(etrunc = etrunc, eround = eround))
+
+  ret <- list(par = hopt, value = cd, counts = n,
+              exitcode = exitcode, message = msg,
+              abs.error = c(trunc = et, round = er),
+              method = "Kink", iterations = diag.list)
+  class(ret) <- "stepsize"
+  return(ret)
+}
+
+#' Estimated total error plot
 #'
 #' Visualises the estimated truncation error, rounding error, and total error
 #' used in automatic step-size selection for numerical differentiation.
@@ -1237,48 +1618,59 @@ step.M <- function(FUN, x, h0 = NULL, range = NULL, shrink.factor = 0.5,
 #'   acceptable but slightly deviates from the expected behaviour.
 #' @param eps Numeric scalar: condition error, i.e. the error bound for the accuracy of the evaluated
 #' function; used for labelling rounding error assumptions.
-#' @param delta Numeric scalar: subtraction cancellation error, used for labelling rounding error
-#'   assumptions.
 #' @param ... Additional graphical parameters passed to \code{plot()}.
 #'
 #' @returns Nothing (invisible null).
 #' @export
 #'
 #' @examples
-#' hgrid <- 10^seq(-8, 3, 0.25)
-#' plotTE(hgrid, etrunc = 2e-12 * hgrid^2 + 1e-14 / hgrid,
-#'        eround = 1e-14 / hgrid, hopt = 0.4, i.increasing = 30:45, i.good = 32:45)
-plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
-                   i.increasing = NULL, i.good = NULL, i.okay = NULL,
-                   eps = .Machine$double.eps/2, delta = .Machine$double.eps/2, ...) {
-  etotal <- etrunc + eround
-  evec <- c(etotal, etrunc, eround)
-  yl <- range(evec[is.finite(evec) & evec != 0])
-  etrunc.good <- etrunc[is.finite(etrunc)]
-  min.trunc <- if (any(etrunc.good > 0)) min(etrunc.good[etrunc.good > 0]) else yl[1]
-  # If the rounding error is too steep, cut the plot to 1/3 of it below min(etrunc)
-  if (log10(yl[1]) - log10(min.trunc) < -4) yl[1] <- min.trunc^(2/3) * yl[1]^(1/3)
-  plot(hgrid[etotal != 0], etotal[etotal != 0], log = "xy", bty = "n",
-       ylim = yl,
+#'
+#' a <- step.K(sin, 1)
+#' hgrid <- a$iterations$h
+#' etotal <- a$iterations$est.error[, 1]
+#' eround <- a$iterations$est.error[, 2]
+#' elabels <- c(rep("r", 32), rep("i", 2), rep("g", 12), rep("b", 15))
+#' hopt <- a$par
+#' plotTE(hgrid, etotal = 2e-12 * hgrid^2 + 1e-14 / hgrid,
+#'        eround = 1e-14 / hgrid, hopt = 0.4, i.increasing = 30:45, i.good = 32:45,
+#'        abline.round = c(-46.5, -1))
+plotTE <- function(hgrid, etotal, eround, hopt = NULL,
+                   elabels = NULL, echeck = NULL,
+                   epsilon = .Machine$double.eps^(7/8), ...) {
+  cols <- c("#7e1fde", "#328d2d", "#d58726", "#ca203a")
+  evec <- c(etotal, eround)
+  good.inds <- is.finite(etotal) & (etotal != 0)
+  yl <- range(etotal[good.inds])
+  plot(hgrid[good.inds], etotal[good.inds],
+       log = "xy", bty = "n", ylim = yl,
        ylab = "Estimated abs. error in df/dx", xlab = "Step size",
        main = "Estimated error vs. finite-difference step size", ...)
-  graphics::points(hgrid[etrunc != 0], etrunc[etrunc != 0], pch = 0, cex = 0.7)
-  graphics::points(hgrid[eround != 0], eround[eround != 0], pch = 4, cex = 0.7)
-  graphics::mtext(paste0("assuming rel. condition err. < ", printE(eps),
-                         ", rel. subtractive err. < ", printE(delta)), cex = 0.8, line = 0.5)
+  graphics::mtext(paste0("assuming max. rel. numerical err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
+  i.round      <- which(elabels == "r")
+  i.good       <- which(elabels == "g")
+  i.ok         <- which(elabels == "o")
+  i.increasing <- which(elabels == "i")
+  i.bad        <- which(elabels == "b")
+  if (length(i.round) > 0)
+    graphics::points(hgrid[i.round], etotal[i.round], pch = 16, col = cols[1], cex = 0.9)
   if (length(i.good) > 0)
-    graphics::points(hgrid[i.good], etrunc[i.good], pch = 16, lwd = 2, col = "#22AA00", cex = 0.8)
-  if (length(i.increasing) > 0) {
-    i.invalid <- setdiff(i.increasing, i.good)
-    graphics::points(hgrid[i.invalid], etrunc[i.invalid], pch = 16, col = "#CC3333", cex = 0.8)
-  }
-  if (length(i.okay) > 0)
-    graphics::points(hgrid[i.okay], etrunc[i.okay], pch = 16, col = "#CC7700", cex = 0.80)
-  if (!is.null(hopt)) graphics::abline(v = hopt, lty = 2, col = "#00000088")
-  graphics::legend("top", c("Truncation", "Rounding", "Total"), pch = c(0, 4, 1),
-                   pt.cex = c(0.7, 0.7, 1), ncol = 3, box.col = "#FFFFFF00", bg = "#FFFFFFEE")
-  graphics::legend("bottom", c("Good", "Fair", "Invalid"), pch = 16, col = c("#22AA00", "#CC7700", "#CC3333"),
-                   ncol = 3, box.col = "#FFFFFF00", bg = "#FFFFFFEE")
+    graphics::points(hgrid[i.good], etotal[i.good], pch = 16, col = cols[2], cex = 0.9)
+  if (length(i.ok) > 0)
+    graphics::points(hgrid[i.ok], etotal[i.ok], pch = 16, col = cols[3], cex = 0.9)
+  if (length(i.increasing) > 0)
+    graphics::points(hgrid[i.increasing], etotal[i.increasing], pch = 16, col = cols[4], cex = 0.9)
+  if (length(i.bad) > 0)
+    graphics::points(hgrid[i.bad], etotal[i.bad], pch = 4, col = "#00000088", cex = 0.9)
+
+  graphics::lines(hgrid, eround, col = "#000000", lty = 3)
+
+  if (!is.null(echeck)) graphics::lines(hgrid, echeck, col = "#FFFFFFBB", lwd = 3)
+  if (!is.null(echeck)) graphics::lines(hgrid, echeck)
+
+  if (!is.null(hopt)) graphics::abline(v = hopt, lty = 3, col = "#00000088")
+  graphics::legend("topleft", c("Rounding", "Trunc. good", "Trunc. fair", "Trunc. invalid"),
+                   pch = 16, col = cols,
+                   box.col = "#FFFFFF00", bg = "#FFFFFFAA", ncol = 2)
   return(invisible(NULL))
 }
 
@@ -1294,16 +1686,13 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
 #'   procedure is requested; otherwise, it is absolute.
 #' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
-#'   \code{"CR"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
+#'   \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 #'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
 #'   \insertCite{mathur2012analytical}{pnd}.
-#' @param diagnostics Logical: if \code{TRUE}, returns the full iteration history
-#'   including all function evaluations. Passed to the appropriate \code{step.XX} function.
 #' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
-#'   if \code{control$diagnostics} is \code{TRUE}, full iteration history
-#'   including all function evaluations is returned; different methods have
-#'   slightly different diagnostic outputs.
+#'   full iteration history including all function evaluations is returned, but
+#'   different methods have slightly different diagnostic outputs.
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
 #'
@@ -1328,7 +1717,7 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #'   \code{3} indicates a solution at the boundary of the allowed value range,
 #'   \code{4} signals that the maximum number of iterations was reached.
 #'   \code{message} -- summary messages of the exit status.
-#'   If \code{method.ards$diagnostics} is \code{TRUE}, \code{iterations} is a list of lists
+#'   \code{iterations} is a list of lists
 #'   including the full step size search path, argument grids, function values on
 #'   those grids, estimated error ratios, and estimated derivative values for
 #'   each coordinate.
@@ -1336,8 +1725,9 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #'
 #' @seealso [step.CR()] for Curtis--Reid (1974) and its modification,
 #'   [step.DV()] for Dumontet--Vignes (1977),
-#'   [step.SW()] for Stepleman--Winarsky (1979), and
-#'   [step.M()] for Mathur (2012).
+#'   [step.SW()] for Stepleman--Winarsky (1979),
+#'   [step.M()] for Mathur (2012), and
+#'   [step.K()] for Kostyrka (2026).
 #'
 #' @references
 #' \insertAllCited{}
@@ -1351,7 +1741,7 @@ plotTE <- function(hgrid, etrunc, eround, hopt = NULL,
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
 gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
-                     method = c("plugin", "SW", "CR", "CRm", "DV", "M"), diagnostics = FALSE, control = NULL,
+                     method = c("plugin", "SW", "CR", "CRm", "DV", "M", "K"), control = NULL,
                      cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                      cl = NULL, ...) {
   # TODO: implement "all"
@@ -1382,25 +1772,30 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
   # The h0 and range arguments are updated later
-  default.args <- list(plugin = list(h0 = h0[1], range = h0[1] / c(1e4, 1e-4),
-                                 cores = cores, preschedule = preschedule,
-                                 cl = cl, diagnostics = diagnostics),
-                       CR = list(h0 = h0[1], version = "original", aim = 100, acc.order = 2, tol = 10,
+  default.args <- list(plugin = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
+                                     range = h0[1] / c(1e4, 1e-4),
+                                     cores = cores, preschedule = preschedule, cl = cl),
+                       CR = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
+                                 version = "original", aim = 100, acc.order = 2, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
-                       CRm = list(h0 = h0[1], version = "modified", aim = 1, acc.order = 2, tol = 4,
+                                 cores = cores, preschedule = preschedule, cl = cl),
+                       CRm = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
+                                  version = "modified", aim = 1, acc.order = 2, tol = 4,
                                   range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
-                                  cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
-                       DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(3/4),
+                                  cores = cores, preschedule = preschedule, cl = cl),
+                       DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(7/8),
                                  ratio.limits = c(2, 15), maxit = 40L,
-                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl),
                        SW = list(h0 = h0[1], shrink.factor = 0.5, range = h0[1] / c(1e12, 1e-8),
                                  seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
-                                 cores = cores, preschedule = preschedule, cl = cl, diagnostics = diagnostics),
+                                 cores = cores, preschedule = preschedule, cl = cl),
                        M = list(h0 = h0[1], range = h0[1] / 2^c(36, -24), shrink.factor = 0.5,
+                                max.rel.error = .Machine$double.eps^(7/8),
                                 min.valid.slopes = 5L, seq.tol = 0.01, correction = TRUE,
-                                cores = cores, preschedule = preschedule, cl = cl,
-                                diagnostics = diagnostics, plot = FALSE))
+                                cores = cores, preschedule = preschedule, cl = cl, plot = FALSE),
+                       K = list(h0 = h0[1], range = h0[1] / 2^c(36, -24), shrink.factor = 0.5,
+                                max.rel.error = .Machine$double.eps^(7/8),
+                                plot = FALSE, cores = cores, preschedule = preschedule, cl = cl))
   margs <- default.args[[method]]
   if (!is.null(control)) {
     bad.args <- setdiff(names(control), names(margs))
@@ -1415,7 +1810,8 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
     stop(paste0("The arguments ", pasteAnd(conflicting.args), " of your function coincide with ",
            "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
            "incorporate the '...' explicitly."))
-  autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV, SW = step.SW, M = step.M)
+  autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV,
+                    SW = step.SW, M = step.M, K = step.K)
 
   f.arg.list <- lapply(seq_along(x), function(i) {
     FUN1 <- function(z) { # Scalar version of FUN
@@ -1436,11 +1832,14 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
               counts = do.call(rbind, lapply(ret.list, "[[", "counts")),
               exitcode = do.call(c, lapply(ret.list, "[[", "exitcode")),
               message = do.call(c, lapply(ret.list, "[[", "message")),
-              abs.err = do.call(c, lapply(ret.list, "[[", "abs.error")),
+              abs.error = if (length(x) == 1) unlist(lapply(ret.list, "[[", "abs.error")) else do.call(rbind, lapply(ret.list, "[[", "abs.error")),
+              method = method,
               iterations = lapply(ret.list, "[[", "iterations"))
   ret[names(ret) != "counts"] <- lapply(ret[names(ret) != "counts"],
                                         function(z) structure(z, names = names(x)))
   if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
+
+  class(ret) <- "gradstep"
 
   return(ret)
 }

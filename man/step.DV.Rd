@@ -9,13 +9,12 @@ step.DV(
   x,
   h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
   range = h0/c(1e+06, 1e-06),
-  max.rel.error = .Machine$double.eps^(3/4),
+  max.rel.error = .Machine$double.eps^(7/8),
   ratio.limits = c(2, 15),
   maxit = 40L,
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
-  diagnostics = FALSE,
   ...
 )
 }
@@ -58,32 +57,28 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
-including all function evaluations.
-Note: the history tracks the third derivative, not the first.}
-
 \item{...}{Passed to FUN.}
 }
 \value{
-A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-step size found, \code{value} -- the estimated numerical first derivative (central
-differences), \code{counts} -- the number of iterations (each iteration includes
-four function evaluations), \code{abs.error} -- an estimate of the total
-approximation error (sum of truncation and rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates optimal termination within tolerance,
-\code{1} means that the third derivative is zero (large step size preferred),
-\code{3} indicates a solution at the boundary of the allowed value range,
-\code{4} signals that the maximum number of iterations was reached and the
-found optimal step size belongs to the allowed range,
-\code{5} occurs when the maximum number of iterations was reached and the
-found optimal step size did belong to the allowed range and had to be snapped
-to one end.
-\code{6} is used when \code{maxit = 1} and no search was performed.
-\code{message} is a summary message of the exit status.
-If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-including the full step size search path (NB: for the 3rd derivative),
-argument grids, function values on those grids, and estimated 3rd derivative values.
+A list similar to the one returned by \code{optim()}:
+\itemize{
+\item \code{par} – the optimal step size found.
+\item \code{value} – the estimated numerical first derivative (using central differences).
+\item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{exitcode} – an integer code indicating the termination status:
+\itemize{
+\item \code{0} – Optimal termination within tolerance.
+\item \code{1} – Third derivative is zero; large step size preferred.
+\item \code{3} – Solution lies at the boundary of the allowed value range.
+\item \code{4} – Maximum number of iterations reached; optimal step size is within the allowed range.
+\item \code{5} – Maximum number of iterations reached; optimal step size was outside allowed range and had to be snapped to a boundary.
+\item \code{6} – No search was performed (used when \code{maxit = 1}).
+}
+\item \code{message} – A summary message of the exit status.
+\item \code{iterations} – A list including the full step size search path (note: for the third derivative),
+argument grids, function values on those grids, and estimated third derivative values.
+}
 }
 \description{
 Dumontet--Vignes automatic step selection
@@ -93,14 +88,17 @@ This function computes the optimal step size for central differences using the
 \insertCite{dumontet1977determination}{pnd} algorithm.
 If the estimated third derivative is exactly zero, the function assumes a third
 derivative of 1 to prevent division-by-zero errors.
+
+Note: the iteration history tracks the third derivative, not the first.
 }
 \examples{
 f <- function(x) x^4
 step.DV(x = 2, f)
-step.DV(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
+step.DV(x = 2, f, h0 = 1e-3)
 
 # Plug-in estimator with only one evaluation of f'''
 step.DV(x = 2, f, maxit = 1)
+step.plugin(x = 2, f)
 }
 \references{
 \insertAllCited{}

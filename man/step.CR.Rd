@@ -8,6 +8,7 @@ step.CR(
   FUN,
   x,
   h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
+  max.rel.error = .Machine$double.eps^(7/8),
   version = c("original", "modified"),
   aim = if (version[1] == "original") 100 else 1,
   acc.order = c(2L, 4L),
@@ -18,7 +19,6 @@ step.CR(
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
-  diagnostics = FALSE,
   ...
 )
 }
@@ -65,27 +65,28 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
-including all function evaluations.}
-
 \item{...}{Passed to \code{FUN}.}
 }
 \value{
-A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-step size found, \code{value} -- the estimated numerical first derivative (central differences;
-very useful for computationally expensive functions), \code{counts} -- the number of
-iterations (each iteration includes three function evaluations), \code{abs.error} --
-an estimate of the total approximation error (sum of truncation and rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates optimal termination within tolerance,
-\code{1} means that the third derivative is zero (large step size preferred),
-\code{2} is returned if there is no change in step size within tolerance,
-\code{3} indicates a solution at the boundary of the allowed value range,
-\code{4} signals that the maximum number of iterations was reached.
-\code{message} -- a summary message of the exit status.
-If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-including the full step size search path, argument grids, function values on
-those grids, estimated error ratios, and estimated derivative values.
+A list similar to the one returned by \code{optim()}:
+\itemize{
+\item \code{par} – the optimal step size found.
+\item \code{value} – the estimated numerical first derivative (using central differences;
+especially useful for computationally expensive functions).
+\item \code{counts} – the number of iterations (each iteration includes three function evaluations).
+\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{exitcode} – an integer code indicating the termination status:
+\itemize{
+\item \code{0} – Optimal termination within tolerance.
+\item \code{1} – Third derivative is zero; large step size preferred.
+\item \code{2} – No change in step size within tolerance.
+\item \code{3} – Solution lies at the boundary of the allowed value range.
+\item \code{4} – Maximum number of iterations reached.
+}
+\item \code{message} – A summary message of the exit status.
+\item \code{iterations} – A list including the full step size search path, argument grids,
+function values on those grids, estimated error ratios, and estimated derivative values.
+}
 }
 \description{
 Curtis--Reid automatic step selection
@@ -115,7 +116,7 @@ to the beginning of one of the arguments of \code{\link[=step.CR]{step.CR()}}.
 \examples{
 f <- function(x) x^4
 step.CR(x = 2, f)
-step.CR(x = 2, f, h0 = 1e-3, diagnostics = TRUE)
+step.CR(x = 2, f, h0 = 1e-3)
 step.CR(x = 2, f, version = "modified")
 step.CR(x = 2, f, version = "modified", acc.order = 4)
 

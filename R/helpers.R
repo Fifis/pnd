@@ -8,7 +8,20 @@ checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(att
 pasteAnd <- function(x) paste0(x, collapse = ", ")
 
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234
-printE <- function(x, d = 2) sprintf(paste0("%1.", d, "e"), x)
+printE <- function(x, d = 2) sprintf(paste0("%1.", d, ifelse(x >= 0.01 & x <= 10^d, "f", "e")), x)
+
+# Split a vector into contiguous runs
+splitRuns <- function(x) {
+  x <- sort(x)
+  splits <- c(0, which(diff(x) > 1), length(x))
+  runs <- vector("list", length(splits) - 1)
+  for (i in seq_along(runs)) {
+    start <- splits[i] + 1
+    end <- splits[i + 1]
+    runs[[i]] <- x[start:end]
+  }
+  runs
+}
 
 #' Number of core checks and changes
 #'

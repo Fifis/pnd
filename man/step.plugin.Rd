@@ -8,11 +8,11 @@ step.plugin(
   FUN,
   x,
   h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
+  max.rel.error = .Machine$double.eps^(7/8),
   range = h0/c(10000, 1e-04),
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
   cl = NULL,
-  diagnostics = FALSE,
   ...
 )
 }
@@ -25,6 +25,13 @@ step.plugin(
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
 size for first derivarives is internallt translated into the initial step size for third
 derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
+
+\item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
+error of function evaluation. For highly accurate functions with all accurate bits
+is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+output of optimisation routines etc.), it is higher, typically
+\code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
+\code{.Machine$double.eps^(3/4) = 2e-12} for common functions.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
@@ -40,27 +47,26 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
-including all function evaluations.
-Note: the history tracks the third derivative, not the first.}
-
 \item{...}{Passed to FUN.}
 }
 \value{
-A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-step size found, \code{value} -- the estimated numerical first derivative (central
-differences), \code{counts} -- the number of iterations (here, it is 2),
-\code{abs.error} -- an estimate of the total approximation error (sum of truncation and
-rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates termination with checks passed tolerance,
-\code{1} means that the third derivative is exactly zero (large step size preferred),
-\code{2} signals that the third derivative is too close to zero (large step size preferred),
-\code{3} indicates a solution at the boundary of the allowed value range.
-\code{message} is a summary message of the exit status.
-If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-including the two-step size search path, argument grids, function values on those grids,
-and estimated 3rd derivative values.
+A list similar to the one returned by \code{optim()}:
+\itemize{
+\item \code{par} – the optimal step size found.
+\item \code{value} – the estimated numerical first derivative (using central differences).
+\item \code{counts} – the number of iterations (in this case, it is 2).
+\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{exitcode} – an integer code indicating the termination status:
+\itemize{
+\item \code{0} – Termination with checks passed tolerance.
+\item \code{1} – Third derivative is exactly zero; large step size preferred.
+\item \code{2} – Third derivative is too close to zero; large step size preferred.
+\item \code{3} – Solution lies at the boundary of the allowed value range.
+}
+\item \code{message} – A summary message of the exit status.
+\item \code{iterations} – A list including the two-step size search path, argument grids,
+function values on those grids, and estimated third derivative values.
+}
 }
 \description{
 Plug-in step selection
@@ -70,14 +76,14 @@ This function computes the optimal step size for central differences using the
 plug-in approach.
 The optimal step size is determined as the minimiser of the total error, which for central
 finite differences is (assuming minimal bounds for relative rounding errors)
-\deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x) \epsilon_{\mathrm{mach}}}}}{[(1.5 mach.eps * f' / f''')^(1/3)]}
+\deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x)} \epsilon_{\mathrm{mach}}}.}{(1.5 mach.eps * f' / f''')^(1/3).}
 If the estimated third derivative is too small, the function assumes a third
 derivative of 1 to prevent division-by-zero errors.
 }
 \examples{
 f <- function(x) x^4
 step.plugin(x = 2, f)
-step.plugin(x = 0, f, diagnostics = TRUE)  # f''' = 0, setting a large one
+step.plugin(x = 0, f)  # f''' = 0, setting a large one
 }
 \references{
 \insertAllCited{}

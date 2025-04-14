@@ -8,12 +8,12 @@ step.M(
   FUN,
   x,
   h0 = NULL,
+  max.rel.error = .Machine$double.eps^(7/8),
   range = NULL,
   shrink.factor = 0.5,
   min.valid.slopes = 5L,
   seq.tol = 0.01,
   correction = TRUE,
-  diagnostics = FALSE,
   plot = FALSE,
   cores = 1,
   preschedule = getOption("pnd.preschedule", TRUE),
@@ -48,9 +48,6 @@ continuation of the downwards slope of the total error); otherwise, returns
 the grid point that is is lowest in the increasing sequence of valid error
 estimates.}
 
-\item{diagnostics}{Logical: if \code{TRUE}, returns the full iteration history
-including all function evaluations.}
-
 \item{plot}{Logical: if \code{TRUE}, plots the estimated truncation and round-off
 errors.}
 
@@ -69,21 +66,23 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \item{...}{Passed to FUN.}
 }
 \value{
-A list similar to the one returned by \code{optim()}: \code{par} -- the optimal
-step size found, \code{value} -- the estimated numerical first derivative (central
-differences), \code{counts} -- the number of iterations (each iteration includes
-two function evaluations), \code{abs.error} -- an estimate of the total
-approximation error (sum of truncation and rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates optimal termination due to a sequence of correct reductions,
-\code{1} indicates that the reductions are slightly not within tolerance,
-\code{2} indicates that the tolerances are so wrong, an approximate minimum is returned,
-\code{3} signals that there are not enough finite function values and the rule of thumb is returned.
-\code{message} is a summary message of the exit status.
-If \code{diagnostics} is \code{TRUE}, \code{iterations} is a list
-including the full step size search path,
-argument grids, function values on those grids, estimated derivative values,
-estimated error values, and monotonicity check results.
+A list similar to the one returned by \code{optim()}:
+\itemize{
+\item \code{par} – the optimal step size found.
+\item \code{value} – the estimated numerical first derivative (using central differences).
+\item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{exitcode} – an integer code indicating the termination status:
+\itemize{
+\item \code{0} – Optimal termination due to a sequence of correct reductions.
+\item \code{1} – Reductions are slightly outside the tolerance.
+\item \code{2} – Tolerances are significantly violated; an approximate minimum is returned.
+\item \code{3} – Not enough finite function values; a rule-of-thumb value is returned.
+}
+\item \code{message} – A summary message of the exit status.
+\item \code{iterations} – A list including the step and argument grids,
+function values on those grids, estimated derivative values, and estimated error values.
+}
 }
 \description{
 Mathur's AutoDX-like automatic step selection
