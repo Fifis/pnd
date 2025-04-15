@@ -1170,18 +1170,18 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
     if (is.na(hopt0)) {
       m3 <- med3lowest(hgrid, log2etrunc, tstar, hnaive, h0)
       i.hopt <- m3$i.hopt
-      hopt0 <- m3$hopt0
-      hopt <- m3$hopt
+      hopt0 <- min(h0, m3$hopt0)  # Fail-safe: the bandwidth cannot be too large
+      hopt <- min(h0, m3$hopt)
       exitcode <- m3$exitcode
     } else {
       i.hopt <- which(hgrid == hopt0)
       hopt <- hopt0 * (1 / tstar)^(1/3) # TODO: any power
     }
-  } else {
+  } else {  # Fail-safe return for cases like x^2 at 0
     m3 <- med3lowest(hgrid, log2etrunc, tstar, hnaive, h0)
     i.hopt <- m3$i.hopt
-    hopt0 <- m3$hopt0
-    hopt <- m3$hopt
+    hopt0 <- min(h0, m3$hopt0)  # Because hopt0 can be gigantic
+    hopt <- min(h0, m3$hopt)
     exitcode <- m3$exitcode
 
     if (exitcode == 2)
@@ -1223,10 +1223,10 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
       i.okay <- if (!is.null(i.increasing) && exists("okay.slopes")) i.increasing[okay.slopes] else NULL
     i.round <- 1:min(i.hopt, i.good, i.okay, i.increasing)
     elabels <- rep("b", n)
+    elabels[i.increasing] <- "i"
     elabels[i.round] <- "r"
     elabels[i.good] <- "g"
-    elabels[i.okay] <- "o"
-    elabels[i.increasing] <- "i"
+    elabels[i.okay] <- "o"  # In increasing order of priority
 
     plotTE(hgrid = hgrid, etotal = etrunc, eround = eround, hopt = hopt,
            elabels = elabels, epsilon = max.rel.error)
@@ -1309,11 +1309,9 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
   if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
-  if (acc.order %% 2 != 0) stop("acc.order must be even because the differences are central.")
   if (!is.numeric(shrink.factor) || shrink.factor <= 0 || shrink.factor >= 1)
     stop("'shrink.factor' must be strictly greater than 0 and less than 1. Recommended: 0.5.")
-  if (acc.order %% 2 != 0)
-    stop("'acc.order' must be even for central differences.")
+  if (acc.order %% 2 != 0) stop("'acc.order' must be even for central differences.")
 
   cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a reasonably large power of 2
@@ -1425,11 +1423,15 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   log2e[log2e == -Inf] <- NA
   # plot(log2h, log2e)
 
+  # Check-like function of two parameters: horizontal and vertical location
+  checkFit <- function (theta, x, a, m) (theta[2]-m*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
+
   # If the function is symmetric / low-degree polynomial, the truncation error is always zero -- return
   # the safe option; otherwise, carry out a search
   is.finite.etrunc <- is.finite(log2e)
   n.good <- sum(is.finite.etrunc)
-  if (n.good >= 3) {
+  is.good.round <- n.good >= 3
+  if (is.good.round) {
     # Identifying regions of rounding, valid truncation, and invalid truncation
     # whilst also safeguarding against noisiness; define the slope at a point as
     # the average right and left slope
@@ -1470,16 +1472,13 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     }
 
     if ((!zero.trunc) && length(i.trunc.valid) >= 3) {  # It makes sense to equate the two errors
-      # Check-like function of two parameters: horizontal and vertical location
-      checkFit <- function (theta, x, a, m) {
-        (theta[2]-m*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
-      }
       # Pseudo-Huber loss with knee radius
       phuber <- function(x, r) r^2 * (sqrt(1 + (x/r)^2) - 1)
       penalty <- function(theta, a, m, subset) {
         ehat <- checkFit(theta = theta, x = log2h, a, m)
         resid <- log2e - ehat
         rmad <- median(abs(resid), na.rm = TRUE)
+        if (rmad < max.rel.error) rmad <- mean(abs(resid), na.rm = TRUE)
         mean(phuber(resid, r = rmad)[subset], na.rm = TRUE)
       }
       # Objective function of the two parameters only
@@ -1488,11 +1487,15 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
       # Constrained optimisation on a reasonable range
       # Initial value: median of 3 lowest points
-      theta0 <- c(median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e, na.rm = TRUE))
-      ui <- rbind(diag(2), -diag(2))
-      ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
-               -c(max(log2h), unname(quantile(log2e, 0.75, na.rm = TRUE))))
-      opt <- constrOptim(theta = theta0, f = fobj, grad = NULL, ui = ui, ci = ci, control = list(reltol = 1e-6))
+      theta0 <- c(median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e[sbst], na.rm = TRUE))
+
+      # ui <- rbind(diag(2), -diag(2))
+      # ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
+      #          -c(max(log2h), unname(quantile(log2e, 0.75, na.rm = TRUE))))
+      # opt <- constrOptim(theta = theta0, f = fobj, grad = NULL, ui = ui, ci = ci, control = list(reltol = 1e-6))
+      opt <- optim(par = theta0, fn = fobj, method = "BFGS", control = list(reltol = .Machine$double.eps^(1/3)))
+      # Unconstrained optimisation works fine; this is 10x faster than constrOptim
+
       # Left branch: t2 - m*(x-t1), right branch: t2 + a*(x-t1)
       # Working in logarithms: the difference between the two at hopt must be log(a)
       # (a+m) * (x-hopt0) = -log(a) --> hopt = hopt0 / a^(1/(m+a))
@@ -1543,12 +1546,16 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     if (any(is.finite.etrunc)) {
       elabels <- rep("b", n)
       elabels[i.round] <- "r"
-      elabels[i.trunc.valid] <- "g"
-      slope.rel.err <- (local.slopes - acc.order) / acc.order
-      i.trunc.okay <- which(slope.rel.err > 0 & abs(slope.rel.err) <= 0.5)
-      i.trunc.okay <- setdiff(i.trunc.okay, i.trunc.valid)
-      i.trunc.okay <- i.trunc.okay[i.trunc.okay > (max(i.round)-3)]  # To avoid random jumps in the rounding part
-      elabels[i.trunc.okay] <- "o"
+      if (is.good.round) {  # At least 3 points in the truncation branch
+        elabels[i.trunc.valid] <- "g"
+        slope.rel.err <- (local.slopes - acc.order) / acc.order
+        i.trunc.okay <- which(slope.rel.err > 0 & abs(slope.rel.err) <= 0.5) # Positive slope, +- 50% error
+        i.trunc.okay <- setdiff(i.trunc.okay, i.trunc.valid)
+        i.trunc.okay <- i.trunc.okay[i.trunc.okay > (max(i.round)-3)]  # To avoid random jumps in the rounding part
+        elabels[i.trunc.okay] <- "o"
+      } else {
+        i.trunc.valid <- i.trunc.ok <- NULL
+      }
       i.trunc.increasing <- (c(NA, diff(etrunc)) > 0) | (c(diff(etrunc), NA) > 0)
       i.trunc.increasing <- setdiff(which(i.trunc.increasing), c(i.trunc.okay, i.trunc.valid))
       if (length(i.trunc.increasing) > 0) i.trunc.increasing <- i.trunc.increasing[i.trunc.increasing >= (max(i.round)-2)]
@@ -1570,7 +1577,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   h.closest <- hgrid[i.closest]
   cd.closest <- cds[[1]][i.closest]
   cd <- approx(x = h.closest, y = cd.closest, xout = hopt)$y
-  if (!zero.trunc) {
+  if (!zero.trunc && exists("opt")) {  # If optimisation was carried out
     et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
   } else {
     et <- zte
@@ -1583,14 +1590,11 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                 "truncation error is near-zero, relying on the expected rounding error"
   )
 
-  diag.list <- list(h = hgrid, x = xgrid, f = fgrid,
-                    deriv = cbind(f = cds[[1]], fhigher = cds[[2]]),
+  diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cbind(f = cds[[1]], fhigher = cds[[2]]),
                     est.error = cbind(etrunc = etrunc, eround = eround))
 
-  ret <- list(par = hopt, value = cd, counts = n,
-              exitcode = exitcode, message = msg,
-              abs.error = c(trunc = et, round = er),
-              method = "Kink", iterations = diag.list)
+  ret <- list(par = hopt, value = cd, counts = n, exitcode = exitcode, message = msg,
+              abs.error = c(trunc = et, round = er), method = "Kink", iterations = diag.list)
   class(ret) <- "stepsize"
   return(ret)
 }
@@ -1640,12 +1644,16 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
   cols <- c("#7e1fde", "#328d2d", "#d58726", "#ca203a")
   evec <- c(etotal, eround)
   good.inds <- is.finite(etotal) & (etotal != 0)
+  if (!any(good.inds)) {
+    warning("The truncation error is either exactly 0 or NA. Nothing to plot.")
+    return(invisible(NULL))
+  }
   yl <- range(etotal[good.inds])
   plot(hgrid[good.inds], etotal[good.inds],
        log = "xy", bty = "n", ylim = yl,
        ylab = "Estimated abs. error in df/dx", xlab = "Step size",
        main = "Estimated error vs. finite-difference step size", ...)
-  graphics::mtext(paste0("assuming max. rel. numerical err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
+  graphics::mtext(paste0("assuming max. rel. err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
   i.round      <- which(elabels == "r")
   i.good       <- which(elabels == "g")
   i.ok         <- which(elabels == "o")
@@ -1668,8 +1676,8 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
   if (!is.null(echeck)) graphics::lines(hgrid, echeck)
 
   if (!is.null(hopt)) graphics::abline(v = hopt, lty = 3, col = "#00000088")
-  graphics::legend("topleft", c("Rounding", "Trunc. good", "Trunc. fair", "Trunc. invalid"),
-                   pch = 16, col = cols,
+  graphics::legend("topleft", c("Rounding", "Trunc. good", "Trunc. fair", "Trunc. growing", "Invalid"),
+                   pch = c(16, 16, 16, 16, 4), col = c(cols, "#000000"),
                    box.col = "#FFFFFF00", bg = "#FFFFFFAA", ncol = 2)
   return(invisible(NULL))
 }
