@@ -258,6 +258,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @param acc.order Integer or vector of integers specifying the desired accuracy order
 #'   for each element of \code{x}.
 #'   The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
+#' @param stencil Optional custom vector of points for function evaluation.
+#'   Must include at least \code{m+1} points for the \code{m}-th order derivative.
 #' @param side Integer scalar or vector indicating the type of finite difference:
 #'   \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 #'   Central differences are recommended unless computational cost is prohibitive.
@@ -319,6 +321,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
+#' @order 1
 #' @export
 #'
 #' @examples
@@ -461,15 +464,12 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   # If all deriv.order, acc.order, side are the same, invert Vandermonde matrices only once
   if ((length(unique(deriv.order)) == 1 && length(unique(acc.order)) == 1 &&
       length(unique(side)) == 1) || !is.null(stencil)) {
-    if (is.null(stencil)) {
-      stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1])
-    } else {
-      stencil1 <- stencil
-    }
+    # Default stencil or, if not null, the user-supplied one
+    stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1], stencil = stencil)
     stencils <- replicate(n, stencil1, simplify = FALSE)
   } else {
     stencils <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i],
-                                               acc.order = acc.order[i], side = side[i]))
+                                               acc.order = acc.order[i], side = side[i], stencil = stencil))
   }
 
   # Vectorisation can be inferred if FUN(x) is supplied

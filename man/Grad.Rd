@@ -63,6 +63,9 @@ Central differences are recommended unless computational cost is prohibitive.}
 for each element of \code{x}.
 The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
+\item{stencil}{Optional custom vector of points for function evaluation.
+Must include at least \code{m+1} points for the \code{m}-th order derivative.}
+
 \item{h}{Numeric or character specifying the step size(s) for the numerical
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
 \code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
@@ -101,11 +104,7 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
 \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
 
-\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
-matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
-to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
-because the latter is a named argument of these functions. Either supply the full names of all
-similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
+\item{...}{Ignored.}
 }
 \value{
 Numeric vector of the gradient. If \code{FUN} returns a vector,
