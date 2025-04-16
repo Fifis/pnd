@@ -47,7 +47,7 @@ test_that("function dimension check works", {
 
 test_that("Grad works with automatic step sizes", {
   f <- function(x) x^2 - 2*x + 2
-  expect_equal(as.numeric(Grad(f, x = 0.75, h = "CR")), -0.5, tolerance = 1e-8)
+  expect_equal(as.numeric(Grad(f, x = 0.75, h = "CRm")), -0.5, tolerance = 1e-8)
 })
 
 test_that("Grad can accept dot arguments", {
@@ -55,6 +55,11 @@ test_that("Grad can accept dot arguments", {
   # and gradstep()
   f <- function(x, a0) sin(x + a0)
   expect_equal(Grad(f, x = 0, a0 = 1, h = 1e-5), Grad(sin, x = 1, h = 1e-5))
-  expect_equal(attr(suppressMessages(Grad(f, x = 0, a0 = 1, h = "CR")),
-                    "step.search")$exitcode, 0)
+  expect_equal(attr(Grad(f, x = 0, a0 = 1, h = "SW"), "step.search")$exitcode, 0)
+})
+
+test_that("Grad can work on an arbitrary stencil", {
+  d2 <- Grad(sin, 1, h = 1e-4, stencil = c(-1, 1))
+  d4 <- Grad(sin, 1, h = 1e-4, stencil = c(-2, -1, 1, 2))
+  expect_lt(abs(cos(1) - d4), abs(cos(1) - d2))
 })

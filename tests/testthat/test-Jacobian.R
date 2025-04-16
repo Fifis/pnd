@@ -27,6 +27,19 @@ test_that("Jacobian can accept dot arguments", {
   expect_equal(Jacobian(f, x = 1, a0 = 1, h = 1e-5), Jacobian(f1, x = 1, h = 1e-5))
 })
 
+test_that("Jacobian can work on an arbitrary stencil", {
+  f <- function(x) c(sum(sin(x[1:2])), exp(x[3]))
+  jac <- rbind(c(cos(1:2), 0), c(0, 0, exp(3)))
+  d2 <- Jacobian(f, 1:3, h = 1e-4, stencil = c(-1, 1))
+  d4 <- Jacobian(f, 1:3, h = 1e-4, stencil = c(-2, -1, 1, 2))  # More accurate for a large step
+  expect_equal(d2, d4, tolerance = 1e-7)
+  # Comparing errors of non-zero elements
+  dd2 <- abs(d2-jac)
+  dd4 <- abs(d4-jac)
+  zeros <- jac == 0
+  expect_true(all(dd2[!zeros] > dd4[!zeros]))
+})
+
 
 # TODO: compatibility with numDeriv
 
