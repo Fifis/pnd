@@ -1,38 +1,58 @@
 #' Print method for numerical derivatives
 #' @rdname GenD
+#' @inheritParams printMat
+#' @param ... Ignored.
 #' @order 2
 #' @export
-print.GenD <- function(x) {
+#' @examples
+#' # Printing whilst preserving names
+#' x <- structure(1:3, names = c("Andy", "Bradley", "Ca"))
+#' print(Grad(function(x) prod(sin(x)), 1))  # 1D derivative
+#' print(Grad(function(x) prod(sin(x)), x))
+#' print(Jacobian(function(x) c(prod(sin(x)), sum(exp(x))), x))
+print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
+                       begin = "", sep = "  ", end = "", ...) {
   nc <- NCOL(x)
   nr <- NROW(x)
   a <- attributes(x)
   # Printing gradients because those are manageable
   same.h <- all(a$step.size[1] == a$step.size)
+  xf <- formatMat(x, digits = digits, shave.spaces = shave.spaces)
+  colnames(xf) <- if (is.null(dim(x))) names(x) else colnames(x)
+  xf <- alignStrings(xf, colnames(xf), pad = "l")
+  xp <- printMat(xf, begin = begin, sep = sep, end = end, print = FALSE, format = FALSE)
   if (nc == 1) {
-    cat("Estimated ", if (nr == 1) "derivative" else "gradient", ": [", pasteAnd(printE(x, 4)),
-        "].\n(", a$step.size.method, " step size: ",
+    cat("Estimated ", if (nr == 1) "derivative: " else "gradient:\n",
+        paste0(xp, "\n"),
+        "(", a$step.size.method, " step size: ",
         if (same.h) printE(a$step.size[1], 1) else pasteAnd(printE(a$step.size, 1)), ").\n", sep = "")
   } else { # Jacobian printed by row
-    cat("Estimated Jacobian:\n")
-    for (i in 1:nr) cat(paste(printE(x[i, ], 3), collapse = " | "), "\n")
-    cat("(", a$step.size.method, " step size: ", if (same.h) printE(a$step.size, 1) else
-      paste0(printE(min(a$step.size), 1), "--", printE(max(a$step.size), 1)), ".)\n", sep = "")
+    cat("Estimated Jacobian:\n",
+    paste0(xp, "\n"),
+    "(", a$step.size.method, " step size", if (same.h) ": " else " range: ",
+        if (same.h) printE(a$step.size[1], 1) else paste0(printE(range(a$step.size), 1), collapse = "..."),
+        ".)\n", sep = "")
   }
 }
 
 #' Print method for Hessians
-#' @rdname hessian
+#' @rdname Hessian
+#' @inheritParams printMat
+#' @param ... Ignored.
 #' @order 2
 #' @export
-print.hessian <- function(x) {
+print.Hessian <- function(x, digits = 4, shave.spaces = TRUE,
+                          begin = "", sep = "  ", end = "", ...) {
   nc <- NCOL(x)
   nr <- NROW(x)
   a <- attributes(x)
   # Printing gradients because those are manageable
   same.h <- all(a$step.size[1] == a$step.size)
   cat("Estimated Hessian:\n")
-  for (i in 1:nr) cat(paste(printE(x[i, ], 3), collapse = " | "), "\n")
-  cat("Step size: [", if (same.h) printE(a$step.size, 1) else pasteAnd(printE(a$step.size, 1)), "].\n", sep = "")
+  printMat(x, digits = digits, shave.spaces = shave.spaces, begin = begin, sep = sep, end = end)
+  cat("(step size: ", begin,
+      if (same.h) printE(a$step.size[1], 1) else paste0(printE(a$step.size, 1), collapse = sep),
+      end, ")\n", sep = "")
 }
 
 #' Print method for step size
@@ -47,7 +67,7 @@ print.hessian <- function(x) {
 #' print(step.SW(x = 1, sin))
 #' print(step.M(x = 1, sin))
 #' print(step.K(x = 1, sin))
-print.stepsize <- function(x) {
+print.stepsize <- function(x, ...) {
   cat("Step size: ", x$par, " (numerical derivative value: ", x$value, ").\n", sep = "")
   if (x$method == "plug-in") {
     cat(x$counts, " plug-in calculations terminated with code ", x$exitcode, ".\n", sep = "")
@@ -69,7 +89,7 @@ print.stepsize <- function(x) {
 #' @examples
 #' f <- function(x) x[1]^3 + sin(x[2])*exp(x[3])
 #' print(gradstep(x = c(2, pi/4, 0.5), f))
-print.gradstep <- function(x) {
+print.gradstep <- function(x, ...) {
   if (length(x$par) < 2) {
     print.stepsize(x)
   } else {
@@ -93,7 +113,7 @@ print.gradstep <- function(x) {
 #' @rdname checkDimensions
 #' @order 2
 #' @export
-print.checkDimensions <- function(x) {
+print.checkDimensions <- function(x, ...) {
   cat("Function properties: ", if (!x["elementwise"]) "NOT ", "element-wise, ",
       if (!x["vectorised"]) "NOT ", "vectorised, ",
       if (!x["multivalued"]) "single-valued." else "multi-valued.", sep = "")

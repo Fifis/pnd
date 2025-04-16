@@ -311,6 +311,6 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
     attr(hes, "step.size.method") <- "user-supplied"
   }
 
-  class(hes) <- "hessian"
+  class(hes) <- "Hessian"
   return(hes)
 }

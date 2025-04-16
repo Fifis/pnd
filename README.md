@@ -42,48 +42,38 @@ numDeriv::grad(f, x)
 #> 0.5403023 -0.4161468 -0.9899925 -0.6536436
 
 pnd::Grad(f, x)
-#>       Jan        Feb        Mar        Apr
-#> 0.5403023 -0.4161468 -0.9899925 -0.6536436
-#> attr(,"step.size")
-#>          Jan          Feb          Mar          Apr
-#> 6.055454e-06 1.211091e-05 1.816636e-05 2.422182e-05
-#> attr(,"step.size.method")
-#> "default"
+#> Estimated gradient:
+#>      Jan      Feb      Mar      Apr  
+#>   0.5403  -0.4161  -0.9900  -0.6536  
+#> (default step size: 6.1e-06, 1.2e-05, 1.8e-05, 2.4e-05).
 ```
 
-The output contains diagnostic information about the chosen step size. Our function
-preserved the names of the input argument, unlike `grad`.
+The output contains diagnostic information about the chosen step size.
+Our function preserved the names of the input argument, unlike `grad`.
 
 The default step size in many implementations is proportional to the argument value, and this is reflected in the default output.
 Should the user desire a fixed step size, this can be easily achieved with an extra argument named `h`:
 
 ```r
 pnd::Grad(f, x, h = c(1e-5, 1e-5, 1e-5, 2e-5))
-#>       Jan        Feb        Mar        Apr 
-#> 0.5403023 -0.4161468 -0.9899925 -0.6536436 
-#> attr(,"step.size")
-#>   Jan   Feb   Mar   Apr 
-#> 1e-05 1e-05 1e-05 2e-05 
-attr(,"step.size.method")
-#> "user-supplied"
+#> Estimated gradient:
+#>      Jan      Feb      Mar      Apr  
+#>   0.5403  -0.4161  -0.9900  -0.6536  
+#> (user-supplied step size: 1.0e-05, 1.0e-05, 1.0e-05, 2.0e-05).
 ```
 
 Finally, it is easy to request an algorithmically chosen optimal step size -- here is how to do it with the Stepleman--Winarsky (1979) rule, named `"SW"`, that works well in practice:
 
 ```r
 pnd::Grad(f, x, h = "SW")
-#>       Jan        Feb        Mar        Apr 
-#> 0.5403023 -0.4161468 -0.9899925 -0.6536436 
-#> attr(,"step.size")
-#>          Jan          Feb          Mar          Apr 
-#> 5.048535e-06 1.000000e-05 7.500000e-06 1.000000e-05 
-#> attr(,"step.size.method")
-#> "SW"
+#> Estimated gradient:
+#>      Jan      Feb      Mar      Apr  
+#>   0.5403  -0.4161  -0.9900  -0.6536  
+#> (SW step size: 5.0e-06, 1.0e-05, 7.5e-06, 1.0e-05).
 ```
 
-Extensive diagnostics and error estimates can be requested at any time:
-`pnd::Grad(f, x, h = "SW", report = 2)` will contain the step-search path for each coordinate of `x`.
-Use `report = 0` to produce just the numerical gradient without any attributes, like `numDeriv::grad()` would.
+Extensive diagnostics requested at any time: the step-search tracing information is saved in the `attr(pnd::Grad(...), "step.search")` attribute that has an `$iterations` element.
+The numerical gradients and Jacobian are simple numeric vectors and matrices with attributes that facilitate printing -- feel free to handle them as any other numeric object.
 
 ## Learning resources
 
