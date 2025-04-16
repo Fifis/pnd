@@ -3,6 +3,7 @@
 - BUG: Matching in the Hessian is too slow -- de-duplicate first
 - BUG: 1x1 Hessians?
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
+- FEATURE: Pass stencils from `Grad()` to `fdCoef()`
 - FEATURE: check that all derivative-search methods return a truncation and a rounding error
 - FEATURE: add a plotting method for all step-size searches
 - FEATURE: add options for default accuracy (maybe 4?)
@@ -18,7 +19,6 @@
 - FEATURE: Add absolute or relative step size
 - FEATURE: add `diagnostics` to return an attribute of grad containing original f evaluations
 - FEATURE: Add a vector of step sizes for different arguments
-- FEATURE: Pass arguments from Grad to `fdCoef`, e.g. allow stencils in `Grad` or stencil matrices like in the presentation
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
 - FEATURE: Hessian via direct 4-term difference for a faster evaluation
 - FEATURE: Functions for fast and reliable Hessian computation based on parallel gradient evaluation

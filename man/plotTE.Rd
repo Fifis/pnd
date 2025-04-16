@@ -19,29 +19,26 @@ plotTE(
 \item{hgrid}{Numeric vector: a sequence of step sizes used as the horizontal positions
 (usually exponentially spaced).}
 
+\item{etotal}{Numeric vector: estimated combined error at each step size.
+This is typically computed by subtracting a more accurate finite-difference approximation from
+a less accurate one.}
+
 \item{eround}{Numeric vector: estimated rounding error at each step size; usually the best guess
 or the upper bound is used.}
 
 \item{hopt}{Numeric scalar (optional): selected optimal step size. If provided,
 a vertical line is drawn at this value.}
 
-\item{...}{Additional graphical parameters passed to \code{plot()}.}
+\item{elabels}{Character vector of the same length as \code{hgrid} containing the following values:
+\code{"r", "g", "o", "i", "b"} for \strong{r}ounding, \strong{g}ood truncation, \strong{o}kay truncation,
+\strong{i}ncreasing truncation and \strong{b}ad truncation.}
 
-\item{etrunc}{Numeric vector: estimated truncation error at each step size.
-This is typically computed by subtracting a more accurate finite-difference approximation from
-a less accurate one.}
+\item{echeck}{Numeric vector: estimated V-shaped check, usually from a fit.}
 
-\item{i.increasing}{Integer vector (optional): indices of step sizes where the
-truncation error is increasing, which indicates the search range.}
-
-\item{i.good}{Integer vector (optional): indices of step sizes where the truncation
-error follows the expected reduction (slope ~ accuracy order; 2 for central differences).}
-
-\item{i.okay}{Integer vector (optional): indices where the truncation error is
-acceptable but slightly deviates from the expected behaviour.}
-
-\item{eps}{Numeric scalar: condition error, i.e. the error bound for the accuracy of the evaluated
+\item{epsilon}{Numeric scalar: condition error, i.e. the error bound for the accuracy of the evaluated
 function; used for labelling rounding error assumptions.}
+
+\item{...}{Additional graphical parameters passed to \code{plot()}.}
 }
 \value{
 Nothing (invisible null).

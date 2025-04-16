@@ -444,7 +444,7 @@ Practically, it implies that the weights of the summation terms further away fro
 In this example, 85.5\% of the sum is defined by the finite difference with $h_4$, and 14.0\% with $h_3$.
 Therefore, the following function is twice as cheap, and the difference between the estimated derivative values is negligible.
 ```{r richardson}
-g2 <- Grad(f, x0, h = 1.25e-05, acc.order = 4, report = 0,
+g2 <- Grad(f, x0, h = 1.25e-05, acc.order = 4,
            elementwise = TRUE, vectorised = TRUE, multivalued = FALSE)
 print(g2)
 
@@ -489,7 +489,7 @@ In central differences, $f(x_0)$ is not used; with 8 symmetric evaluations, the 
 With `pnd`, there is no need to re-define the function to save its computed values because both the grid and the function values are returned as the attribute.
 ```{r}
 # f <- function(x) x^9
-# fp2 <- pnd::Grad(f, x = 1, h = "SW", acc.order = 8, vectorised1d = TRUE, report = 2)
+# fp2 <- pnd::Grad(f, x = 1, h = "SW", acc.order = 8, vectorised1d = TRUE)
 # print(attributes(fp2)$step.search$iterations, digits = 16)
 ```
 

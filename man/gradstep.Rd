@@ -6,15 +6,14 @@
 \alias{gradstep}
 \title{Print method for step size}
 \usage{
-\method{print}{stepsize}(x)
+\method{print}{stepsize}(x, ...)
 
-\method{print}{gradstep}(x)
+\method{print}{gradstep}(x, ...)
 
 gradstep(
   FUN,
   x,
   h0 = NULL,
-  zero.tol = sqrt(.Machine$double.eps),
   method = c("plugin", "SW", "CR", "CRm", "DV", "M", "K"),
   control = NULL,
   cores = 1,
@@ -27,14 +26,12 @@ gradstep(
 \item{x}{Numeric vector or scalar: the point at which the derivative is computed
 and the optimal step size is estimated.}
 
+\item{...}{Passed to FUN.}
+
 \item{FUN}{Function for which the optimal numerical derivative step size is needed.}
 
 \item{h0}{Numeric vector or scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
-
-\item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-procedure is requested; otherwise, it is absolute.}
 
 \item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
@@ -57,8 +54,6 @@ take less than 0.1 s per evaluation.}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
-
-\item{...}{Passed to FUN.}
 }
 \value{
 A list similar to the one returned by \code{optim()} and made of
