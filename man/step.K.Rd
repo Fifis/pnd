@@ -41,6 +41,12 @@ The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.ord
 step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
 number should be a negative power of 2 for the most accurate representation.}
 
+\item{max.rel.error}{Error bound for the relative function-evaluation error
+(\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+If the function is relying on numerical optimisation routines, consider setting to
+\code{sqrt(.Machine$double.eps)}.
+If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.}
+
 \item{plot}{Logical: if \code{TRUE}, plots the estimated truncation and round-off
 errors.}
 
@@ -57,12 +63,6 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 (fork cluster) on everything else.}
 
 \item{...}{Passed to FUN.}
-
-\item{epsilon}{Error bound for the relative function-evaluation error
-(\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
-If the function is relying on numerical optimisation routines, consider setting to
-\code{sqrt(.Machine$double.eps)}.
-If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.}
 }
 \value{
 A list similar to the one returned by \code{optim()}:

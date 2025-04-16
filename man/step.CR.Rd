@@ -30,6 +30,12 @@ step.CR(
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
+\item{max.rel.error}{Error bound for the relative function-evaluation error
+(\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+If the function is relying on numerical optimisation routines, consider setting to
+\code{sqrt(.Machine$double.eps)}.
+If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.}
+
 \item{version}{Character scalar: \code{"original"} for the original 1974 version by
 Curtis and Reid; \code{"modified"} for Kostyrka’s 2025 modification, which adds an
 extra evaluation for a more accurate estimate of the truncation error.}

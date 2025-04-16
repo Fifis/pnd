@@ -29,6 +29,12 @@ step.M(
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
+\item{max.rel.error}{Error bound for the relative function-evaluation error
+(\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+If the function is relying on numerical optimisation routines, consider setting to
+\code{sqrt(.Machine$double.eps)}.
+If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.}
+
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
 \item{shrink.factor}{A scalar less than 1 that is used to create a sequence of

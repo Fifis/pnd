@@ -175,6 +175,11 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#' @param max.rel.error Error bound for the relative function-evaluation error
+#'   (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+#'   If the function is relying on numerical optimisation routines, consider setting to
+#'   \code{sqrt(.Machine$double.eps)}.
+#'   If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.
 #' @param version Character scalar: \code{"original"} for the original 1974 version by
 #'   Curtis and Reid; \code{"modified"} for Kostyrka’s 2025 modification, which adds an
 #'   extra evaluation for a more accurate estimate of the truncation error.
@@ -990,6 +995,11 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
 #' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
+#' @param max.rel.error Error bound for the relative function-evaluation error
+#'   (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
+#'   If the function is relying on numerical optimisation routines, consider setting to
+#'   \code{sqrt(.Machine$double.eps)}.
+#'   If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.
 #' @param shrink.factor A scalar less than 1 that is used to create a sequence of
 #'   step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
 #'   number should be a negative power of 2 for the most accurate representation.
@@ -1244,11 +1254,6 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
 #'
 #' @inheritParams step.M
 #' @inheritParams GenD
-#' @param epsilon Error bound for the relative function-evaluation error
-#' (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
-#' If the function is relying on numerical optimisation routines, consider setting to
-#' \code{sqrt(.Machine$double.eps)}.
-#' If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.
 #'
 #' @details
 #' This function computes the optimal step size for central differences using the statistical
@@ -1399,7 +1404,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
   # A value to compare to the threshold for Zero Truncation Error
   zte.cond <- etrunc != 0 & is.finite(etrunc)
-  zte <- if (any(zte.cond)) median(etrunc[zte.cond]) else .Machine$double.eps
+  zte <- if (any(zte.cond)) stats::median(etrunc[zte.cond]) else .Machine$double.eps
 
 
   # Rounding error
@@ -1477,7 +1482,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       penalty <- function(theta, a, m, subset) {
         ehat <- checkFit(theta = theta, x = log2h, a, m)
         resid <- log2e - ehat
-        rmad <- median(abs(resid), na.rm = TRUE)
+        rmad <- stats::median(abs(resid), na.rm = TRUE)
         if (rmad < max.rel.error) rmad <- mean(abs(resid), na.rm = TRUE)
         mean(phuber(resid, r = rmad)[subset], na.rm = TRUE)
       }
@@ -1487,13 +1492,13 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
       # Constrained optimisation on a reasonable range
       # Initial value: median of 3 lowest points
-      theta0 <- c(median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e[sbst], na.rm = TRUE))
+      theta0 <- c(stats::median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e[sbst], na.rm = TRUE))
 
       # ui <- rbind(diag(2), -diag(2))
       # ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
       #          -c(max(log2h), unname(quantile(log2e, 0.75, na.rm = TRUE))))
       # opt <- constrOptim(theta = theta0, f = fobj, grad = NULL, ui = ui, ci = ci, control = list(reltol = 1e-6))
-      opt <- optim(par = theta0, fn = fobj, method = "BFGS", control = list(reltol = .Machine$double.eps^(1/3)))
+      opt <- stats::optim(par = theta0, fn = fobj, method = "BFGS", control = list(reltol = .Machine$double.eps^(1/3)))
       # Unconstrained optimisation works fine; this is 10x faster than constrOptim
 
       # Left branch: t2 - m*(x-t1), right branch: t2 + a*(x-t1)
@@ -1576,7 +1581,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
   h.closest <- hgrid[i.closest]
   cd.closest <- cds[[1]][i.closest]
-  cd <- approx(x = h.closest, y = cd.closest, xout = hopt)$y
+  cd <- stats::approx(x = h.closest, y = cd.closest, xout = hopt)$y
   if (!zero.trunc && exists("opt")) {  # If optimisation was carried out
     et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
   } else {
@@ -1607,20 +1612,18 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 #'
 #' @param hgrid Numeric vector: a sequence of step sizes used as the horizontal positions
 #'   (usually exponentially spaced).
-#' @param etrunc Numeric vector: estimated truncation error at each step size.
+#' @param etotal Numeric vector: estimated combined error at each step size.
 #'   This is typically computed by subtracting a more accurate finite-difference approximation from
 #'   a less accurate one.
 #' @param eround Numeric vector: estimated rounding error at each step size; usually the best guess
 #'   or the upper bound is used.
+#' @param echeck Numeric vector: estimated V-shaped check, usually from a fit.
 #' @param hopt Numeric scalar (optional): selected optimal step size. If provided,
 #'   a vertical line is drawn at this value.
-#' @param i.increasing Integer vector (optional): indices of step sizes where the
-#'   truncation error is increasing, which indicates the search range.
-#' @param i.good Integer vector (optional): indices of step sizes where the truncation
-#'   error follows the expected reduction (slope ~ accuracy order; 2 for central differences).
-#' @param i.okay Integer vector (optional): indices where the truncation error is
-#'   acceptable but slightly deviates from the expected behaviour.
-#' @param eps Numeric scalar: condition error, i.e. the error bound for the accuracy of the evaluated
+#' @param elabels Character vector of the same length as \code{hgrid} containing the following values:
+#'   \code{"r", "g", "o", "i", "b"} for **r**ounding, **g**ood truncation, **o**kay truncation,
+#'   **i**ncreasing truncation and **b**ad truncation.
+#' @param epsilon Numeric scalar: condition error, i.e. the error bound for the accuracy of the evaluated
 #' function; used for labelling rounding error assumptions.
 #' @param ... Additional graphical parameters passed to \code{plot()}.
 #'
@@ -1690,9 +1693,6 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric vector or scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
-#' @param zero.tol Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-#'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-#'   procedure is requested; otherwise, it is absolute.
 #' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 #'   \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 #'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
@@ -1748,7 +1748,7 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
 #' gradstep(x = 1, FUN = sin, method = "M")
 #' # Works for gradients
 #' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
-gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
+gradstep <- function(FUN, x, h0 = NULL,
                      method = c("plugin", "SW", "CR", "CRm", "DV", "M", "K"), control = NULL,
                      cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                      cl = NULL, ...) {
@@ -1756,15 +1756,12 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
   method <- method[1]
   # TODO: test if Mathur accepts the plot
   if (is.null(h0)) {
-    lttol <- abs(x) < zero.tol
     deriv.order <- 1  # TODO: take into account later
     acc.order <- 2
-    if (method != "M") {
-      h0 <- (abs(x)*(!lttol) + lttol) * 1e-5
-    } else {
-      h0 <- 2^round(log2(0.01 * (abs(x)*(!lttol) + lttol)))
-    }
+    h0 <- stepx(x, deriv.order = deriv.order, acc.order = acc.order)
+    if (method %in% c("M", "K")) h0 <- 2^round(log2(128 * h0))
   }
+  h0 <- unname(h0)
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
@@ -1843,9 +1840,10 @@ gradstep <- function(FUN, x, h0 = NULL, zero.tol = sqrt(.Machine$double.eps),
               abs.error = if (length(x) == 1) unlist(lapply(ret.list, "[[", "abs.error")) else do.call(rbind, lapply(ret.list, "[[", "abs.error")),
               method = method,
               iterations = lapply(ret.list, "[[", "iterations"))
-  ret[names(ret) != "counts"] <- lapply(ret[names(ret) != "counts"],
-                                        function(z) structure(z, names = names(x)))
+  valid.names <- names(ret) %in% c("counts", "abs.error")
+  ret[valid.names] <- lapply(ret[valid.names], function(z) structure(z, names = names(x)))
   if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
+  rownames(ret$abs.error) <- names(x)
 
   class(ret) <- "gradstep"
 
