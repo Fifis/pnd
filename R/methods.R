@@ -1,4 +1,4 @@
-#' Print method for numerical derivatives
+# Print method for numerical derivatives
 #' @rdname GenD
 #' @inheritParams printMat
 #' @param ... Ignored.
@@ -35,7 +35,7 @@ print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
   }
 }
 
-#' Print method for Hessians
+# Print method for Hessians
 #' @rdname Hessian
 #' @inheritParams printMat
 #' @param ... Ignored.
@@ -55,7 +55,7 @@ print.Hessian <- function(x, digits = 4, shave.spaces = TRUE,
       end, ")\n", sep = "")
 }
 
-#' Print method for step size
+# Print method for step size
 #' @rdname gradstep
 #' @order 2
 #' @export
@@ -81,7 +81,7 @@ print.stepsize <- function(x, ...) {
 }
 
 
-#' Print method for gradient step size
+# Print method for gradient step size
 #' @rdname gradstep
 #' @order 2
 #' @export
@@ -109,7 +109,7 @@ print.gradstep <- function(x, ...) {
   }
 }
 
-#' Print method for check results
+# Print method for check results
 #' @rdname checkDimensions
 #' @order 2
 #' @export

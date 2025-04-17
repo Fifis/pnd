@@ -94,7 +94,13 @@ The following articles provide the theory behind the methods implemented in this
 
 ## Installation
 
-This package currently exists only on GitHub. To install it, run the following two commands:
+The stable version is on [CRAN](https://cran.r-project.org/package=pnd).
+To install it, run the following line:
+```r
+install.packages("pnd")
+```
+
+The development version is available on GitHub. To install it, run the following two commands:
 ```r
 install.packages("devtools")
 devtools::install_github("Fifis/pnd")

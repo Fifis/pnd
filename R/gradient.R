@@ -22,6 +22,7 @@
 #'
 #' @returns A named logical vector indicating if a function is element-wise or not,
 #' vectorised or not, and multivalued or not.
+#' @order 1
 #' @export
 #'
 #' @examples

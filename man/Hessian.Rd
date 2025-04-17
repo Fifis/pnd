@@ -3,7 +3,7 @@
 \name{print.Hessian}
 \alias{print.Hessian}
 \alias{Hessian}
-\title{Print method for Hessians}
+\title{Numerical Hessians}
 \usage{
 \method{print}{Hessian}(
   x,
