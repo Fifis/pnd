@@ -31,3 +31,26 @@ test_that("step size is valid for various values of x", {
 test_that("duplicated row indices are correct", {
   expect_equal(dupRowInds(mtcars[rep(1:10, 10), rep(1:10, 10)]), rep(1:10, 10))
 })
+
+test_that("Strings are aligned correctly", {
+  x <- structure(1:4, names = month.name[1:4])
+  o <- alignStrings(x, pad = "c")
+  expect_equal(apply(nchar(o), 2, diff), rep(0, 4))
+
+  x <- matrix(c(1, 2.3, 4.567, 8, 9, 0), nrow = 2, byrow = TRUE)
+  colnames(x) <- c("Andy", "Bradley", "Ci")
+  o <- alignStrings(x, pad = "r")
+  expect_equal(apply(nchar(o), 2, diff), matrix(0, nrow = 2, ncol = 3))
+})
+
+test_that("Matrices are formatted and printed correctly", {
+  x <- matrix(c(1234567, 12345.67, 123.4567, 1.23456, -1.23456e-1, 0,
+                -1.23456e-4, 1.23456e-2, -1.23456e-6), nrow = 3)
+  xf <- matrix(c("1.2e+6", " 1.2", "-1.2e-4", "1.2e+4", "-0.1", " 1.2e-2",
+                 "1.2e+2", " 0  ", "-1.2e-6"), nrow = 3, byrow = TRUE)
+  expect_equal(formatMat(x, digits = 1), xf)
+
+  o <- printMat(x, digits = 1, shave.spaces = TRUE, begin = "c(", sep = ", ",
+                end = ")", print = FALSE, format = TRUE)
+  expect_equal(o[3], "c(1.2e+2,  0  , -1.2e-6)")
+})

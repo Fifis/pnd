@@ -27,6 +27,10 @@ test_that("Hessians are correct", {
   expect_equal(attr(Hessian(f, x, h = 0.01), "step.size.method"), "user-supplied")
 })
 
+test_that("1x1 Hessians are handled correctly", {
+  expect_equal(as.numeric(Hessian(FUN = sin, x = 1)), -sin(1), tolerance = 1e-8)
+})
+
 test_that("named arguments are handled correctly", {
   x <- 1:4
   f <- function(x) prod(sin(x))
