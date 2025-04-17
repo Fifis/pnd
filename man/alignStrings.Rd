@@ -9,8 +9,9 @@ alignStrings(x, names = NULL, pad = c("l", "c", "r"))
 \arguments{
 \item{x}{A numeric vector or matrix to be aligned with a vector of column names.}
 
-\item{names}{A character vector of element or column names to be output first. Numeric
-inputs are converted to character automatically.}
+\item{names}{Optional: if x does not have (column) names, a character vector of element
+or column names to be output first. Ignored if \code{x} is named.
+Numeric inputs are converted to character automatically.}
 
 \item{pad}{A single character: \code{"l"} for left padding (flush-right justification),
 \code{"c"} for centre, and \code{"r"} for right padding (flush-left justification).}

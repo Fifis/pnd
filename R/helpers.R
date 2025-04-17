@@ -49,7 +49,7 @@ printMat <- function(x, digits = 3, shave.spaces = TRUE,
   if (format) x <- formatMat(x, digits = digits, shave.spaces = shave.spaces)
   x <- split(x, seq_len(nrow(x)))
   for (i in seq_along(x)) {
-    x[[i]] <- paste0(c(begin, x[[i]], end), collapse = sep)
+    x[[i]] <- paste0(begin, paste0(x[[i]], collapse = sep), end, collapse = "")
     if (print) cat(x[[i]], "\n", sep = "")
   }
   return(invisible(unname(unlist(x))))
@@ -148,8 +148,9 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
 #' Align printed output to the longest argument
 #'
 #' @param x A numeric vector or matrix to be aligned with a vector of column names.
-#' @param names A character vector of element or column names to be output first. Numeric
-#' inputs are converted to character automatically.
+#' @param names Optional: if x does not have (column) names, a character vector of element
+#'   or column names to be output first. Ignored if \code{x} is named.
+#'   Numeric inputs are converted to character automatically.
 #' @param pad A single character: \code{"l"} for left padding (flush-right justification),
 #'   \code{"c"} for centre, and \code{"r"} for right padding (flush-left justification).
 #'
@@ -169,11 +170,11 @@ alignStrings <- function(x, names = NULL, pad = c("l", "c", "r")) {
   pad <- match.arg(pad)
   dimx <- dim(x)
   y <- if (!is.null(names)) as.character(names) else NULL
+  if (is.null(y)) y <- if (is.null(dimx)) names(x) else colnames(x)
   if (is.null(dimx)) {
     x <- matrix(x, nrow = 1)
     dimx <- dim(x)
   }
-  if (is.null(y)) y <- if (is.null(dimx)) names(x) else colnames(x)
   if (is.null(y)) {  # Nothing to align, exit
     x <- as.character(x)
     if (!is.null(dimx)) dim(x) <- dimx
@@ -188,7 +189,7 @@ alignStrings <- function(x, names = NULL, pad = c("l", "c", "r")) {
   nmax <- apply(n, 2, max)
   nshort <- -sweep(n, 2, nmax, "-")
   repN <- function(n) if (n > 0) paste0(rep(" ", n), collapse = "") else ""
-  nleft <- switch(pad, l = nshort, c = floor(nshort/2), r = rep(0, length(x)))
+  nleft <- switch(pad, l = nshort, c = floor(nshort/2), r = rep(0, length(nshort)))
   nright <- nshort - nleft
   pad.left  <- sapply(nleft, repN)
   pad.right <- sapply(nright, repN)
