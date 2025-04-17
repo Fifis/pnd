@@ -76,6 +76,7 @@ A list similar to the one returned by \code{optim()}:
 \item \code{0} – Optimal termination; a minimum of the V-shaped function was found.
 \item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
 \item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
+\item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,

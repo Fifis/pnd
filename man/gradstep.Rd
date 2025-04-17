@@ -33,8 +33,9 @@ slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 
 
 \item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
-\code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
-\insertCite{mathur2012analytical}{pnd}.}
+\code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, \code{"M"} for
+\insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, exerimental),
+and \code{"plugin"} for the single-step plug-in estimator.}
 
 \item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
@@ -79,10 +80,10 @@ each coordinate.
 Automatic step selection for numerical derivatives
 }
 \details{
-We recommend using the Mathur algorithm because it does not suffer
+We recommend using the Stepleman--Winarsky algorithm because it does not suffer
 from over-estimation of the truncation error in the Curtis--Reid approach
 and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-approach. It really tries muliple step sizes simultaneously and handles missing
+approach. It really tries multiple step sizes and handles missing
 values due to bad evaluations for inadequate step sizes really in a robust manner.
 }
 \examples{
@@ -107,6 +108,7 @@ print(gradstep(x = c(2, pi/4, 0.5), f))
 }
 \seealso{
 \code{\link[=step.CR]{step.CR()}} for Curtis--Reid (1974) and its modification,
+\code{\link[=step.plugin]{step.plugin()}} for the one-step plug-in solution,
 \code{\link[=step.DV]{step.DV()}} for Dumontet--Vignes (1977),
 \code{\link[=step.SW]{step.SW()}} for Stepleman--Winarsky (1979),
 \code{\link[=step.M]{step.M()}} for Mathur (2012), and

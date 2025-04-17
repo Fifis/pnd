@@ -1279,6 +1279,7 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
 #'         \item \code{0} – Optimal termination; a minimum of the V-shaped function was found.
 #'         \item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
 #'         \item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
+#'         \item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
@@ -1367,65 +1368,61 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   fplus <- fgrid[, 2]
   fminus <- fgrid[, 1]
 
-  s <- 2^(0:(acc.order/2-1))
-  s <- c(-rev(s), s)  # Stencil of powers of 2 because h is halved
-
-  s2 <- 2^(0:(acc.order/2+1))
+  # Stencil of powers of 1/shrink.factor because the step is shrunk in this manner
+  # Rounding near-integers to integers to handle cases such as sqrt(2)^2 - 2 = 2*MachEps
+  s2 <- inv.sf^(0:(acc.order/2 + 1))
+  near.int <- (s2/round(s2) - 1) < 16 * .Machine$double.eps
+  s2[near.int] <- round(s2[near.int])
   s2 <- c(-rev(s2), s2)
-  stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order, stencil = s)
-  # A higher derivative for an alternative estimate of the truncation term
+  s1 <- s2[2:(length(s2)-1)]
+  s0 <- s1[2:(length(s2)-1)]  # For actual first derivatives
+  # Standard + high accuracy for an alternative estimate of the truncation term
   # because it is the next acc.order-th derivative in the Taylor expansion
-  stcd  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = 4, stencil = s2)
+  stc0  <- fdCoef(deriv.order = deriv.order, acc.order = acc.order,   stencil = s0)
+  stc1  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order,   stencil = s1)
+  stc2  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order+2, stencil = s2)
 
-  stc.list <- list(stc, stcd)
-  do <- c(deriv.order, deriv.order+acc.order)
+  stc.list <- list(stc0, stc1, stc2)
   cds <- vector("list", 2)
-  for (i in 1:2) {
-    i.spos <- stc.list[[i]]$stencil > 0
+  for (i in 1:3) {
+    i.spos <- stc.list[[i]]$stencil > 0  # x+h, x+2h, ...
     i.sneg <- stc.list[[i]]$stencil < 0
-    wpos  <- stc.list[[i]]$weights[i.spos]  # Weights for f(xplus) starting at x+h, x+2h, ...
-    wneg  <- rev(stc.list[[i]]$weights[i.sneg]) # Weights for f(xplus) starting at x-h, x-2h, ...
-    fmpos <- sapply(1:sum(i.spos), function(i) c(fplus[i:n], rep(NA, i-1)))
-    fmneg <- sapply(1:sum(i.spos), function(i) c(fminus[i:n], rep(NA, i-1)))
-    if (i == 1) {  # Saving f+ and f- for round-off-error analysis
-      fmp <- fmpos
-      fmn <- fmneg
-    }
-    colnames(fmpos) <- names(wpos)
-    colnames(fmneg) <- names(wneg)
-    # Estimated derivative times h^acc.order
-    cds[[i]] <- (colSums(t(fmpos) * wpos) + colSums(t(fmneg) * wneg)) / hgrid
+    wpos  <-     stc.list[[i]]$weights[i.spos]  # Weights for f(...) starting at h: x+h, x+th, ...
+    wneg  <- rev(stc.list[[i]]$weights[i.sneg]) # Weights for f(...) starting at -h: x-h, x-th, ...
+    fpos <- sapply(1:sum(i.spos), function(j) c(fplus[j:n], rep(NA, j-1)))
+    fneg <- sapply(1:sum(i.sneg), function(j) c(fminus[j:n], rep(NA, j-1)))
+    # Estimated required and higher-order derivative times h^acc.order
+    cds[[i]] <- (colSums(t(fpos) * wpos) + colSums(t(fneg) * wneg)) / hgrid
   }
-  etrunc <- (cds[[1]] - c(cds[[1]][2:n], NA)) / (1 - shrink.factor^acc.order)
-  etrunc2 <- cds[[2]]
+  etrunc1 <- cds[[2]] * abs(attr(stc1, "remainder.coef"))  #  f''' * <w, b> / (a+d)!
+  etrunc2 <- cds[[3]] * abs(attr(stc2, "remainder.coef"))
+  etrunc <- etrunc2
   bad.etrunc <- (!is.finite(etrunc)) | (etrunc == 0)
-  etrunc[bad.etrunc] <- etrunc2[bad.etrunc]
+  etrunc[bad.etrunc] <- etrunc1[bad.etrunc]
   etrunc <- abs(etrunc)
+  # plot(abs(cds[[2]]), log = "y"); points(abs(cds[[3]]), col = 2)
 
   # A value to compare to the threshold for Zero Truncation Error
-  zte.cond <- etrunc != 0 & is.finite(etrunc)
-  zte <- if (any(zte.cond)) stats::median(etrunc[zte.cond]) else .Machine$double.eps
+  good.te <- etrunc != 0 & is.finite(etrunc)
+  med.te <- if (any(good.te)) stats::median(etrunc[good.te]) else .Machine$double.eps
 
-
-  # Rounding error
+  # Approximate rounding error for the plot
   # epsilon = relative error of evaluation of f(x), e.g. maximum noise
-  # delta = Error of h|f'(x)true - f'(x)| / |f(x)true|
-  fmax <- apply(abs(cbind(fmp, fmn)), 1, max)
-  i.neg <- grep("-", names(stc$weights))
-  i.pos <- grep("\\+", names(stc$weights))
-  if (length(stc$stencil) == 2) {
-    f.eps <- max.rel.error * (abs(stc$weights[i.neg]*fmn) + abs(stc$weights[i.pos]*fmp))
-  } else {
-    f.eps <- max.rel.error * colSums(abs(rbind(stc$weights[i.neg]*t(fmn), stc$weights[i.pos]*t(fmp))))
-  }
+  # delta = Error of |f'(x)true - f'(x)| / |f(x)true|
+  # Taking not the exact terms but the first necessary n terms because it does not matter for small h
+  # and is too erratic in any case
+  stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order)
+  l <- length(stc$stencil) / 2
+  fmax <- apply(abs(cbind(fpos[, 1:l], fneg[, 1:l])), 1, max)
+  f.eps <- max.rel.error * sum(abs(stc$weights)) * fmax
   f.delta <- 0.5 * .Machine$double.eps * fmax
-  eround <- (drop(f.eps) + f.delta) / hgrid^deriv.order
+  eround <- (f.eps + f.delta) / hgrid^deriv.order
   # plot(hgrid, eround, log = "xy")
 
   # Initial value:
   log2h <- log2(hgrid)
   log2e <- suppressWarnings(log2(etrunc))
-  log2e[log2e == -Inf] <- NA
+  log2e[is.infinite(log2e)] <- NA  # Preserving NaNs just in case
   # plot(log2h, log2e)
 
   # Check-like function of two parameters: horizontal and vertical location
@@ -1454,10 +1451,19 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
     # Estimated minimum: where the slope changes from negative to positive
     i.trunc.valid <- which(abs((local.slopes - acc.order) / acc.order) < 0.1)
+    only.right.branch <- FALSE
     if (length(i.trunc.valid) > 0) {
       zero.trunc <- FALSE
       # Extending it because the local regression used +-1 points at the ends
       i.trunc.valid <- sort(unique(c(i.trunc.valid-1, i.trunc.valid, i.trunc.valid+1)))
+
+      # Edge case: if the slope of etrunc is always acc.order, then, there is no check
+      if (0 %in% i.trunc.valid) {
+        only.right.branch <- FALSE
+        i.trunc.valid <- i.trunc.valid[i.trunc.valid > 0]
+        exitcode <- 3
+      }
+
       # If there are more than 1 run, pick the longest one
       # However, if it is shorter than 5 (2 points were added artificially; we want a length-3 run), discard it
       itv.runs <- splitRuns(i.trunc.valid)
@@ -1467,16 +1473,17 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       if (length(i.trunc.valid) >= 5) {
         i.round <- seq(1, (min(i.trunc.valid)-1))
       } else {  # If the truncation error is too erratic, treat everything as a rounding error
-        zero.trunc <- zte < max.rel.error
+        zero.trunc <- med.te < max.rel.error
         i.round <- which(etrunc != 0 & is.finite(etrunc))
       }
     } else {  # Maybe the higher-order derivatives are close to zero compared to the function noise?
-      zero.trunc <- zte < max.rel.error
+      zero.trunc <- med.te < max.rel.error
       # If the truncation error is zero, treat everything as a rounding error
       i.round <- which(etrunc != 0 & is.finite(etrunc))
     }
 
-    if ((!zero.trunc) && length(i.trunc.valid) >= 3) {  # It makes sense to equate the two errors
+    if ((!only.right.branch) && (!zero.trunc) && length(i.trunc.valid) >= 3) {
+      # It makes sense to equate the two errors when there are both branches with enough points
       # Pseudo-Huber loss with knee radius
       phuber <- function(x, r) r^2 * (sqrt(1 + (x/r)^2) - 1)
       penalty <- function(theta, a, m, subset) {
@@ -1491,8 +1498,9 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       fobj <- function (theta) penalty(theta, a = acc.order, m = deriv.order, subset = sbst)
 
       # Constrained optimisation on a reasonable range
-      # Initial value: median of 3 lowest points
-      theta0 <- c(stats::median(log2h[rank(log2e, ties.method = "first") <= 3]), min(log2e[sbst], na.rm = TRUE))
+      # Initial value: median of 5 lowest points, but not farther than the the rightmost point of the valid truncation range
+      theta0 <- c(stats::median(log2h[rank(log2e, ties.method = "first") <= 5]), min(log2e[sbst], na.rm = TRUE))
+      if (theta0[1] > log2h[max(i.trunc.valid)]) theta0 <- c(log2h[min(i.trunc.valid)], log2e[min(i.trunc.valid)])
 
       # ui <- rbind(diag(2), -diag(2))
       # ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
@@ -1502,11 +1510,11 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       # Unconstrained optimisation works fine; this is 10x faster than constrOptim
 
       # Left branch: t2 - m*(x-t1), right branch: t2 + a*(x-t1)
-      # Working in logarithms: the difference between the two at hopt must be log(a)
-      # (a+m) * (x-hopt0) = -log(a) --> hopt = hopt0 / a^(1/(m+a))
+      # Working in logarithms: the difference between the two at hopt must be log(d/a)
+      # (a+m) * (x-hopt0) = log(d/a) --> hopt = hopt0 / (d/a)^(1/(d+a))
       # This ensures that etrunc/eround = 1/a
       hopt0   <- if (!zero.trunc) 2^opt$par[1] else 0.001 * max(1, abs(x))
-      hopt <- hopt0 / (acc.order^(1/(deriv.order + acc.order)))
+      hopt <- hopt0 * (deriv.order/acc.order)^(1/(deriv.order + acc.order))
       hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, m = deriv.order)
     } else {  # Zero truncation --> choosing the smallest error that yields a non-zero total-error estimate
       hopt <- hgrid[min(i.etrunc.finite)]
@@ -1527,14 +1535,16 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     exitcode <- 2
   }
 
-  if (exitcode > 0) {
+  if (exitcode %in% c(1, 2)) {
     complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
     f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
+    if (!is.finite(f0)) stop(paste0("Could not compute the function value at ", x, "."))
     if (f0 < .Machine$double.eps) f0 <- .Machine$double.eps
     expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
     # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
     # which implies that a large fail-safe step can be chosen
-    mean.sign <- mean(sign(diff(eround[is.finite(eround)])))
+    f.er <- is.finite(eround)
+    mean.sign <- if (sum(f.er) > 1) mean(sign(diff(eround[f.er]))) else 1
     if (mean.sign > 0.5) {  # Preferring a slightly larger step size
       hopt <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order,
                         zero.tol = .Machine$double.eps^(1/3))
@@ -1545,6 +1555,9 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     }
     log2hopt <- log2(hopt)
     # TODO: generalise; do the theory!
+  } else if (exitcode == 3) {  # If the right branch is growing, choose a smaller step size
+    hopt <- hgrid[round(stats::quantile(i.trunc.valid, 0.25))]
+    log2hopt <- log2(hopt)
   }
 
   if (plot) {
@@ -1580,19 +1593,31 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # Approximating f'(hopt) by linear interpolation between 2 closest points
   i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
   h.closest <- hgrid[i.closest]
-  cd.closest <- cds[[1]][i.closest]
+
+  # The grid with the largest stencil remains in memory
+
+  cd.closest <- cds[[1]][i.closest]  # Derivatives at 2 closest points
+  if (sum(is.na(cd.closest)) == 1) cd.closest <- rep(cd.closest[is.finite(cd.closest)[1]], 2)
+  # If there are no finite values, take the value that is the closest to the centre
+  if (sum(is.na(cd.closest)) == 2) {
+    i.mid <- which(is.finite(cds[[1]]))
+    cd.closest <- rep(hgrid[which.min(abs(i.mid - n/2))], 2)
+  }
   cd <- stats::approx(x = h.closest, y = cd.closest, xout = hopt)$y
   if (!zero.trunc && exists("opt")) {  # If optimisation was carried out
     et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
   } else {
-    et <- zte
+    et <- med.te
   }
   er <- if (!zero.trunc) et * acc.order else mean(eround[i.closest])
+  # TODO: fix this formula, double-check the calculations
 
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
                 "truncation branch slope is close to zero, relying on the expected rounding error",
-                "truncation error is near-zero, relying on the expected rounding error"
+                "truncation error is near-zero, relying on the expected rounding error",
+                "there is no left branch of the combined error, fitting impossible"
+
   )
 
   diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cbind(f = cds[[1]], fhigher = cds[[2]]),
@@ -1656,7 +1681,7 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
        log = "xy", bty = "n", ylim = yl,
        ylab = "Estimated abs. error in df/dx", xlab = "Step size",
        main = "Estimated error vs. finite-difference step size", ...)
-  graphics::mtext(paste0("assuming max. rel. err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
+  graphics::mtext(paste0("dotted line: rounding error assuming max. rel. err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
   i.round      <- which(elabels == "r")
   i.good       <- which(elabels == "g")
   i.ok         <- which(elabels == "o")
@@ -1695,8 +1720,9 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
 #' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 #'   \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
-#'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, and "M" for
-#'   \insertCite{mathur2012analytical}{pnd}.
+#'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, \code{"M"} for
+#'   \insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, exerimental),
+#'   and \code{"plugin"} for the single-step plug-in estimator.
 #' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
 #'   full iteration history including all function evaluations is returned, but
@@ -1705,10 +1731,10 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
 #' @param ... Passed to FUN.
 #'
 #' @details
-#' We recommend using the Mathur algorithm because it does not suffer
+#' We recommend using the Stepleman--Winarsky algorithm because it does not suffer
 #' from over-estimation of the truncation error in the Curtis--Reid approach
 #' and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-#' approach. It really tries muliple step sizes simultaneously and handles missing
+#' approach. It really tries multiple step sizes and handles missing
 #' values due to bad evaluations for inadequate step sizes really in a robust manner.
 #'
 #' @return A list similar to the one returned by \code{optim()} and made of
@@ -1729,9 +1755,12 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
 #'   including the full step size search path, argument grids, function values on
 #'   those grids, estimated error ratios, and estimated derivative values for
 #'   each coordinate.
+#'
+#' @order 1
 #' @export
 #'
 #' @seealso [step.CR()] for Curtis--Reid (1974) and its modification,
+#'   [step.plugin()] for the one-step plug-in solution,
 #'   [step.DV()] for Dumontet--Vignes (1977),
 #'   [step.SW()] for Stepleman--Winarsky (1979),
 #'   [step.M()] for Mathur (2012), and
