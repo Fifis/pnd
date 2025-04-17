@@ -50,31 +50,37 @@ generateGrid2 <- function(x, side, acc.order, h) {
     dx[, j] <- bh.list[[j]]
     dx
   })
-  inds <- t(utils::combn(x = n, m = 2))
-  colnames(inds) <- c("i", "j")
 
-  xmat.offdiag <- lapply(seq_len(nrow(inds)), function(k) {
-    i <- inds[k, "i"]
-    j <- inds[k, "j"]
-    dxi <- dx.list[[i]]
-    dxj <- dx.list[[j]]
-    # For each step from dx.list[[i]] and dx.list[[j]]...
-    iinds <- cbind(ii = rep(seq_len(nrow(dxi)), nrow(dxj)),
-                   jj = rep(seq_len(nrow(dxj)), each = nrow(dxi)))
-    # Two steps the weights are multiplied
-    xlist <- lapply(seq_len(nrow(iinds)), function(kk) {
-      ii <- iinds[kk, "ii"]
-      jj <- iinds[kk, "jj"]
-      return(list(x = x + dxi[ii, ] + dxj[jj, ],
-                  weights = w.list[[i]][ii] * w.list[[j]][jj]))
+  if (n >= 2) {
+    inds <- t(utils::combn(x = n, m = 2))
+    colnames(inds) <- c("i", "j")
+
+    xmat.offdiag <- lapply(seq_len(nrow(inds)), function(k) {
+      i <- inds[k, "i"]
+      j <- inds[k, "j"]
+      dxi <- dx.list[[i]]
+      dxj <- dx.list[[j]]
+      # For each step from dx.list[[i]] and dx.list[[j]]...
+      iinds <- cbind(ii = rep(seq_len(nrow(dxi)), nrow(dxj)),
+                     jj = rep(seq_len(nrow(dxj)), each = nrow(dxi)))
+      # Two steps the weights are multiplied
+      xlist <- lapply(seq_len(nrow(iinds)), function(kk) {
+        ii <- iinds[kk, "ii"]
+        jj <- iinds[kk, "jj"]
+        return(list(x = x + dxi[ii, ] + dxj[jj, ],
+                    weights = w.list[[i]][ii] * w.list[[j]][jj]))
+      })
+      xmat <- do.call(rbind, lapply(xlist, "[[", "x"))
+      xmat <- cbind(xmat, index1 = i, index2 = j,
+                    weights = do.call(c, lapply(xlist, "[[", "weights")))
+      xmat
     })
-    xmat <- do.call(rbind, lapply(xlist, "[[", "x"))
-    xmat <- cbind(xmat, index1 = i, index2 = j,
-                  weights = do.call(c, lapply(xlist, "[[", "weights")))
-    xmat
-  })
-  xmat.offdiag <- do.call(rbind, xmat.offdiag)
-  n2 <- nrow(xmat.offdiag)
+    xmat.offdiag <- do.call(rbind, xmat.offdiag)
+    n2 <- nrow(xmat.offdiag)
+  } else {  # 1x1 Hessians
+    xmat.offdiag <- NULL
+  }
+
 
   # De-duplicate from the very beginning, mark f0
   xvals <- rbind(xmat.diagonal, xmat.offdiag)
