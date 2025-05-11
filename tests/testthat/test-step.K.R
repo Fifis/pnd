@@ -10,6 +10,12 @@ test_that("Kostyrka's step selection behaves reasonably", {
   if (file.exists("Rplot.pdf")) unlink("Rplot.pdf")
 })
 
+test_that("Kostyrka's step selection works for gradients", {
+  f <- function(x) sin(x[1]) * cos(x[2]) + exp(x[3])
+  s <- gradstep(f, 1:3, method = "K")
+  expect_equal(s$exitcode, rep(0, 3))
+})
+
 test_that("Kostyrka's method returns reasonable values with unfortunate inputs", {
   s <- step.K(sin, 1, shrink.factor = 1/8, max.rel.error = 0.5, cores = 1)
   expect_equal(s$value, cos(1), tolerance = 1e-9)

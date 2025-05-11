@@ -1858,7 +1858,7 @@ gradstep <- function(FUN, x, h0 = NULL,
     margs1$h0 <- h0[i]
     margs1$range <- if (!is.null(control$range)) control$range else
       h0[i] / switch(method, plugin = c(1e4, 1e-4), CR = c(1e5, 1e-5), CRm = c(1e5, 1e-5),
-                     DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24))
+                     DV = c(1e6, 1e-6), SW = c(1e12, 1e-8), M = 2^c(36, -24), K = 2^c(36, -24))
     return(c(margs1, x = unname(x[i]), FUN = FUN1))
   })
   ret.list <- lapply(f.arg.list, function(arg1) do.call(autofun, arg1))
