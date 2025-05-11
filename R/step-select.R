@@ -1604,6 +1604,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     cd.closest <- rep(hgrid[which.min(abs(i.mid - n/2))], 2)
   }
   cd <- stats::approx(x = h.closest, y = cd.closest, xout = hopt)$y
+  if (is.na(cd)) cd <- mean(cd.closest)
   if (!zero.trunc && exists("opt")) {  # If optimisation was carried out
     et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
   } else {
@@ -1869,10 +1870,15 @@ gradstep <- function(FUN, x, h0 = NULL,
               abs.error = if (length(x) == 1) unlist(lapply(ret.list, "[[", "abs.error")) else do.call(rbind, lapply(ret.list, "[[", "abs.error")),
               method = method,
               iterations = lapply(ret.list, "[[", "iterations"))
-  valid.names <- names(ret) %in% c("counts", "abs.error")
-  ret[valid.names] <- lapply(ret[valid.names], function(z) structure(z, names = names(x)))
-  if (method == "SW") rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
-  rownames(ret$abs.error) <- names(x)
+  valid.names <- setdiff(names(ret), c("counts", "abs.error", "method"))
+  ret[valid.names] <- lapply(ret[valid.names], function(z) {
+    if (is.matrix(z)) rownames(z) <- names(x) else
+      if (length(z) == length(x)) names(z) <- names(x) else
+        stop("Name error in gradstep (please send a bug report).")
+    return(z)
+  })
+  if (!is.null(dim(ret$counts))) rownames(ret$counts) <- names(x) else names(ret$counts) <- names(x)
+  if (!is.null(dim(ret$abs.error))) rownames(ret$abs.error) <- names(x)
 
   class(ret) <- "gradstep"
 

@@ -77,7 +77,7 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
   fcond <- is.finite(x)
   xf <- x[econd & fcond]
   xe <- x[(!econd) & fcond]
-  xi <- x[(!econd) & (!fcond)]
+  xi <- x[!fcond]
 
   if (length(xf) > 0) {  # Formatting like a float
     nd <- ceiling(log10(abs(xf)))  # Number of digits to the left of zero
@@ -114,7 +114,7 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
   if (any(has.exp) && any(!has.exp)) xout[(!has.exp) & fcond] <- paste0(xout[(!has.exp) & fcond],  "   ")
 
   # Restoring non-finite values
-  x[(!econd) & (!fcond)] <- xi
+  x[!fcond] <- xi
 
   dim(xout) <- dim(x)
   if (is.null(dim(x))) xout <- matrix(xout, nrow = 1)
