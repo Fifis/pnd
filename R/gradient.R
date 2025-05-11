@@ -197,8 +197,10 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
   weights <- lapply(stencils, "[[", "weights")
   weights <- unname(unlist(weights))
   stencils <- lapply(stencils, "[[", "stencil")
-  slengths <- sapply(stencils, "length")
+  slengths <- vapply(stencils, "length", numeric(1))
   index <- rep(1:n, times = slengths)
+  if (length(h) == 1) h <- rep(h, n)
+  if (length(h) != n) stop("generateGrid: 'h' must have length 1 or length(x).")
 
   if (elementwise) {  # Apply the stencil to each single coordinate of the input x
     # x is 1-dimensional if the input is repeated scalars
