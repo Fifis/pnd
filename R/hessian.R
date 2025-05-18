@@ -6,7 +6,6 @@
 #'
 #' @inheritParams GenD
 #'
-#'
 #' @return A list with elements:
 #' \itemize{
 #'   \item \code{xlist}: a list of unique coordinate shifts,
