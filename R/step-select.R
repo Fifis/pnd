@@ -672,7 +672,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   # If the estimate of f''' is near-zero, the step-size estimate may be too large --
   # only the modified one needs not be saved
   me13 <- max.rel.error^(1/3)
-  if (abs(cd3) == 0) {#' Plug-in step selection
+  if (abs(cd3) < max.rel.error) {
     exitcode <- 1
     h <- pmax(me13, abs(x) / 128)
     cd3 <- me13^2 * abs(x)
