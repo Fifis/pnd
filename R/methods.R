@@ -30,7 +30,7 @@ print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
     cat("Estimated Jacobian:\n",
     paste0(xp, "\n"),
     "(", a$step.size.method, " step size", if (same.h) ": " else " range: ",
-        if (same.h) printE(a$step.size[1], 1) else paste0(printE(range(a$step.size), 1), collapse = "..."),
+        if (same.h) printE(a$step.size[1], 1) else paste(printE(range(a$step.size), 1), collapse = "..."),
         ".)\n", sep = "")
   }
 }
@@ -49,7 +49,7 @@ print.Hessian <- function(x, digits = 4, shave.spaces = TRUE,
   cat("Estimated Hessian:\n")
   printMat(x, digits = digits, shave.spaces = shave.spaces, begin = begin, sep = sep, end = end)
   cat("(step size: ", begin,
-      if (same.h) printE(a$step.size[1], 1) else paste0(printE(a$step.size, 1), collapse = sep),
+      if (same.h) printE(a$step.size[1], 1) else paste(printE(a$step.size, 1), collapse = sep),
       end, ")\n", sep = "")
 }
 
@@ -72,7 +72,7 @@ print.stepsize <- function(x, ...) {
   } else if (x$method %in% c("Mathur", "Kink")) {
     cat(x$method, " grid search across ", x$counts, " step sizes ended with code ", x$exitcode, ".\n", sep = "")
   } else {
-    cat(x$method, " search terminated after ", paste0(x$counts, collapse = "+"),
+    cat(x$method, " search terminated after ", paste(x$counts, collapse = "+"),
         " iterations with code ", x$exitcode, ".\n", sep = "")
   }
   cat("Error estimates: truncation ", sprintf("%1.0e", x$abs.error[1]),

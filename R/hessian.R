@@ -220,9 +220,9 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
         acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) rep(2*ma$r, n) else rep(8L, n)
         if (is.na(ma$d)) ma$d <- .Machine$double.eps^(1 / (2 + acc.order))
         if (is.numeric(ma$v)) {
-          warning(paste0("Unlike numDeriv, which uses a large initial step size and ",
-                         "shrinkage, pnd uses a smaller initial step and an equispaced ",
-                         "symmetric grid. The method argument 'v' will be therefore ignored."))
+          warning("Unlike numDeriv, which uses a large initial step size and ",
+                  "shrinkage, pnd uses a smaller initial step and an equispaced ",
+                  "symmetric grid. The method argument 'v' will be therefore ignored.")
         }
         is.small <- abs(x) < ma$zero.tol
         h <- (ma$d * abs(x) * !is.small) + (ma$eps * is.small)
@@ -230,9 +230,9 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
       ell[["method"]] <- NULL
     }
     if (length(acc.order) != n) stop("The 'r' method argument must have length 1.")
-    warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
-                   "with more appropriate default values and facilities for automatic ",
-                   "step-size selection. See ?Hessian for more information."))
+    warning("You are using numDeriv-like syntax. We recommend using the new syntax ",
+            "with more appropriate default values and facilities for automatic ",
+            "step-size selection. See ?Hessian for more information.")
   }
 
   if (missing(FUN)) {
@@ -277,14 +277,14 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
   nonfinite.f   <- !sapply(fvals, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals, is.na)) & (!sapply(fvals, is.infinite))
   if (any(horrible.f)) {
-    warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-                   "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
-                   "returning character or other type. Check the function output."))
+    warning("'FUN' must output numeric values only, but some non-numeric values were ",
+            "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
+            "returning character or other type. Check the function output.")
     fvals[horrible.f] <- NA_real_
   } else if (any(nonfinite.f)) {
-    warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-                   "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
-                   "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
+    warning("'FUN' must output numeric values only, but some non-numeric values were ",
+            "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
+            "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution.")
     fvals[nonfinite.f] <- NA_real_
   }
 

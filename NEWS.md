@@ -8,7 +8,6 @@
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
 - FEATURE: SW, M, K algorithm for arbitrary derivative and accuracy orders
 - FEATURE: if any algorithm returns a step size larger than `0.5*|x|`, throw a warning
-- FEATURE: Handle NA in SSS -- test like `step.M`, and auto-shrink the step at the beginning if `FUN(x)` is not finite
 - FEATURE: Add a vector of step sizes for different arguments
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
 - FEATURE: Arbitrary mixed orders
@@ -24,6 +23,7 @@
 
 # pnd 0.1.0 (2015-XX-XX)
 - Feature: original kink-based algorithm for step size selection `step.K()`
+- Feature: added safety shrinking if `FUN(x)` is finite but `FUN(x+h)` is not in all SSS routines
 - Feature: added S3 printing methods for derivatives and step sizes
 - Feature: removed the `diagnostics` and `report` arguments; the iteration information is always saved, but not printed
 - Feature: added support for `max.rel.error` for all step-selection methods

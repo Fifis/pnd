@@ -5,7 +5,7 @@ safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(
 checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(attributes(x)), "error")
 
 # Concatenate together with a comma between the terms
-pasteAnd <- function(x) paste0(x, collapse = ", ")
+pasteAnd <- function(x) paste(x, collapse = ", ")
 
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234
 printE <- function(x, d = 2) sprintf(paste0("%1.", d, ifelse(x >= 0.01 & x <= 10^d, "f", "e")), x)
@@ -49,7 +49,7 @@ printMat <- function(x, digits = 3, shave.spaces = TRUE,
   if (format) x <- formatMat(x, digits = digits, shave.spaces = shave.spaces)
   x <- split(x, seq_len(nrow(x)))
   for (i in seq_along(x)) {
-    x[[i]] <- paste0(begin, paste0(x[[i]], collapse = sep), end, collapse = "")
+    x[[i]] <- paste(begin, paste(x[[i]], collapse = sep), end, sep = "", collapse = "")
     if (print) cat(x[[i]], "\n", sep = "")
   }
   return(invisible(unname(unlist(x))))
@@ -98,7 +98,7 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
     xe <- sprintf(paste0("%1.", digits, "e"), xe)
     xe <- gsub("e([+-])0", "e\\1", xe)  # Shaving off the redundant zero
     if (any(exact.zero)) {
-      xe[exact.zero] <- paste0(c("0 ", rep(" ", digits)), collapse = "")
+      xe[exact.zero] <- paste(c("0 ", rep(" ", digits)), collapse = "")
     }
   }
 
@@ -107,11 +107,11 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
   xout[(!econd) & fcond] <- xe
 
   has.minus <- grepl("^\\-", xout)  # Padding with spaces if there is a minus
-  if (any(has.minus) && any(!has.minus)) xout[(!has.minus) & fcond] <- paste0(" ", xout[(!has.minus) & fcond])
+  if (any(has.minus) && !all(has.minus)) xout[(!has.minus) & fcond] <- paste0(" ", xout[(!has.minus) & fcond])
 
   # Padding with spaces to right-align with the exponential caboose
   has.exp <- grepl("e", xout)
-  if (any(has.exp) && any(!has.exp)) xout[(!has.exp) & fcond] <- paste0(xout[(!has.exp) & fcond],  "   ")
+  if (any(has.exp) && !all(has.exp)) xout[(!has.exp) & fcond] <- paste0(xout[(!has.exp) & fcond],  "   ")
 
   # Restoring non-finite values
   x[!fcond] <- xi
@@ -188,7 +188,7 @@ alignStrings <- function(x, names = NULL, pad = c("l", "c", "r")) {
   n  <- nchar(yx)
   nmax <- apply(n, 2, max)
   nshort <- -sweep(n, 2, nmax, "-")
-  repN <- function(n) if (n > 0) paste0(rep(" ", n), collapse = "") else ""
+  repN <- function(n) if (n > 0) paste(rep(" ", n), collapse = "") else ""
   nleft <- switch(pad, l = nshort, c = floor(nshort/2), r = rep(0, length(nshort)))
   nright <- nshort - nleft
   pad.left  <- sapply(nleft, repN)
@@ -217,7 +217,7 @@ checkCores <- function(cores = NULL) {
   if (is.null(cores)) cores <- max.cores
 
   if (cores > max.cores)
-    warning(paste0("Requested more cores than you have logical cores. Consider setting 'cores = ", max.cores, "'.\n"))
+    warning("Requested more cores than you have logical cores. Consider setting 'cores = ", max.cores, "'.\n")
 
   chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")  # Limit to 2 cores for CRAN checks
   if (nzchar(chk) && chk == "TRUE") cores <- min(cores, 2L)
@@ -261,8 +261,8 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
     if (inherits(cl, "cluster"))
       cores <- length(cl)
     else  # Not a cluster implies rubbish input
-      stop(paste0("The object passed as a cluster is not a cluster. ",
-                  "Use 'cl <- parallel::makeCluster(", cores, ")' to create a proper one."))
+      stop("The object passed as a cluster is not a cluster. ",
+           "Use 'cl <- parallel::makeCluster(", cores, ")' to create a proper one.")
   }
 
   cores <- checkCores(cores)

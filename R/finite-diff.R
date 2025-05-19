@@ -38,10 +38,10 @@
 #' # it should be rounded towards zero:
 #' solveVandermonde(s = -3:3, b = c(0, 1, rep(0, 5))) * 60
 solveVandermonde <- function(s, b) {
-  if (length(unique(s)) != length(s)) stop("The stencil points in 's' must be unique.")
+  if (anyDuplicated(s) != 0L) stop("The stencil points in 's' must be unique.")
   if (length(s) != length(b)) stop("The input arguments 's' and 'b' must be of the same length.")
-  if (is.unsorted(s)) warning(paste0("Numerical solutions of Vandermonde systems based on ",
-    "unsorted inputs are EXTREMELY unstable. Sort the input in ascending order!"))
+  if (is.unsorted(s)) warning("Numerical solutions of Vandermonde systems based on ",
+    "unsorted inputs are EXTREMELY unstable. Sort the input in ascending order!")
   # Algorithm 4.6.2 from Golub & Loan (2013) 'Matrix computations', 4th ed.
   n <- length(s) - 1
   for (k in 0:(n-1)) {
@@ -170,9 +170,9 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
         prefix <- switch(acc.order, "st", "nd", "rd")
         if (is.null(prefix)) prefix <- "th"
         acc.order <- acc.order + 1L
-        warning(paste0("You requested ", acc.order-1, prefix, "-order-accurate central differences, ",
-                       "but the minimal stencil will provide accuracy order ", acc.order,
-                       " -- higher by 1, which is generally desirable."))
+        warning("You requested ", acc.order-1, prefix, "-order-accurate central differences, ",
+                "but the minimal stencil will provide accuracy order ", acc.order,
+                " -- higher by 1, which is generally desirable.")
       }
       l.end <- floor(acc.order/2) + floor((deriv.order-1)/2)
       stencil <- (-l.end):l.end
@@ -185,8 +185,8 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   stencil <- sort(stencil)
   is.dup <- duplicated(stencil)
   if (any(is.dup)) {
-    warning(paste0("The user-supplied stencil contains duplicates: ",
-                   paste0(stencil[is.dup], collapse = ", "), " -- dropping them."))
+    warning(paste("The user-supplied stencil contains duplicates: ",
+                  paste(stencil[is.dup], collapse = ", "), " -- dropping them."))
     stencil <- stencil[!is.dup]
   }
   l <- length(stencil)
@@ -197,9 +197,9 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   if (l < deriv.order + acc.order - is.symm) {
     prefix <- switch(a, "st", "nd", "rd")
     if (is.null(prefix)) prefix <- "th"
-    warning(paste0("The user-supplied stencil needs ", acc.order - a,
-                   " more unique points to achieve the requested accuracy order ", acc.order, ". ",
-                   "The result will be only ", a, prefix, "-order-accurate."))
+    warning("The user-supplied stencil needs ", acc.order - a,
+            " more unique points to achieve the requested accuracy order ", acc.order, ". ",
+            "The result will be only ", a, prefix, "-order-accurate.")
   }
 
   b <- numeric(l)
@@ -221,7 +221,7 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
     }
   }
   rs <- round(stencil, 2) # Suitable names for reasonable integer stencils
-  if (any(duplicated(rs))) {
+  if (anyDuplicated(rs) != 0) {
     rs <- sprintf("%1.2e", stencil)
     names(weights) <- paste0("x", ifelse(stencil < 0, "", "+"), rs, "h")
     warning(paste("Stencils should contain large entries like '-0.5, 1, 3', but this one has",
@@ -238,7 +238,7 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   resulting.terms[abs(resulting.terms) < zero.tol] <- 0
   flabs <- vapply(oseq, function(i) {
     if (i == 0) " f" else
-      if (i <= 4) paste0(" f", paste0(rep("'", i), collapse = "")) else
+      if (i <= 4) paste(" f", paste(rep("'", i), collapse = "")) else
         paste0(" f^(", i, ")")
   }, FUN.VALUE = character(1))
   frac <- paste0(sprintf("%.4e", resulting.terms), flabs)
@@ -247,7 +247,7 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
     frac <- "f exactly"
     ea <- Inf
   } else {
-    frac <- paste0(frac[which(resulting.terms != 0)[1:2]], collapse = " + ")
+    frac <- paste(frac[which(resulting.terms != 0)[1:2]], collapse = " + ")
     frac <- gsub("*1\\.0000e\\+00", "", frac)
     frac <- paste0(gsub("\\+ -", "- ", gsub("^ +", "", frac)), " + ...")
     # Updating the effective accuracy order in case of zero stencil elements

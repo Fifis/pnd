@@ -94,10 +94,10 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   } else {
     vector.fail <- if (n > 1) FALSE else NA
   }
-  if (all(!is.finite(f0)))
-    warning(paste0("Could not evaluate FUN(x) to at least one finite numeric value ",
-                "neither directly nor coordinate-wise. Make sure that the function ",
-                "value at the requested point is a numeric vector or scalar."))
+  if (!any(is.finite(f0)))
+    warning("Could not evaluate FUN(x) to at least one finite numeric value ",
+            "neither directly nor coordinate-wise. Make sure that the function ",
+            "value at the requested point is a numeric vector or scalar.")
 
   l <- length(f0)
 
@@ -419,17 +419,17 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
         acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) 2*ma$r else 8
         if (is.na(ma$d)) ma$d <- .Machine$double.eps^(1 / (1 + acc.order))
         if (is.numeric(ma$v)) {
-          warning(paste0("Unlike numDeriv, which uses a large initial step size and ",
-                         "shrinkage, pnd uses a smaller initial step and an equispaced ",
-                         "symmetric grid. The method argument 'v' will be therefore ignored."))
+          warning("Unlike numDeriv, which uses a large initial step size and ",
+                  "shrinkage, pnd uses a smaller initial step and an equispaced ",
+                  "symmetric grid. The method argument 'v' will be therefore ignored.")
         }
         is.small <- abs(x) < ma$zero.tol
         h <- ma$d * abs(x) + ma$eps * is.small
       }
     }
-    warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
-                   "with more appropriate default values and facilities for automatic ",
-                   "step-size selection. See ?Grad and ?gradstep for more information."))
+    warning("You are using numDeriv-like syntax. We recommend using the new syntax ",
+            "with more appropriate default values and facilities for automatic ",
+            "step-size selection. See ?Grad and ?gradstep for more information.")
   }
 
   if (missing(FUN)) {
@@ -500,14 +500,14 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   nonfinite.f   <- !sapply(fvals0, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
   if (any(horrible.f)) {
-    warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-                   "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
-                   "returning character or other type. Check the function output."))
+    warning("'FUN' must output numeric values only, but some non-numeric values were ",
+            "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
+            "returning character or other type. Check the function output.")
     fvals0[horrible.f] <- NA_real_
   } else if (any(nonfinite.f)) {
-    warning(paste0("'FUN' must output numeric values only, but some non-numeric values were ",
-                   "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
-                   "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution."))
+    warning("'FUN' must output numeric values only, but some non-numeric values were ",
+            "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
+            "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution.")
     fvals0[nonfinite.f] <- NA_real_
   }
 
@@ -655,8 +655,8 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
   if (chk["multivalued"])
-    stop(paste0("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
-                "to obtain a matrix of derivatives."))
+    stop("Use 'Jacobian()' instead of 'Grad()' for vector-valued functions ",
+         "to obtain a matrix of derivatives.")
 
   d <- GenD(FUN = FUN, x = x,
             elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],

@@ -116,6 +116,6 @@ test_that("parallelisation of Hessian works", {
 
 test_that("high-dimensional Hessians work", {
   f <- function(x) 0.5*mean(x^2)
-  expect_equal(diag(Hessian(f, 1:100)), rep(0.01, 100), tolerance = 1e-4)
+  expect_equal(diag(Hessian(f, 1:50)), rep(1/50, 50), tolerance = 1e-5)
 })
 
