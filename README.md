@@ -24,7 +24,7 @@ Optimal step sizes and parallel evaluation of numerical derivatives translate di
 - **Gradient and Hessian calculations:** obtain the direction and curvature required by most quasi-Newton optimisation algorithms.
 - **Parallel capabilities:** evaluate multiple values under the best parallelisation scheme that reduces overhead. For example, on a 12-core machine, a 4th-order accurate Jacobian of a 3-dimensional function takes almost the same amount of time as one function evaluation.
 - **Optimal step size selection:** obtain adaptive step size to ensure the best trade-off between mathematical truncation error and computer floating-point rounding error for the best overall accuracy.
-- **Five optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2025) modification, Dumontet–Vignes (1977), Stepleman–Winarsky (1979), and Mathur (2012) algorithms. Future versions will feature parallelised algorithms.
+- **Six optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2025) modification, Dumontet–Vignes (1977), Stepleman–Winarsky (1979), Mathur (2012), and Kostyrka (2025) algorithms. Future versions will feature parallelised algorithms.
 
 ## Getting started
 
