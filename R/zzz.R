@@ -18,7 +18,6 @@
   # Worst case: less than a quarter is returned
   if (is.null(cores) || is.na(cores)) cores <- max(1, floor(parallel::detectCores()/2) - 1)
 
-  # if (cores > 4) cores <- cores - 1  # Leaving some resources for the system
   msg <- paste0(cores, " physical cores for parallelism through mclapply forking are available on Linux.\n")
   if (os == "Windows") msg <- paste0(msg, "Create and register a default cluster first.")
   if (.Platform$OS.type != "unix") {

@@ -2,9 +2,11 @@
 
 test_that("step size length h0 must be 1 or length(x)", {
   expect_error(gradstep(x = 1, FUN = sin, h0 = c(1e-5, 1e-6)), "must be a scalar")
-  expect_error(gradstep(x = 1:2,
-                        FUN = function(z) {if (length(z)>1) stop("Non-vectorised"); z^2}),
-               "must be finite")
+  expect_error(gradstep(x = 1:2, FUN = function(z) {
+    if (length(z) > 1) stop("Non-vectorised")
+    z^2
+    }),
+    "must be finite")
   expect_equal(gradstep(sin, 1, h0 = 0.01)$exitcode, 0)
   # expect_equal(gradstep(function(x) sum(sin(x)), 1:3, h0 = 0.01)$exitcode, rep(0, 3))
 })

@@ -36,10 +36,6 @@ generateGrid2 <- function(x, side, acc.order, h) {
     xmat
   })
   xmat.diagonal <- do.call(rbind, xmat.diagonal)
-  n1 <- nrow(xmat.diagonal)
-  # The duplicated element would be x0
-  is.x0 <- which(rownames(xmat.diagonal) == "x")
-  is.dup.x0 <- is.x0[-1]
 
   sw.list <- lapply(1:n, function(j) fdCoef(deriv.order = 1, acc.order = acc.order[j], side = side[j]))
   bh.list <- lapply(1:n, function(j) sw.list[[j]]$stencil * h[j])  # Shifts
@@ -75,7 +71,6 @@ generateGrid2 <- function(x, side, acc.order, h) {
       xmat
     })
     xmat.offdiag <- do.call(rbind, xmat.offdiag)
-    n2 <- nrow(xmat.offdiag)
   } else {  # 1x1 Hessians
     xmat.offdiag <- NULL
   }

@@ -88,7 +88,8 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     if (is.na(vector.fail))
       stop("Could not evaluate FUN(x) for scalar x. Derivatives or gradients cannot be computed.")
     tic0 <- Sys.time()
-    f0 <- suppressWarnings(unlist(runParallel(FUN = function(y) safeF(FUN, y, ...), x = x, cl = cl, preschedule = preschedule)))
+    f0 <- suppressWarnings(unlist(runParallel(FUN = function(y) safeF(FUN, y, ...),
+                                              x = x, cl = cl, preschedule = preschedule)))
     tic1 <- Sys.time()
   } else {
     vector.fail <- if (n > 1) FALSE else NA
@@ -175,6 +176,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     attr(ret, "f") <- c(f0, fhvals)
   }
   attr(ret, "seconds") <- if (user.f0) NA else as.numeric(difftime(tic1, tic0, units = "secs"))
+  attr(ret, "message") <- msg
 
   class(ret) <- "checkDimensions"
   return(ret)
@@ -457,7 +459,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                        cores = cores, preschedule = preschedule, cl = cl, ...)
     h <- h.auto$par
     autostep <- TRUE
-    # TODO: use this gradient already
+    # TODO: use this gradient already for central differences
   } else if (any(h <= 0)) {
     stop("The argument 'h' (step size) must be positive.")
   }
@@ -493,7 +495,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   # TODO: deduplicate, save CPU
-  fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x, cores = cores, cl = cl, preschedule = preschedule)
+  fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
+                        cores = cores, cl = cl, preschedule = preschedule)
   nonfinite.f   <- !sapply(fvals0, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
   if (any(horrible.f)) {
@@ -527,6 +530,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   attr(jac, "step.size") <- h
   if (autostep) {
     attr(jac, "step.size.method") <- hmethod
+    # TODO: use in printing
+    attr(jac, "step.search") <- h.auto
   } else if (all(h == h.default)) {
     attr(jac, "step.size.method") <- "default"
   } else if (compat) {
@@ -534,8 +539,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   } else {
     attr(jac, "step.size.method") <- "user-supplied"
   }
-  # TODO: use in printing
-  if (autostep) attr(jac, "step.search") <- h.auto
 
   class(jac) <- "GenD"
   return(jac)

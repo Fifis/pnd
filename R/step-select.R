@@ -277,7 +277,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   version <- match.arg(version)
@@ -418,7 +419,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 #'         \item \code{1} – Third derivative is zero; large step size preferred.
 #'         \item \code{3} – Solution lies at the boundary of the allowed value range.
 #'         \item \code{4} – Maximum number of iterations reached; optimal step size is within the allowed range.
-#'         \item \code{5} – Maximum number of iterations reached; optimal step size was outside allowed range and had to be snapped to a boundary.
+#'         \item \code{5} – Maximum number of iterations reached; optimal step size
+#'           was outside allowed range and had to be snapped to a boundary.
 #'         \item \code{6} – No search was performed (used when \code{maxit = 1}).
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
@@ -443,7 +445,8 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     ratio.limits = c(2, 15), maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -462,7 +465,8 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   while (i <= maxit) {
     if (i == 1) k <- k0
-    res.i <- getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error, cores = cores, cl = cl, preschedule = preschedule, ...)
+    res.i <- getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error,
+                       cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
@@ -533,9 +537,6 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   cd <- (fgrid[2] - fgrid[1]) / h / 2
   etrunc <- unname(abs(res.i$deriv["f3"])) * h^2 / 6     # Formula for 'em' from Dumontet (1973), 1.4.2 (p. 37)
   eround <- max.rel.error * max(abs(fgrid)) / h  # Formula for 'ed' ibid.
-  # err <- max.rel.error*abs(f0)/h/3 +
-  #   (exitcode != 1) * (h^5*f3^2/36/max.rel.error/abs(f0) - h^8*abs(f3)^3/648/max.rel.error^2/f0^2)
-  # We are not interested in the aggregate error, we need a decomposition
 
   msg <- switch(exitcode + 1,
                 "target error ratio reached within tolerance",
@@ -611,7 +612,8 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
                         cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                         cl = NULL, ...) {
   # TODO: add zero.tol everywhere
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -622,7 +624,8 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   iters <- vector("list", 2)
-  iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1, cores = cores, cl = cl, preschedule = preschedule, ...)
+  iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1,
+                              cores = cores, cl = cl, preschedule = preschedule, ...)
   cd3 <- iters[[1]]$cd
   f0 <- iters[[1]]$f0
 
@@ -654,8 +657,8 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
     side <- "right"
   }
 
-  iters[[2]] <- getValsPlugin(FUN = FUN, x = x, h = h, stage = 2, cores = cores, cl = cl, preschedule = preschedule, ...)
-  fgrid <- iters[[2]]$f
+  iters[[2]] <- getValsPlugin(FUN = FUN, x = x, h = h, stage = 2,
+                              cores = cores, cl = cl, preschedule = preschedule, ...)
 
   msg <- switch(exitcode + 1,
                 "successfully computed non-zero f''' and f'",
@@ -752,7 +755,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
@@ -772,7 +776,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     if (!main.loop) {
       if (i == 1) {
         res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
-                           ratio.last = NULL, ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
+                           ratio.last = NULL, ratio.beforelast = NULL,
+                           cores = cores, cl = cl, preschedule = preschedule, ...)
         iters[[i]] <- res.i
         f0 <- res.i$f0
         hnew <- res.i$h
@@ -814,7 +819,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
             if (hnew > range[2]) hnew <- range[2] # Safeguarding against huge steps
             res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
-                               ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
+                               ratio.last = iters[[i-1]], ratio.beforelast = NULL,
+                               cores = cores, cl = cl, preschedule = preschedule, ...)
             iters[[i]] <- res.i
             if (abs(hnew/hold - 1) < seq.tol) { # The algorithm is stuck at one range end
               main.loop <- TRUE
@@ -831,7 +837,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
               for (i in 1:maxit) {
                 hnew <- hnew/2
                 res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
-                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
+                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL,
+                                   cores = cores, cl = cl, preschedule = preschedule, ...)
                 iters[[i]] <- res.i
                 if (is.finite(res.i$f)) break
               }
@@ -848,7 +855,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
               for (i in 1:maxit) {
                 hnew <- hnew/2
                 res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
-                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL, cores = cores, cl = cl, preschedule = preschedule, ...)
+                                   ratio.last = iters[[i-1]], ratio.beforelast = NULL,
+                                   cores = cores, cl = cl, preschedule = preschedule, ...)
                 iters[[i]] <- res.i
                 if (is.finite(res.i$f)) break
               }
@@ -889,7 +897,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       if (hnew < range[1]) hnew <- range[1]
       i <- i + 1
       res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
-                         ratio.last = iters[[i-1]], ratio.beforelast = iters[[i-2]], cores = cores, cl = cl, preschedule = preschedule, ...)
+                         ratio.last = iters[[i-1]], ratio.beforelast = iters[[i-2]],
+                         cores = cores, cl = cl, preschedule = preschedule, ...)
       iters[[i]] <- res.i
     }
 
@@ -1062,7 +1071,8 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
                    correction = TRUE, plot = FALSE,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * max(abs(x), 1)
@@ -1314,7 +1324,8 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                    max.rel.error = .Machine$double.eps^(7/8), plot = FALSE,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
-  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. For 'x' longer than 1, use 'gradstep'.")
+  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+                                  "For 'x' longer than 1, use 'gradstep'."))
   if (!is.numeric(shrink.factor) || shrink.factor <= 0 || shrink.factor >= 1)
     stop("'shrink.factor' must be strictly greater than 0 and less than 1. Recommended: 0.5.")
   if (acc.order %% 2 != 0) stop("'acc.order' must be even for central differences.")
@@ -1353,12 +1364,6 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   hat.check <- NULL
 
   # Creating a sequence of step sizes for evaluation
-  sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
-  range.sugg <- range / c(1024, 1/1024)
-  err1 <- paste0("Either increase 'shrink.factor' (e.g. from ", shrink.factor,
-                 " to ", sf.sugg, ") to have a finer grid, or increase 'range' (",
-                 "from [", pasteAnd(printE(range)), "] to ",
-                 "[", pasteAnd(printE(range.sugg)), "]).")
   hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
   n <- length(hgrid)
   xgrid <- x + c(-hgrid, hgrid)
@@ -1407,8 +1412,8 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   med.te <- if (any(good.te)) stats::median(etrunc[good.te]) else .Machine$double.eps
 
   # Approximate rounding error for the plot
-  # epsilon = relative error of evaluation of f(x), e.g. maximum noise
-  # delta = Error of |f'(x)true - f'(x)| / |f(x)true|
+  # epsilon is the relative error of evaluation of f(x), e.g. maximum noise
+  # delta is the error of |f'(x)true - f'(x)| / |f(x)true|
   # Taking not the exact terms but the first necessary n terms because it does not matter for small h
   # and is too erratic in any case
   stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order)
@@ -1572,12 +1577,12 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
         i.trunc.okay <- i.trunc.okay[i.trunc.okay > (max(i.round)-3)]  # To avoid random jumps in the rounding part
         elabels[i.trunc.okay] <- "o"
       } else {
-        i.trunc.valid <- i.trunc.ok <- NULL
+        i.trunc.valid <- i.trunc.okay <- NULL
       }
       i.trunc.increasing <- (c(NA, diff(etrunc)) > 0) | (c(diff(etrunc), NA) > 0)
       i.trunc.increasing <- setdiff(which(i.trunc.increasing), c(i.trunc.okay, i.trunc.valid))
       if (length(i.trunc.increasing) > 0) i.trunc.increasing <- i.trunc.increasing[i.trunc.increasing >= (max(i.round)-2)]
-      if (length(i.trunc.increasing) > 0 & length(c(i.trunc.valid, i.trunc.okay)) > 0)
+      if (length(i.trunc.increasing) > 0 && length(c(i.trunc.valid, i.trunc.okay)) > 0)
         i.trunc.increasing <- i.trunc.increasing[i.trunc.increasing <= (max(i.trunc.valid, i.trunc.okay)-2)]
       elabels[i.trunc.increasing] <- "i"
 
@@ -1671,7 +1676,6 @@ plotTE <- function(hgrid, etotal, eround, hopt = NULL,
                    elabels = NULL, echeck = NULL,
                    epsilon = .Machine$double.eps^(7/8), ...) {
   cols <- c("#7e1fde", "#328d2d", "#d58726", "#ca203a")
-  evec <- c(etotal, eround)
   good.inds <- is.finite(etotal) & (etotal != 0)
   if (!any(good.inds)) {
     warning("The truncation error is either exactly 0 or NA. Nothing to plot.")

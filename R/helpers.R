@@ -268,11 +268,7 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
   cores <- checkCores(cores)
 
   # If no specific parameters are requested, evaluate; if cl is not NULL, then, cores has the necessary length
-  if (cores == 1) {
-    #  if (is.list(x) && length(x) > 0 && inherits(x[[1]], "expression"))
-    #    stop("Internal error: lapply should call the function directly to prevent overhead.")
-    return(lapply(x, FUN))
-  }
+  if (cores == 1) return(lapply(x, FUN))
 
   if (is.null(cl) && cores > 1) {
     if (.Platform$OS.type == "windows") {
@@ -300,6 +296,9 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
 #' taken as input, and repeated indices of the first occurrence of each row
 #' are returned.
 #'
+#' This function is faster -- at least in the examples tested so far -- than
+#' `match(data.frame(t(m)), data.frame(t(unique(m))))`.
+#'
 #' @returns A vector of row indices corresponding to the first ocurrence of a given row.
 #' @export
 #'
@@ -311,17 +310,15 @@ dupRowInds <- function(m) {
   tm <- t(m)
   d <- duplicated(m)
   di <- which(d)
-  if (length(di) == 0) return(1:nrow(m))
+  if (length(di) == 0) return(seq_len(nrow(m)))
   mdup  <- m[di, , drop = FALSE]
-  tmuniq <- t(m[-di, , drop = FALSE])
   mudup  <- unique(mdup)  # Unique duplicates
 
   ret <- rep(NA, nrow(m))
   ret[!d] <- 1:sum(!d)
-  for (i in 1:nrow(mudup)) {
+  for (i in seq_len(nrow(mudup))) {
     muniq.match <- which(apply(tm == mudup[i, ], 2, all))
     ret[muniq.match[-1]] <- ret[muniq.match[1]]
   }
   return(ret)
 }
-

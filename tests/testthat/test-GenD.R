@@ -34,4 +34,3 @@ test_that("missing values are treated properly", {
   expect_warning(Grad(f, 1:3, side = 1, elementwise = TRUE, vectorised = FALSE,
                       multivalued = FALSE), "not even NA")
 })
-

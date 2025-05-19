@@ -43,8 +43,6 @@ print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
 #' @export
 print.Hessian <- function(x, digits = 4, shave.spaces = TRUE,
                           begin = "", sep = "  ", end = "", ...) {
-  nc <- NCOL(x)
-  nr <- NROW(x)
   a <- attributes(x)
   # Printing gradients because those are manageable
   same.h <- all(a$step.size[1] == a$step.size)
@@ -74,7 +72,8 @@ print.stepsize <- function(x, ...) {
   } else if (x$method %in% c("Mathur", "Kink")) {
     cat(x$method, " grid search across ", x$counts, " step sizes ended with code ", x$exitcode, ".\n", sep = "")
   } else {
-    cat(x$method, " search terminated after ", paste0(x$counts, collapse = "+"), " iterations with code ", x$exitcode, ".\n", sep = "")
+    cat(x$method, " search terminated after ", paste0(x$counts, collapse = "+"),
+        " iterations with code ", x$exitcode, ".\n", sep = "")
   }
   cat("Error estimates: truncation ", sprintf("%1.0e", x$abs.error[1]),
       ", rounding ", sprintf("%1.0e", x$abs.error[2]), ", total ", sprintf("%1.0e", sum(x$abs.error)), ".\n", sep = "")
@@ -98,9 +97,11 @@ print.gradstep <- function(x, ...) {
         "Numerical derivative value: [", pasteAnd(printE(x$value)), "].\n", sep = "")
     all.equal.ec <- all(diff(x$exitcode) == 0)
     if (x$method == "plug-in") {
-      cat("Plug-in calculations terminated with code ", if (all.equal.ec) x$exitcode[1] else pasteAnd(x$exitcode), ".\n", sep = "")
+      cat("Plug-in calculations terminated with code ",
+          if (all.equal.ec) x$exitcode[1] else pasteAnd(x$exitcode), ".\n", sep = "")
     } else if (x$method %in% c("Mathur", "Kink")) {
-      cat(x$method, " grid searches across ", x$counts, " step sizes ended with codes ", pasteAnd(x$exitcode), ".\n", sep = "")
+      cat(x$method, " grid searches across ", x$counts, " step sizes ended with codes ",
+          pasteAnd(x$exitcode), ".\n", sep = "")
     } else {
       cat(x$method, " searches terminated with codes ", pasteAnd(x$exitcode), ".\n", sep = "")
     }
@@ -118,4 +119,3 @@ print.checkDimensions <- function(x, ...) {
       if (!x["vectorised"]) "NOT ", "vectorised, ",
       if (!x["multivalued"]) "single-valued." else "multi-valued.", sep = "")
 }
-

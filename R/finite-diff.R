@@ -236,8 +236,11 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   B <- outer(stencil, oseq, "^")
   resulting.terms <- colSums(B * weights) / factorial(oseq)
   resulting.terms[abs(resulting.terms) < zero.tol] <- 0
-  flabs <- vapply(oseq, function(i) if (i == 0) " f" else if (i <= 4)
-    paste0(" f", paste0(rep("'", i), collapse = "")) else paste0(" f^(", i, ")"), FUN.VALUE = character(1))
+  flabs <- vapply(oseq, function(i) {
+    if (i == 0) " f" else
+      if (i <= 4) paste0(" f", paste0(rep("'", i), collapse = "")) else
+        paste0(" f^(", i, ")")
+  }, FUN.VALUE = character(1))
   frac <- paste0(sprintf("%.4e", resulting.terms), flabs)
   # If the interpolation is exact, then, the total error is zero
   if (identical(stencil, 0)) {
