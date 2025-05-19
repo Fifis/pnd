@@ -31,6 +31,11 @@ test_that("Curtis-Reid step selection behaves reasonably", {
 
 })
 
+test_that("Curtis--Reid algorithm stops if the function returns NA for all allowed step sizes", {
+  f <- function(x) ifelse(abs(x - 2) < 1e-8, x^4, NA)
+  expect_error(step.CR(f, 2, range = c(1e-7, 1e-2)), "attempts of step shrinkage")
+})
+
 test_that("Curtis--Reid steps grow for linear functions", {
   expect_equal(step.CR(x = 1, function(x) x)$exitcode, 1)
 })

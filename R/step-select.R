@@ -49,7 +49,7 @@ getValsCR <- function(FUN, x, h, max.rel.error, vanilla, cores, cl, preschedule,
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
     first.err.ind <- which(e)[1]
-    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+    warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
 
@@ -80,7 +80,7 @@ getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
     first.err.ind <- which(e)[1]
-    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+    warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
 
@@ -102,14 +102,14 @@ getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
 getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
   pow <- if (stage == 1) 3 else 1
   s <- fdCoef(deriv.order = pow)
-  xgrid <- x + s$stencil * h * if (stage == 1) h * .Machine$double.eps^(-2/15) else 1
+  xgrid <- x + s$stencil * h * if (stage == 1) .Machine$double.eps^(-2/15) else 1
 
   FUNsafe <- function(z) safeF(FUN, z, ...)
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
     first.err.ind <- which(e)[1]
-    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+    warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
 
@@ -131,7 +131,7 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
     first.err.ind <- which(e)[1]
-    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+    warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
 
@@ -163,7 +163,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
     first.err.ind <- which(e)[1]
-    warning(paste0("First error: ", as.character(attr(fp[[first.err.ind]], "error"))))
+    warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
   return(matrix(fgrid, ncol = 2))
@@ -277,8 +277,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     range = h0 / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   version <- match.arg(version)
@@ -312,7 +312,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     if (i > 1) {
       if (abs(hnew/hold - 1) < seq.tol) {
         exitcode <- 2
-        break # Step 4: if the step size does not change, stop
+        break  # Step 4: if the step size does not change, stop
       } else { # 4a, b: outside the range, replace with the border
         if (hnew < range[1]) hnew <- range[1]
         if (hnew > range[2]) hnew <- range[2]
@@ -327,9 +327,20 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                        vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
-      stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
-                  ".\nChange the range, which is currently [", pasteAnd(range),
-                  "], and/or\ntry a different starting h0, which is currently ", h0, "."))
+      bad.iters <- 0
+      while (TRUE) {
+        bad.iters <- bad.iters + 1
+        hnew <- hnew / 2
+        if (hnew < max(range[1], .Machine$double.eps))
+          stop("step.CR: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+               " after ", bad.iters, " attempts of step shrinkage",
+               ".\nChange the range, which is currently [", pasteAnd(range),
+               "], and/or\ntry a different starting h0, which is currently ", h0, ".")
+        res.i <- getValsCR(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error,
+                           vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
+        if (!any(bad <- !is.finite(res.i$f))) break
+      }
+      iters[[i]] <- res.i
     }
 
     if (res.i$ratio >= target[1] && res.i$ratio <= target[2]) {
@@ -445,8 +456,8 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     ratio.limits = c(2, 15), maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -469,9 +480,20 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                        cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
-      stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
-                  ". Change the range, which is currently [", pasteAnd(range),
-                  "], and/or try a different starting h0, which is currently ", h0, "."))
+      bad.iters <- 0
+      while (TRUE) {
+        bad.iters <- bad.iters + 1
+        k <- k / 2
+        if (k < max(range[1], .Machine$double.eps))
+          stop("step.DV: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+               " after ", bad.iters, " attempts of step shrinkage",
+               ".\nChange the range, which is currently [", pasteAnd(range),
+               "], and/or\ntry a different starting h0, which is currently ", h0, ".")
+        res.i <- suppressWarnings(getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error,
+                                  cores = cores, cl = cl, preschedule = preschedule, ...))
+        if (!any(bad <- !is.finite(res.i$f))) break
+      }
+      iters[[i]] <- res.i
     }
 
     # Quick rule of thumb: stop after the first iteration
@@ -612,8 +634,8 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
                         cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                         cl = NULL, ...) {
   # TODO: add zero.tol everywhere
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 4)
@@ -626,6 +648,23 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   iters <- vector("list", 2)
   iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1,
                               cores = cores, cl = cl, preschedule = preschedule, ...)
+  if (any(bad <- !is.finite(iters[[1]]$f))) {
+    bad.iters <- 0
+    while (TRUE) {
+      bad.iters <- bad.iters + 1
+      h0 <- h0 / 2
+      if (h0 < max(range[1], .Machine$double.eps))
+        stop("step.plugin: Could not compute the function value at ", pasteAnd(iters[[1]]$x[bad]),
+             " after ", bad.iters, " attempts of step shrinkage",
+             ".\nChange the range, which is currently [", pasteAnd(range),
+             "], and/or\ntry a different starting h0, which is currently ", h0, ".")
+      iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1,
+                                  cores = cores, cl = cl, preschedule = preschedule, ...)
+      if (!any(bad <- !is.finite(iters[[1]]$f))) break
+    }
+  }
+
+
   cd3 <- iters[[1]]$cd
   f0 <- iters[[1]]$f0
 
@@ -755,8 +794,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
   cores <- min(cores, 3)
@@ -779,15 +818,27 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                            ratio.last = NULL, ratio.beforelast = NULL,
                            cores = cores, cl = cl, preschedule = preschedule, ...)
         iters[[i]] <- res.i
-        f0 <- res.i$f0
+        f0 <- res.i$f0  # f(x)
+        f <- res.i$f    # f(x +- h)
         hnew <- res.i$h
       }
-      if (!is.finite(f0)) {
-        stop(paste0("Could not compute the function value at ", x, ". FUN(x) must be finite."))
-      }
+      if (!is.finite(f0)) stop("Could not compute the function value at ", x, ". FUN(x) must be finite.")
       if (any(bad <- !is.finite(res.i$f))) {
-        stop(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad]),
-                    ". FUN(", x, ") is finite -- reduce the step h0, which is currently ", h0, "."))
+        bad.iters <- 0
+        while (TRUE) {
+          bad.iters <- bad.iters + 1
+          hnew <- hnew / 2
+          if (hnew < max(range[1], .Machine$double.eps))
+            stop("step.SW: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+                 " after ", bad.iters, " attempts of step shrinkage",
+                 ".\nChange the range, which is currently [", pasteAnd(range),
+                 "], and/or\ntry a different starting h0, which is currently ", h0, ".")
+          res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
+                             ratio.last = NULL, ratio.beforelast = NULL,
+                             cores = cores, cl = cl, preschedule = preschedule, ...)
+          if (!any(bad <- !is.finite(res.i$f))) break
+        }
+        iters[[i]] <- res.i
       }
 
       # First check: are the function values of different signs?
@@ -830,10 +881,10 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
             bad <- !is.finite(res.i$f)
             if (any(bad) && !rounding.small) {  # Not in the original paper, but a necessary fail-safe
-              warning(paste0("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
-                             "]. FUN(", pasteAnd(printE(x)), ") is finite -- try the initial step h0 larger than ",
-                             printE(h0), " but smaller than ", printE(hold), ". Halving from ",
-                             printE(hnew), " to ", printE(hnew/2), ")."))
+              warning("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
+                       "]. FUN(", pasteAnd(printE(x)), ") is finite -- try the initial step h0 larger than ",
+                       printE(h0), " but smaller than ", printE(hold), ". Halving from ",
+                       printE(hnew), " to ", printE(hnew/2), ").")
               for (i in 1:maxit) {
                 hnew <- hnew/2
                 res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
@@ -843,15 +894,15 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 if (is.finite(res.i$f)) break
               }
               if (!is.finite(res.i$f))
-                stop(paste0("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
-                             "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
-                             " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
+                stop("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
+                     "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
+                     " Try 'gradstep(..., method = \"K\")' or 'step.K(...)' for a more reliable algorithm.")
             }
 
             if (any(bad) && !rounding.nottoosmall) {
-              warning(paste0("Could not compute the function value at ", pasteAnd(res.i$x[bad, , drop = FALSE]),
-                             ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, ". ",
-                             "Halving from ", printE(hnew), " to ", printE(hnew/2), ")."))
+              warning("Could not compute the function value at ", pasteAnd(res.i$x[bad, , drop = FALSE]),
+                      ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, ". ",
+                      "Halving from ", printE(hnew), " to ", printE(hnew/2), ").")
               for (i in 1:maxit) {
                 hnew <- hnew/2
                 res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = FALSE,
@@ -861,10 +912,10 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 if (is.finite(res.i$f)) break
               }
               if (!is.finite(res.i$f))
-                stop(paste0("Could not compute the function value at [",
-                            pasteAnd(printE(res.i$x[bad, , drop = FALSE])),
-                             "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
-                             " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm."))
+                stop("Could not compute the function value at [",
+                     pasteAnd(printE(res.i$x[bad, , drop = FALSE])),
+                     "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
+                     " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm.")
             }
           }
         } # End initial step search
@@ -902,7 +953,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       iters[[i]] <- res.i
     }
 
-    if (any(!res.i$monotone)) break
+    if (!all(res.i$monotone)) break
   }
   hopt <- iters[[i-1]]$h # No monotonicity = bad
   hprev <- iters[[i-2]]$h
@@ -936,21 +987,21 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                   "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),
                 "maximum number of iterations reached")
 
-  if (exitcode == 2) warning(paste0("The step size did not change between iterations. ",
-                             "This should not happen. Send a bug report to https://github.com/Fifis/pnd/issues"))
+  if (exitcode == 2) warning("The step size did not change between iterations. ",
+                             "This should not happen. Send a bug report to https://github.com/Fifis/pnd/issues")
   if (exitcode == 3 && !close.left)
-    warning(paste0("The algorithm terminated at the right range of allowed step sizes. ",
-                   "Possible reasons: (1) h0 is too low and the bisection step overshot ",
-                   "the next value; (2) h0 was too large and the truncation error estimate ",
-                   "is invalid; (3) the range is too narrow. Please try a slightly larger ",
-                   "and a slightly smaller h0, or expand the range."))
+    warning("The algorithm terminated at the right range of allowed step sizes. ",
+            "Possible reasons: (1) h0 is too low and the bisection step overshot ",
+            "the next value; (2) h0 was too large and the truncation error estimate ",
+            "is invalid; (3) the range is too narrow. Please try a slightly larger ",
+            "and a slightly smaller h0, or expand the range.")
 
   if (hopt > 0.01*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
     exitcode <- 3
-    warning(paste0("The found step size, ", hopt, ", exceeds 1% of |x|, ",
-                   abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
-                   "and x-h due to large steps. Try a different starting value h0 to be sure. ",
-                   "Returning 0.01|x| ."))
+    warning("The found step size, ", hopt, ", exceeds 1% of |x|, ",
+            abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
+            "and x-h due to large steps. Try a different starting value h0 to be sure. ",
+            "Returning 0.01|x| .")
     i <- i + 1
     hopt <- 0.01*abs(x)
     res.i <- getValsSW(FUN = FUN, x = x, h = hopt, max.rel.error = max.rel.error,
@@ -1071,8 +1122,8 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
                    correction = TRUE, plot = FALSE,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   cores <- checkCores(cores)
   if (is.null(h0)) { # Setting the initial step to a large enough power of 2
     h0 <- 0.01 * max(abs(x), 1)
@@ -1177,11 +1228,11 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
       if (any(okay.slopes)) {
         good.slopes <- okay.slopes
         exitcode <- 1
-        warning(paste0("The estimated truncation error has a slightly wrong reduction rate (~",
-                       med.slope, ", but should be ~2). ", err1))
+        warning("The estimated truncation error has a slightly wrong reduction rate (~",
+                med.slope, ", but should be ~2). ", err1)
       } else {
-        warning(paste0("The estimated truncation error has a wrong reduction rate (~", med.slope,
-                    ", but should be ~2). ", err1))
+        warning("The estimated truncation error has a wrong reduction rate (~", med.slope,
+                ", but should be ~2). ", err1)
       }
       i.okay <- i.increasing[okay.slopes]
     }
@@ -1205,17 +1256,17 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
     exitcode <- m3$exitcode
 
     if (exitcode == 2)
-      warning(paste0("Could not find a sequence of of ", min.valid.slopes, " reductions ",
-                     "of the truncation error. Visualise by adding 'plot = TRUE'. ", err1,
-                     " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
-                     "returning the approximate argmin of the total error."))
+      warning("Could not find a sequence of of ", min.valid.slopes, " reductions ",
+              "of the truncation error. Visualise by adding 'plot = TRUE'. ", err1,
+              " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
+              "returning the approximate argmin of the total error.")
     if (exitcode == 3)
-      warning(paste0("There are <3 finite function values on the grid. ",
-                     "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
-                     "function does not return finite values on the range x+[",
-                     pasteAnd(printE(range)), "] with ", n,
-                     " exponentially spaced points. Returning a very rough value that may ",
-                     "not even yield a finite numerical derivative."))
+      warning("There are <3 finite function values on the grid. ",
+              "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
+              "function does not return finite values on the range x+[",
+              pasteAnd(printE(range)), "] with ", n,
+              " exponentially spaced points. Returning a very rough value that may ",
+              "not even yield a finite numerical derivative.")
   }
 
   # !!! If exitcode e, return the last one
@@ -1324,8 +1375,8 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                    max.rel.error = .Machine$double.eps^(7/8), plot = FALSE,
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                    cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
-                                  "For 'x' longer than 1, use 'gradstep'."))
+  if (length(x) != 1) stop("The step-size selection can handle only univariate inputs. ",
+                           "For 'x' longer than 1, use 'gradstep'.")
   if (!is.numeric(shrink.factor) || shrink.factor <= 0 || shrink.factor >= 1)
     stop("'shrink.factor' must be strictly greater than 0 and less than 1. Recommended: 0.5.")
   if (acc.order %% 2 != 0) stop("'acc.order' must be even for central differences.")
@@ -1472,7 +1523,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       # If there are more than 1 run, pick the longest one
       # However, if it is shorter than 5 (2 points were added artificially; we want a length-3 run), discard it
       itv.runs <- splitRuns(i.trunc.valid)
-      itv.len <- sapply(itv.runs, length)
+      itv.len <- lengths(itv.runs)
       if (length(itv.runs) > 1)
         i.trunc.valid <- itv.runs[[which.max(itv.len)]]
       if (length(i.trunc.valid) >= 5) {
@@ -1543,7 +1594,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   if (exitcode %in% c(1, 2)) {
     complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
     f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
-    if (!is.finite(f0)) stop(paste0("Could not compute the function value at ", x, "."))
+    if (!is.finite(f0)) stop("Could not compute the function value at ", x, ".")
     if (f0 < .Machine$double.eps) f0 <- .Machine$double.eps
     expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
     # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
@@ -1802,11 +1853,11 @@ gradstep <- function(FUN, x, h0 = NULL,
 
   ell <- list(...)
   if (any(names(ell) == "method.args"))
-    stop(paste0("'method.args' is an argument to control numDeriv::grad(). ",
-                "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'."))
+    stop("'method.args' is an argument to control numDeriv::grad(). ",
+         "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'.")
   f0 <- safeF(FUN, x, ...)
   if (length(f0) > 1) stop("Automatic step selection works only when the function FUN returns a scalar.")
-  if (is.na(f0)) stop(paste0("Could not compute the function value at [", pasteAnd(x), "]. FUN(x) must be finite."))
+  if (is.na(f0)) stop("Could not compute the function value at [", pasteAnd(x), "]. FUN(x) must be finite.")
   if (length(x) == 1 && length(h0) > 1) stop("The argument 'h0' must be a scalar for scalar 'x'.")
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
@@ -1839,16 +1890,16 @@ gradstep <- function(FUN, x, h0 = NULL,
   if (!is.null(control)) {
     bad.args <- setdiff(names(control), names(margs))
     if (length(bad.args) > 0) {
-      stop(paste0("The following arguments are not supported by the ", method, " method: ",
-                  pasteAnd(bad.args)))
+      stop("The following arguments are not supported by the ", method, " method: ",
+            pasteAnd(bad.args))
     }
     margs[names(control)] <- control
   }
   conflicting.args <- intersect(names(margs), names(ell))
   if (length(conflicting.args) > 0)
-    stop(paste0("The arguments ", pasteAnd(conflicting.args), " of your function coincide with ",
-           "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
-           "incorporate the '...' explicitly."))
+    stop("The arguments ", pasteAnd(conflicting.args), " of your function coincide with ",
+         "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
+         "incorporate the '...' explicitly.")
   autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV,
                     SW = step.SW, M = step.M, K = step.K)
 

@@ -30,6 +30,11 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
   expect_equal(step.DV(x = 2, f, maxit = 1)$exitcode, 6)
 })
 
+test_that("Dumontet--Vignes algorithm stops if the function returns NA for all allowed step sizes", {
+  f <- function(x) ifelse(abs(x - 2) < 1e-8, x^4, NA)
+  expect_error(step.DV(f, 2, range = c(1e-7, 1e-2)), "attempts of step shrinkage")
+})
+
 test_that("Tweaking the DV algorithm for noisier functions", {
   f <- function(x) x^4
   s.perfect <- step.DV(x = 2, f, h0 = 1e-7, max.rel.error = 2e-16)

@@ -10,7 +10,12 @@ test_that("Plug-in step checks for small truncation errors", {
 
 test_that("Plug-in step checks for resprecting the ranges", {
   expect_equal(step.plugin(sin, pi/3, range = c(1e-4, 1e-3))$exitcode, 3)
-  expect_equal(step.plugin(sin, pi/3, range = c(1e-7, 1e-6))$exitcode, 3)
+  expect_equal(step.plugin(sin, pi/3, range = c(1e-9, 1e-8))$exitcode, 3)
+})
+
+test_that("Plug-in algorithm stops if the function returns NA for all allowed step sizes", {
+  f <- function(x) ifelse(abs(x - 2) < 1e-8, x^4, NA)
+  expect_error(step.plugin(f, 2, range = c(1e-7, 1e-2)), "attempts of step shrinkage")
 })
 
 test_that("Parallelisation in plug-in step selection works", {
