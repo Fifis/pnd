@@ -4,7 +4,6 @@
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
 - FEATURE: add a plotting method for all step-size searches
 - FEATURE: add options for default accuracy (maybe 4?)
-- FEATURE: Implement de-duplication in the grid of points; reuse f0 and other precomputed values
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
 - FEATURE: SW, M, K algorithm for arbitrary derivative and accuracy orders
@@ -12,8 +11,6 @@
 - FEATURE: Handle NA in SSS -- test like `step.M`, and auto-shrink the step at the beginning if `FUN(x)` is not finite
 - FEATURE: Add a vector of step sizes for different arguments
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
-- FEATURE: Hessian via direct 4-term difference for a faster evaluation
-- FEATURE: Functions for fast and reliable Hessian computation based on parallel gradient evaluation
 - FEATURE: Arbitrary mixed orders
 - MISC: Write the list of controls on the help page of `gradstep()` explicitly!
 - MISC: Check which packages depend on `numDeriv` and check compatibility with 10 top!
@@ -33,6 +30,7 @@
 - Feature: all step-search methods now return both the truncation and the rounding-error estimate
 - Fix: corrected the wrong formula for the plug-in step size
 - Fix: now 1x1 Hessians can be computed (why, though, if second derivatives exist?)
+- Fix: added the `v` argument for `numDeriv` compatibility
 
 # pnd 0.0.10 (2025-04-02)
 - Fix: GitHub issue #2 -- `checkDimensions` could not handle character `h` passed for auto-selection

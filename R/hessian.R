@@ -76,15 +76,21 @@ generateGrid2 <- function(x, side, acc.order, h) {
   }
 
 
-  # De-duplicate from the very beginning, mark f0
+  # De-duplicate only the main diagonal the very beginning
   xvals <- rbind(xmat.diagonal, xmat.offdiag)
   rownames(xvals) <- NULL
   weights <- xvals[, "weights"]
   i1 <- as.integer(xvals[, "index1"])
   i2 <- as.integer(xvals[, "index2"])
   xvals <- xvals[, 1:n, drop = FALSE]  # The true evaluation grid
+  xvals.diag <- xmat.diagonal[, 1:n, drop = FALSE]
   if (!is.null(names(x))) colnames(xvals) <- names(x)
-  uniq.i <- dupRowInds(xvals)
+  # The duplicates are possible only with f0 on the main diagonal
+  uniq.i <- dupRowInds(xvals.diag)
+  # The off-diagonal elements have unique sequential indices
+  # Safeguarding against empty matrices
+  if (!is.null(xmat.offdiag))
+    uniq.i <- c(uniq.i, seq(max(uniq.i)+1, length.out = nrow(xmat.offdiag)))
   xvals <- t(xvals) # Column operations are faster than row operations
   xvals <- lapply(seq_len(ncol(xvals)), function(i) xvals[, i])
 
