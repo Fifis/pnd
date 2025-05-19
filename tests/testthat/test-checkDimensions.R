@@ -28,3 +28,10 @@ test_that("checkDimensions works with good inputs", {
   expect_equal(unname(noAttr(checkDimensions(f, 1:3))), c(FALSE, TRUE, TRUE))
 
 })
+
+test_that("Checks can be skipped without consequences (user responsibility)", {
+  expect_equal(unname(checkDimensions(sin, 1:2, elementwise = TRUE, vectorised = TRUE, multivalued = FALSE)),
+               c(TRUE, TRUE, FALSE))
+  expect_equal(unname(checkDimensions(sin, 1:2, elementwise = FALSE, vectorised = FALSE, multivalued = TRUE)),
+               c(FALSE, FALSE, TRUE))
+})

@@ -100,7 +100,13 @@ test_that("input check works", {
 
 test_that("compatibility with numDeriv", {
   expect_warning(Hessian(x = 1:4, func = sum), "Use the argument")
+  expect_warning(h <- Hessian(function(x) sum(sin(x)), 1:4, method = "Richardson"), "numDeriv-like syntax")
+  expect_equal(diag(h), -sin(1:4), tolerance = 1e-9)
+
+  w <- capture_warnings(Hessian(x = 1:4, sum, method = "Richardson", method.args = list(v = 2)))
+  expect_true(any(grepl("method argument 'v'", w)))
 })
+
 
 test_that("parallelisation of Hessian works", {
   f <- function(x) mean(x^2)

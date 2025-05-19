@@ -200,7 +200,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
     if (is.null(nd.method) && has.nd.args) nd.method <- "Richardson"
     if (length(nd.method) == 1 && nd.method %in% c("simple", "complex", "Richardson")) {
       margs <- ell$method.args
-      ma <- list(eps = 1e-4, d = NA, zero.tol = 1e-5, r = 4, show.details = FALSE)
+      ma <- list(eps = 1e-4, d = NA, zero.tol = 1e-5, r = 4, v = NA, show.details = FALSE)
       # Using a slightly smaller step size for one-sided differences
       if (nd.method == "simple") ma$eps <- ma$eps * .Machine$double.eps^(1/4 - 1/5)
       ma[intersect(names(margs), names(ma))] <- margs[intersect(names(margs), names(ma))]
@@ -211,7 +211,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
         stop("Complex Hessians not implemented yet.")
       } else if (nd.method == "Richardson") {
         side <- numeric(n)
-        acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) 2*ma$r else 8
+        acc.order <- if (!is.null(ma$r) && is.numeric(ma$r)) rep(2*ma$r, n) else rep(8L, n)
         if (is.na(ma$d)) ma$d <- .Machine$double.eps^(1 / (2 + acc.order))
         if (is.numeric(ma$v)) {
           warning(paste0("Unlike numDeriv, which uses a large initial step size and ",
@@ -223,6 +223,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
       }
       ell[["method"]] <- NULL
     }
+    if (length(acc.order) != n) stop("The 'r' method argument must have length 1.")
     warning(paste0("You are using numDeriv-like syntax. We recommend using the new syntax ",
                    "with more appropriate default values and facilities for automatic ",
                    "step-size selection. See ?Hessian for more information."))
