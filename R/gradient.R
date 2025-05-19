@@ -740,9 +740,11 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
   } else {
     chk <- c(elementwise = elementwise, vectorised = vectorised, multivalued = multivalued)
   }
-  if (!chk["multivalued"])
-    stop(paste0("Use 'Grad()' instead of 'Jacobian()' for scalar-valued functions ",
-                "to obtain a vector of derivatives."))
+  # if (!chk["multivalued"])
+  #   warning(paste0("Use 'Grad()' instead of 'Jacobian()' for scalar-valued functions ",
+  #               "to obtain a vector of derivatives."))
+  # Instead of this old check honour the user's request and really return
+  # a row vector for 1D output
 
   d <- GenD(FUN = FUN, x = x,
             elementwise = chk["elementwise"], vectorised = chk["vectorised"], multivalued = chk["multivalued"],
@@ -750,6 +752,16 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
             h = h, h0 = h0, zero.tol = zero.tol, control = control, f0 = f0,
             cores = cores, preschedule = preschedule, cl = cl,
             func = func, method = method, method.args = method.args, ...)
+
+  if (is.null(dim(d))) {
+    a <- attributes(d)
+    l <- length(d)
+    nms <- a[["names"]]
+    a$names <- NULL
+    d <- matrix(d, nrow = 1)
+    attributes(d)[names(a)] <- a
+    colnames(d) <- nms
+  }
 
   return(d)
 }

@@ -11,8 +11,29 @@ test_that("Jacobians are correct", {
   expect_equal(attr(Jacobian(f, x, h = 0.01), "step.size.method"), "user-supplied")
 })
 
-test_that("function dimension check works", {
-  expect_error(Jacobian(sum, 1:3), "for scalar-valued functions")
+test_that("Jacobian works for scalar functions", {
+  h1 <- function(x) {
+    h <- rep(NA, 1)
+    h[1] <- x[1] + x[2] + x[3] - 1
+    h
+  }
+  h2 <- function(x) {
+    h <- rep(NA, 1)
+    h[1] <- 6*x[2] + 4*x[3] - x[1]^3 - 3
+    h[2] <- x[1]
+    h[3] <- x[2]
+    h[4] <- x[3]
+    h
+  }
+  p0 <- structure(c(0.1, 0.2, 0.3), names = c("A", "B", "C"))
+  h1.jac <- Jacobian(h1, p0)
+  h2.jac <- pnd::Jacobian(h2, p0)
+  expect_true(inherits(h1.jac, "GenD"))
+  expect_true(inherits(h2.jac, "GenD"))
+  expect_equal(dim(h1.jac), c(1, 3))
+  expect_equal(dim(h2.jac), c(4, 3))
+  expect_equal(colnames(h1.jac), c("A", "B", "C"))
+  expect_equal(colnames(h2.jac), c("A", "B", "C"))
 })
 
 test_that("Jacobian works with automatic step sizes", {
@@ -39,7 +60,6 @@ test_that("Jacobian can work on an arbitrary stencil", {
   zeros <- jac == 0
   expect_true(all(dd2[!zeros] > dd4[!zeros]))
 })
-
 
 # TODO: compatibility with numDeriv
 
