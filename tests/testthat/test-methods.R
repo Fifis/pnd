@@ -40,7 +40,7 @@ test_that("Step-size search prints uniform and adequate results", {
 
 test_that("Dimension checks are printed adequately", {
   d <- capture.output(print(checkDimensions(sin, x = 1)))
-  expect_equal(d, "Function properties: element-wise, vectorised, single-valued.")
+  expect_identical(d, "Function properties: element-wise, vectorised, single-valued.")
 })
 
 

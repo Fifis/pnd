@@ -185,8 +185,8 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   stencil <- sort(stencil)
   is.dup <- duplicated(stencil)
   if (any(is.dup)) {
-    warning(paste("The user-supplied stencil contains duplicates: ",
-                  paste(stencil[is.dup], collapse = ", "), " -- dropping them."))
+    warning("The user-supplied stencil contains duplicates: ",
+            toString(stencil[is.dup]), " -- dropping them.")
     stencil <- stencil[!is.dup]
   }
   l <- length(stencil)

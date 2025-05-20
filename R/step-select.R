@@ -300,8 +300,8 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   iters <- list()
-  i <- 1
-  exitcode <- 0
+  i <- 1L
+  exitcode <- 0L
 
   while (i <= maxit) {
     hold <- if (i > 1) hnew else NA
@@ -311,13 +311,13 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     # the 2nd iteration even before the 2nd error calculation
     if (i > 1) {
       if (abs(hnew/hold - 1) < seq.tol) {
-        exitcode <- 2
+        exitcode <- 2L
         break  # Step 4: if the step size does not change, stop
       } else { # 4a, b: outside the range, replace with the border
         if (hnew < range[1]) hnew <- range[1]
         if (hnew > range[2]) hnew <- range[2]
         if (max(hnew/hold, hold/hnew) - 1 < seq.tol) {
-          exitcode <- 3
+          exitcode <- 3L
           break
         }
       }
@@ -332,9 +332,9 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
         bad.iters <- bad.iters + 1
         hnew <- hnew / 2
         if (hnew < max(range[1], .Machine$double.eps))
-          stop("step.CR: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+          stop("step.CR: Could not compute the function value at ", toString(res.i$x[bad]),
                " after ", bad.iters, " attempts of step shrinkage",
-               ".\nChange the range, which is currently [", pasteAnd(range),
+               ".\nChange the range, which is currently [", toString(range),
                "], and/or\ntry a different starting h0, which is currently ", h0, ".")
         res.i <- getValsCR(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error,
                            vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
@@ -347,7 +347,7 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       break # Successful termination by matching the range
     }
     if (res.i$ratio < .Machine$double.eps^(4/5)) {
-      exitcode <- 1  # Zero truncation error -> only rounding error
+      exitcode <- 1L  # Zero truncation error -> only rounding error
       hnew <- hnew * 16 # For linear or quadratic functions, a large h is preferred
       iters[[i+1]] <- getValsCR(FUN = FUN, x = x, h = hnew,  max.rel.error = max.rel.error,
                                 vanilla = vanilla, cores = cores, cl = cl, preschedule = preschedule, ...)
@@ -358,9 +358,9 @@ step.CR <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   }
 
   i <- length(iters)
-  if (i >= maxit) exitcode <- 4
+  if (i >= maxit) exitcode <- 4L
 
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "target error ratio reached within tolerance",
                 "truncation error is close to zero, large step is favoured",
                 "step size did not change between iterations",
@@ -471,7 +471,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
   iters <- list()
   i <- 1
-  exitcode <- 0
+  exitcode <- 0L
   ndownwards <- 0 # For counting the number of downwards shrinkages
 
   while (i <= maxit) {
@@ -485,9 +485,9 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
         bad.iters <- bad.iters + 1
         k <- k / 2
         if (k < max(range[1], .Machine$double.eps))
-          stop("step.DV: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+          stop("step.DV: Could not compute the function value at ", toString(res.i$x[bad]),
                " after ", bad.iters, " attempts of step shrinkage",
-               ".\nChange the range, which is currently [", pasteAnd(range),
+               ".\nChange the range, which is currently [", toString(range),
                "], and/or\ntry a different starting h0, which is currently ", h0, ".")
         res.i <- suppressWarnings(getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error,
                                   cores = cores, cl = cl, preschedule = preschedule, ...))
@@ -498,13 +498,13 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
     # Quick rule of thumb: stop after the first iteration
     if (maxit == 1) {
-      exitcode <- 6
+      exitcode <- 6L
       break
     }
 
     # If the estimate of f''' is near-zero, then, the algorithm must stop to avoid division by near-0
     if (abs(res.i$deriv["f3"]) < 8 * .Machine$double.eps) {
-      exitcode <- 1
+      exitcode <- 1L
       break
     }
 
@@ -531,24 +531,24 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   }
   i <- length(iters)
 
-  f3 <- if (exitcode != 1) sum(res.i$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
+  f3 <- if (exitcode != 1L) sum(res.i$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
   f0 <- mean(res.i$f[2:3]) # Approximately f(x); the error is small for small h
   h <- (1.68 * max.rel.error * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
 
   if (h < range[1]) {
     h <- range[1]
-    exitcode <- 3
+    exitcode <- 3L
     side <- "left"
   }
   if (h > range[2]) {
     h <- range[2]
-    exitcode <- 3
+    exitcode <- 3L
     side <- "right"
   }
 
   # Was the procedure systematically unsuccsessful?
   if (i >= maxit && maxit > 1) {  # Did it waste many iterations in vain?
-    exitcode <- if (h == range[1] || h == range[2]) 5 else 4
+    exitcode <- if (h == range[1] || h == range[2]) 5L else 4L
     side <- if (ndownwards >= maxit/2) "right" else "left"
   }
 
@@ -560,7 +560,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   etrunc <- unname(abs(res.i$deriv["f3"])) * h^2 / 6     # Formula for 'em' from Dumontet (1973), 1.4.2 (p. 37)
   eround <- max.rel.error * max(abs(fgrid)) / h  # Formula for 'ed' ibid.
 
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "target error ratio reached within tolerance",
                 "truncation error is zero, large step is favoured",
                 "",
@@ -654,9 +654,9 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
       bad.iters <- bad.iters + 1
       h0 <- h0 / 2
       if (h0 < max(range[1], .Machine$double.eps))
-        stop("step.plugin: Could not compute the function value at ", pasteAnd(iters[[1]]$x[bad]),
+        stop("step.plugin: Could not compute the function value at ", toString(iters[[1]]$x[bad]),
              " after ", bad.iters, " attempts of step shrinkage",
-             ".\nChange the range, which is currently [", pasteAnd(range),
+             ".\nChange the range, which is currently [", toString(range),
              "], and/or\ntry a different starting h0, which is currently ", h0, ".")
       iters[[1]] <- getValsPlugin(FUN = FUN, x = x, h = h0, stage = 1,
                                   cores = cores, cl = cl, preschedule = preschedule, ...)
@@ -668,12 +668,12 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
   cd3 <- iters[[1]]$cd
   f0 <- iters[[1]]$f0
 
-  exitcode <- 0
+  exitcode <- 0L
   # If the estimate of f''' is near-zero, the step-size estimate may be too large --
   # only the modified one needs not be saved
   me13 <- max.rel.error^(1/3)
   if (abs(cd3) < max.rel.error) {
-    exitcode <- 1
+    exitcode <- 1L
     h <- pmax(me13, abs(x) / 128)
     cd3 <- me13^2 * abs(x)
   } else if (max(abs(f0), me13^2) / abs(cd3) > sqrt(1/max.rel.error)) {
@@ -681,25 +681,25 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
     # small values of f0 are truncated to macheps^(2/3) ~ 4e-11
     cd3 <- sqrt(max.rel.error) * max(abs(f0), me13^2)
     h <- pmax(me13, abs(x) / 256)
-    exitcode <- 2
+    exitcode <- 2L
   } else {  # Everything is OK
     h <- abs(1.5 * f0/cd3 * max.rel.error)^(1/3)
   }
 
   if (h < range[1]) {
     h <- range[1]
-    exitcode <- 3
+    exitcode <- 3L
     side <- "left"
   } else if (h > range[2]) {
     h <- range[2]
-    exitcode <- 3
+    exitcode <- 3L
     side <- "right"
   }
 
   iters[[2]] <- getValsPlugin(FUN = FUN, x = x, h = h, stage = 2,
                               cores = cores, cl = cl, preschedule = preschedule, ...)
 
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "successfully computed non-zero f''' and f'",
                 "truncation error is zero, large step is favoured",
                 "truncation error is near-zero, large step is favoured",
@@ -806,7 +806,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   i <- 1
-  exitcode <- 0
+  exitcode <- 0L
   main.loop <- close.left <- FALSE
   first.main <- TRUE
   iters <- list()
@@ -829,9 +829,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
           bad.iters <- bad.iters + 1
           hnew <- hnew / 2
           if (hnew < max(range[1], .Machine$double.eps))
-            stop("step.SW: Could not compute the function value at ", pasteAnd(res.i$x[bad]),
+            stop("step.SW: Could not compute the function value at ", toString(res.i$x[bad]),
                  " after ", bad.iters, " attempts of step shrinkage",
-                 ".\nChange the range, which is currently [", pasteAnd(range),
+                 ".\nChange the range, which is currently [", toString(range),
                  "], and/or\ntry a different starting h0, which is currently ", h0, ".")
           res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
                              ratio.last = NULL, ratio.beforelast = NULL,
@@ -875,14 +875,14 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
             iters[[i]] <- res.i
             if (abs(hnew/hold - 1) < seq.tol) { # The algorithm is stuck at one range end
               main.loop <- TRUE
-              exitcode <- 2
+              exitcode <- 2L
               break
             }
 
             bad <- !is.finite(res.i$f)
             if (any(bad) && !rounding.small) {  # Not in the original paper, but a necessary fail-safe
-              warning("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
-                       "]. FUN(", pasteAnd(printE(x)), ") is finite -- try the initial step h0 larger than ",
+              warning("Could not compute the function value at [", toString(printE(res.i$x[bad])),
+                       "]. FUN(", toString(printE(x)), ") is finite -- try the initial step h0 larger than ",
                        printE(h0), " but smaller than ", printE(hold), ". Halving from ",
                        printE(hnew), " to ", printE(hnew/2), ").")
               for (i in 1:maxit) {
@@ -894,13 +894,13 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                 if (is.finite(res.i$f)) break
               }
               if (!is.finite(res.i$f))
-                stop("Could not compute the function value at [", pasteAnd(printE(res.i$x[bad])),
-                     "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
+                stop("Could not compute the function value at [", toString(printE(res.i$x[bad])),
+                     "]. FUN(", toString(printE(x)), ") is finite -- halving did not help.",
                      " Try 'gradstep(..., method = \"K\")' or 'step.K(...)' for a more reliable algorithm.")
             }
 
             if (any(bad) && !rounding.nottoosmall) {
-              warning("Could not compute the function value at ", pasteAnd(res.i$x[bad, , drop = FALSE]),
+              warning("Could not compute the function value at ", toString(res.i$x[bad, , drop = FALSE]),
                       ". FUN(", x, ") is finite -- try a step h0 smaller than ", hnew, ". ",
                       "Halving from ", printE(hnew), " to ", printE(hnew/2), ").")
               for (i in 1:maxit) {
@@ -913,8 +913,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
               }
               if (!is.finite(res.i$f))
                 stop("Could not compute the function value at [",
-                     pasteAnd(printE(res.i$x[bad, , drop = FALSE])),
-                     "]. FUN(", pasteAnd(printE(x)), ") is finite -- halving did not help.",
+                     toString(printE(res.i$x[bad, , drop = FALSE])),
+                     "]. FUN(", toString(printE(x)), ") is finite -- halving did not help.",
                      " Try 'gradstep(..., method = \"M\")' or 'step.M(...)' for a more reliable algorithm.")
             }
           }
@@ -938,7 +938,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       first.main <- FALSE
     } else { # Monotonicity satisfied, continuing shrinking, only h[i+1] needed
       if (abs(iters[[i]]$h/iters[[i-1]]$h - 1) < seq.tol) {
-        exitcode <- 2 # If h did not shrink, it must have hit the lower bound
+        exitcode <- 2L # If h did not shrink, it must have hit the lower bound
         break  # or something else went wrong; this code will most likely
         # be overwritten by 3; if it does not, throws a warning
       }
@@ -958,27 +958,27 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
   hopt <- iters[[i-1]]$h # No monotonicity = bad
   hprev <- iters[[i-2]]$h
   # Error codes ordered by severity
-  if (abs(hopt / hprev - 1) < seq.tol) exitcode <- 2
+  if (abs(hopt / hprev - 1) < seq.tol) exitcode <- 2L
 
   # If hprev hits the upper limit, the total error needs to be compared
   if (abs(hprev / range[2] - 1) < seq.tol) {
     abs.error.prev <- unname(iters[[i-1]]$est.error["trunc"] / shrink.factor + iters[[i-2]]$est.error["round"])
     abs.error.opt  <- unname(iters[[i-1]]$est.error["trunc"] + iters[[i-1]]$est.error["round"])
     if (abs.error.prev < abs.error.opt) { # The two-times reduction was unnecessary
-      exitcode <- 3
+      exitcode <- 3L
       hopt <- hprev
       iters[[i-2]]$est.error["trunc"] <- unname(iters[[i-1]]$est.error["trunc"] / shrink.factor)
     }
   }
   if (abs(hopt / range[1] - 1) < seq.tol) {
-    exitcode <- 3
+    exitcode <- 3L
     close.left <- TRUE
   }
 
-  if (i >= maxit) exitcode <- 4
+  if (i >= maxit) exitcode <- 4L
 
   # !!! If exitcode e, return the last one
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "successfully found a monotonicity violation",
                 "", # The code cannot be 1 here
                 "step size did not change between iterations",
@@ -987,9 +987,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                   "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),
                 "maximum number of iterations reached")
 
-  if (exitcode == 2) warning("The step size did not change between iterations. ",
+  if (exitcode == 2L) warning("The step size did not change between iterations. ",
                              "This should not happen. Send a bug report to https://github.com/Fifis/pnd/issues")
-  if (exitcode == 3 && !close.left)
+  if (exitcode == 3L && !close.left)
     warning("The algorithm terminated at the right range of allowed step sizes. ",
             "Possible reasons: (1) h0 is too low and the bisection step overshot ",
             "the next value; (2) h0 was too large and the truncation error estimate ",
@@ -997,7 +997,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
             "and a slightly smaller h0, or expand the range.")
 
   if (hopt > 0.01*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
-    exitcode <- 3
+    exitcode <- 3L
     warning("The found step size, ", hopt, ", exceeds 1% of |x|, ",
             abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
             "and x-h due to large steps. Try a different starting value h0 to be sure. ",
@@ -1020,7 +1020,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     monotone = do.call(rbind, lapply(iters, "[[", "monotone")))
 
 
-  best.i <- if (exitcode == 3 && !close.left) i-2 else i-1
+  best.i <- if (exitcode == 3L && !close.left) i-2 else i-1
   ret <- list(par = hopt,
               value = iters[[best.i]]$deriv,
               counts = c(preliminary = i.prelim, main = i - i.prelim),
@@ -1039,11 +1039,11 @@ med3lowest <- function (hgrid, log2etrunc, tstar, hnaive, h0) {
     hopt0 <- sort(hgrid[i.min3])[2]
     i.hopt <- which(hopt0 == hgrid)
     hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
-    exitcode <- 2
+    exitcode <- 2L
   } else {
     hopt0 <- hopt <- hnaive  # At least something should be returned
     i.hopt <- if (sum(i.min3) > 0) min(hgrid[is.finite(log2etrunc)]) else which.min(abs(hgrid-h0))
-    exitcode <- 3
+    exitcode <- 3L
   }
   return(list(hopt0 = hopt0, hopt = hopt, i.hopt = i.hopt, exitcode = exitcode))
 }
@@ -1150,19 +1150,19 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
     range.old <- range
     if (spans[1] < 2^16) range[1] <- hnaive / 2^16
     if (spans[2] < 2^16) range[2] <- hnaive * 2^16
-    warning("The initial range [", pasteAnd(printE(range.old)), "] was extended to [",
-            pasteAnd(printE(range)), "] to ensure a large-enough search space.")
+    warning("The initial range [", toString(printE(range.old)), "] was extended to [",
+            toString(printE(range)), "] to ensure a large-enough search space.")
   }
 
-  exitcode <- 0
+  exitcode <- 0L
 
   # Creating a sequence of step sizes for evaluation
   sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
   range.sugg <- range / c(1024, 1/1024)
   err1 <- paste0("Either increase 'shrink.factor' (e.g. from ", shrink.factor,
                  " to ", sf.sugg, ") to have a finer grid, or increase 'range' (",
-                 "from [", pasteAnd(printE(range)), "] to ",
-                 "[", pasteAnd(printE(range.sugg)), "]).")
+                 "from [", toString(printE(range)), "] to ",
+                 "[", toString(printE(range.sugg)), "]).")
   hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
   tstar <- (1 + inv.sf) / (1 - shrink.factor^2)  # TODO: n = 2...
   n <- length(hgrid)
@@ -1227,7 +1227,7 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
       if (sum(rle(okay.slopes)$values) > 1) okay.slopes <- removeFirstBad(okay.slopes)
       if (any(okay.slopes)) {
         good.slopes <- okay.slopes
-        exitcode <- 1
+        exitcode <- 1L
         warning("The estimated truncation error has a slightly wrong reduction rate (~",
                 med.slope, ", but should be ~2). ", err1)
       } else {
@@ -1255,22 +1255,22 @@ step.M <- function(FUN, x, h0 = NULL, max.rel.error = .Machine$double.eps^(7/8),
     hopt <- min(h0, m3$hopt)
     exitcode <- m3$exitcode
 
-    if (exitcode == 2)
+    if (exitcode == 2L)
       warning("Could not find a sequence of of ", min.valid.slopes, " reductions ",
               "of the truncation error. Visualise by adding 'plot = TRUE'. ", err1,
               " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
               "returning the approximate argmin of the total error.")
-    if (exitcode == 3)
+    if (exitcode == 3L)
       warning("There are <3 finite function values on the grid. ",
               "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
               "function does not return finite values on the range x+[",
-              pasteAnd(printE(range)), "] with ", n,
+              toString(printE(range)), "] with ", n,
               " exponentially spaced points. Returning a very rough value that may ",
               "not even yield a finite numerical derivative.")
   }
 
   # !!! If exitcode e, return the last one
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "successfully found the optimal step size",
                 "successfully found the optimal step size but allowed inaccurate slopes",
                 "truncation error reduction rate is too wrong, returning the approximate best step",
@@ -1407,11 +1407,11 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     range.old <- range
     if (spans[1] < 2^16) range[1] <- hnaive / 2^16
     if (spans[2] < 2^16) range[2] <- hnaive * 2^16
-    warning("The initial range [", pasteAnd(printE(range.old)), "] was extended to [",
-            pasteAnd(printE(range)), "] to ensure a large-enough search space.")
+    warning("The initial range [", toString(printE(range.old)), "] was extended to [",
+            toString(printE(range)), "] to ensure a large-enough search space.")
   }
 
-  exitcode <- 0
+  exitcode <- 0L
   hat.check <- NULL
 
   # Creating a sequence of step sizes for evaluation
@@ -1517,7 +1517,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       if (0 %in% i.trunc.valid) {
         only.right.branch <- FALSE
         i.trunc.valid <- i.trunc.valid[i.trunc.valid > 0]
-        exitcode <- 3
+        exitcode <- 3L
       }
 
       # If there are more than 1 run, pick the longest one
@@ -1584,14 +1584,14 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       # At the optimum, the rounding error should be approx. |(e^(2/3) f^(2/3) f'''^(1/3))/(2^(2/3) 3^(1/3))|
       # However, if f''' ~ 0, we use only the rounding branch and compare it to the optimal value
       # if f''' ~ 1
-      exitcode <- 1
+      exitcode <- 1L
     }
   } else {
     zero.trunc <- TRUE
-    exitcode <- 2
+    exitcode <- 2L
   }
 
-  if (exitcode %in% c(1, 2)) {
+  if (exitcode %in% c(1L, 2L)) {
     complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
     f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
     if (!is.finite(f0)) stop("Could not compute the function value at ", x, ".")
@@ -1611,7 +1611,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     }
     log2hopt <- log2(hopt)
     # TODO: generalise; do the theory!
-  } else if (exitcode == 3) {  # If the right branch is growing, choose a smaller step size
+  } else if (exitcode == 3L) {  # If the right branch is growing, choose a smaller step size
     hopt <- hgrid[round(stats::quantile(i.trunc.valid, 0.25))]
     log2hopt <- log2(hopt)
   }
@@ -1669,7 +1669,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   er <- if (!zero.trunc) et * acc.order else mean(eround[i.closest])
   # TODO: fix this formula, double-check the calculations
 
-  msg <- switch(exitcode + 1,
+  msg <- switch(exitcode + 1L,
                 "target error ratio reached within tolerance",
                 "truncation branch slope is close to zero, relying on the expected rounding error",
                 "truncation error is near-zero, relying on the expected rounding error",
@@ -1857,7 +1857,7 @@ gradstep <- function(FUN, x, h0 = NULL,
          "In pnd::gradstep(), pass the list of step-selection method arguments as 'control'.")
   f0 <- safeF(FUN, x, ...)
   if (length(f0) > 1) stop("Automatic step selection works only when the function FUN returns a scalar.")
-  if (is.na(f0)) stop("Could not compute the function value at [", pasteAnd(x), "]. FUN(x) must be finite.")
+  if (is.na(f0)) stop("Could not compute the function value at [", toString(x), "]. FUN(x) must be finite.")
   if (length(x) == 1 && length(h0) > 1) stop("The argument 'h0' must be a scalar for scalar 'x'.")
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
@@ -1891,13 +1891,13 @@ gradstep <- function(FUN, x, h0 = NULL,
     bad.args <- setdiff(names(control), names(margs))
     if (length(bad.args) > 0) {
       stop("The following arguments are not supported by the ", method, " method: ",
-            pasteAnd(bad.args))
+            toString(bad.args))
     }
     margs[names(control)] <- control
   }
   conflicting.args <- intersect(names(margs), names(ell))
   if (length(conflicting.args) > 0)
-    stop("The arguments ", pasteAnd(conflicting.args), " of your function coincide with ",
+    stop("The arguments ", toString(conflicting.args), " of your function coincide with ",
          "the arguments of the ", method, " method. Please write a wrapper for FUN that would ",
          "incorporate the '...' explicitly.")
   autofun <- switch(method, plugin = step.plugin, CR = step.CR, CRm = step.CR, DV = step.DV,

@@ -11,7 +11,7 @@ test_that("Curtis-Reid step selection handles inputs well", {
 test_that("Curtis-Reid step selection behaves reasonably", {
   f <- function(x) x^4
   s <- step.CR(x = 2, f)
-  expect_equal(s$exitcode, 0)
+  expect_identical(s$exitcode, 0L)
   expect_lt(sum(s$abs.error), 1e-4)
   expect_equal(s$value, 32, tolerance = 1e-8)
   u <- s$iterations$ratio[length(s$iterations$ratio)]
@@ -37,17 +37,17 @@ test_that("Curtis--Reid algorithm stops if the function returns NA for all allow
 })
 
 test_that("Curtis--Reid steps grow for linear functions", {
-  expect_equal(step.CR(x = 1, function(x) x)$exitcode, 1)
+  expect_identical(step.CR(x = 1, function(x) x)$exitcode, 1L)
 })
 
 test_that("Large and small initial values in Curtis--Reid cause range problems", {
   f <- function(x) x^4
-  expect_equal(step.CR(x = 2, f, h0 = 1000)$exitcode, 3)
-  expect_equal(step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))$exitcode, 0)
-  expect_equal(step.CR(x = 2, f, h0 = 1e-12)$exitcode, 1)  # In theory, it should be 3,
+  expect_identical(step.CR(x = 2, f, h0 = 1000)$exitcode, 3L)
+  expect_identical(step.CR(x = 2, f, h0 = 1000, range = c(1e-10, 1e5))$exitcode, 0L)
+  expect_identical(step.CR(x = 2, f, h0 = 1e-12)$exitcode, 1L)  # In theory, it should be 3,
   # but the truncation error estimate is really zero...
-  expect_equal(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3)
-  expect_equal(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 2, range = c(1e-12, 1))$exitcode, 4)
+  expect_identical(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3L)
+  expect_identical(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 2, range = c(1e-12, 1))$exitcode, 4L)
 })
 
 # test_that("Parallelisation speeds things up for Curtis--Reid", {
@@ -60,8 +60,8 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
 # })
 
 test_that("Parallelisation in CR works", {
-  expect_equal(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cores = 2))
+  expect_identical(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)
-  expect_equal(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cl = clus))
+  expect_identical(step.CR(sin, 1, cores = 1), step.CR(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })

@@ -7,7 +7,7 @@ test_that("Dumontet-Vignes step selection handles inputs well", {
 test_that("Dumontet-Vignes step selection behaves reasonably", {
   f <- function(x) x^4
   s <- step.DV(x = 2, f)
-  expect_equal(s$exitcode, 0)
+  expect_identical(s$exitcode, 0L)
   expect_lt(sum(s$abs.error), 1e-6)
   expect_equal(s$value, 32, tolerance = 1e-8)
   u <- s$iterations$ratio[length(s$iterations$ratio)]
@@ -17,17 +17,17 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
   expect_lte(u, 15)
 
   s2 <- step.DV(x = 2, f, range = c(1e-10, 1e-7))
-  expect_equal(s2$exitcode, 3)
+  expect_identical(s2$exitcode, 3L)
   expect_true(grepl("too close to the right end", s2$message))
 
   s3 <- step.DV(x = 2, f, range = c(1e-3, 1e-1))
-  expect_equal(s3$exitcode, 5)
+  expect_identical(s3$exitcode, 5L)
   expect_true(grepl("on the right end", s3$message))
 
   s4 <- step.DV(x = 2, f, h0 = 100, maxit = 5)
-  expect_equal(s4$exitcode, 5)
+  expect_identical(s4$exitcode, 5L)
 
-  expect_equal(step.DV(x = 2, f, maxit = 1)$exitcode, 6)
+  expect_identical(step.DV(x = 2, f, maxit = 1)$exitcode, 6L)
 })
 
 test_that("Dumontet--Vignes algorithm stops if the function returns NA for all allowed step sizes", {
@@ -46,16 +46,16 @@ test_that("DV for functions with near-zero f''' stops immediately", {
   # Quadratic function, f''' = 0
   s1 <- step.DV(function(x) x^2, 1)
   expect_lte(s1$counts, 2)
-  expect_equal(s1$exitcode, 1)
+  expect_identical(s1$exitcode, 1L)
 
   s2 <- step.DV(function(x) pi*x + exp(1), 1)
   expect_lte(s2$counts, 2)
-  expect_equal(s2$exitcode, 1)
+  expect_identical(s2$exitcode, 1L)
 })
 
 test_that("Parallelisation in DV works", {
-  expect_equal(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cores = 2))
+  expect_identical(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)
-  expect_equal(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cl = clus))
+  expect_identical(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })

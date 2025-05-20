@@ -399,7 +399,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   # BEGIN compatibility with numDeriv::grad
   # Detecting numDeriv named arguments in 'method.args'
   compat <- FALSE
-  # TODO: check method.args as well
   has.nd.args <- any(names(method.args) %in% c("eps", "d", "zero.tol", "r", "v", "show.details"))
   if ((!is.null(method)) || has.nd.args) {
     compat <- TRUE

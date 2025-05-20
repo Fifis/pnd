@@ -5,10 +5,10 @@ test_that("Jacobians are correct", {
 
   x <- structure(1:3, names = c("A", "B", "C"))
   g <- Jacobian(f, x)
-  expect_equal(colnames(g), names(x))
-  expect_equal(rownames(g), c("sine", "expon"))
-  expect_equal(attr(g, "step.size.method"), "default")
-  expect_equal(attr(Jacobian(f, x, h = 0.01), "step.size.method"), "user-supplied")
+  expect_identical(colnames(g), names(x))
+  expect_identical(rownames(g), c("sine", "expon"))
+  expect_identical(attr(g, "step.size.method"), "default")
+  expect_identical(attr(Jacobian(f, x, h = 0.01), "step.size.method"), "user-supplied")
 })
 
 test_that("Jacobian works for scalar functions", {
@@ -30,10 +30,10 @@ test_that("Jacobian works for scalar functions", {
   h2.jac <- pnd::Jacobian(h2, p0)
   expect_true(inherits(h1.jac, "GenD"))
   expect_true(inherits(h2.jac, "GenD"))
-  expect_equal(dim(h1.jac), c(1, 3))
-  expect_equal(dim(h2.jac), c(4, 3))
-  expect_equal(colnames(h1.jac), c("A", "B", "C"))
-  expect_equal(colnames(h2.jac), c("A", "B", "C"))
+  expect_identical(dim(h1.jac), c(1L, 3L))
+  expect_identical(dim(h2.jac), c(4L, 3L))
+  expect_identical(colnames(h1.jac), c("A", "B", "C"))
+  expect_identical(colnames(h2.jac), c("A", "B", "C"))
 })
 
 test_that("Jacobian works with automatic step sizes", {
@@ -45,7 +45,7 @@ test_that("Jacobian can accept dot arguments", {
   # ... must be accepted and used by checkDimensions() and gradstep()
   f <- function(x, a0) c(sin(x + a0), cos(x + a0))
   f1 <- function(x) c(sin(x + 1), cos(x + 1))
-  expect_equal(Jacobian(f, x = 1, a0 = 1, h = 1e-5), Jacobian(f1, x = 1, h = 1e-5))
+  expect_identical(Jacobian(f, x = 1, a0 = 1, h = 1e-5), Jacobian(f1, x = 1, h = 1e-5))
 })
 
 test_that("Jacobian can work on an arbitrary stencil", {

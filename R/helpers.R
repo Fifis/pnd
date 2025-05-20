@@ -4,9 +4,6 @@ safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(
 
 checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(attributes(x)), "error")
 
-# Concatenate together with a comma between the terms
-pasteAnd <- function(x) paste(x, collapse = ", ")
-
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234
 printE <- function(x, d = 2) sprintf(paste0("%1.", d, ifelse(x >= 0.01 & x <= 10^d, "f", "e")), x)
 
@@ -49,7 +46,7 @@ printMat <- function(x, digits = 3, shave.spaces = TRUE,
   if (format) x <- formatMat(x, digits = digits, shave.spaces = shave.spaces)
   x <- split(x, seq_len(nrow(x)))
   for (i in seq_along(x)) {
-    x[[i]] <- paste(begin, paste(x[[i]], collapse = sep), end, sep = "", collapse = "")
+    x[[i]] <- paste0(begin, paste(x[[i]], collapse = sep), end, collapse = "")
     if (print) cat(x[[i]], "\n", sep = "")
   }
   return(invisible(unname(unlist(x))))

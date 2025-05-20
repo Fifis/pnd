@@ -7,8 +7,7 @@ test_that("step size length h0 must be 1 or length(x)", {
     z^2
     }),
     "must be finite")
-  expect_equal(gradstep(sin, 1, h0 = 0.0001)$exitcode, 0)
-  # expect_equal(gradstep(function(x) sum(sin(x)), 1:3, h0 = 0.01)$exitcode, rep(0, 3))
+  expect_identical(gradstep(sin, 1, h0 = 0.0001)$exitcode, 0L)
 })
 
 test_that("step selection supports only scalar-valued functions", {
@@ -23,21 +22,21 @@ test_that("unsupported arguments withcause an error", {
 })
 
 test_that("the range is correctly reversed", {
-  expect_equal(gradstep(sin, 1, method = "CR", control = list(range = c(1e-4, 1e-8))),
+  expect_identical(gradstep(sin, 1, method = "CR", control = list(range = c(1e-4, 1e-8))),
                gradstep(sin, 1, method = "CR", control = list(range = c(1e-8, 1e-4))))
-  expect_equal(gradstep(sin, 1, method = "DV", control = list(range = c(1e-4, 1e-8))),
+  expect_identical(gradstep(sin, 1, method = "DV", control = list(range = c(1e-4, 1e-8))),
                gradstep(sin, 1, method = "DV", control = list(range = c(1e-8, 1e-4))))
-  expect_equal(gradstep(sin, 1, method = "SW", control = list(range = c(1e-4, 1e-8))),
+  expect_identical(gradstep(sin, 1, method = "SW", control = list(range = c(1e-4, 1e-8))),
                gradstep(sin, 1, method = "SW", control = list(range = c(1e-8, 1e-4))))
 })
 
 test_that("for unfortunate inputs, the search may hit the boundary", {
   s.sw <- suppressWarnings(gradstep(x = 1e10, FUN = sin, h0 = 1e-20, method = "SW"))
-  expect_equal(s.sw$exitcode, 3)
+  expect_identical(s.sw$exitcode, 3L)
   expect_lt(sum(s.sw$abs.err), 1e-3)
 
   s.dv <- gradstep(x = 1, FUN = sin, method = "DV", control = list(range = c(1e-20, 1e-22)))
-  expect_equal(s.dv$exitcode, 3)
+  expect_identical(s.dv$exitcode, 3L)
 })
 
 # test_that("gradstep correctly handles vector inputs", {

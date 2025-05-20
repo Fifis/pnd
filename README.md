@@ -90,7 +90,9 @@ This package is supported by 3 vignettes:
 
 The following articles provide the theory behind the methods implemented in this package:
 
-* Kostyrka, A. V. (2025). What are you doing, step size: fast computation of accurate numerical derivatives with finite precision. *In progress.*
+* [Kostyrka, A. V. (2025). Step size selection in numerical differences using a regression kink.](https://hdl.handle.net/10993/64958) *Department of Economics and Management discussion paper No. 2025-09, University of Luxembourg.*
+* Kostyrka, A. V. (2025). What are you doing, step size: a survey of step-size selection methods for numerical derivatives. *In progress.*
+* Kostyrka, A. V. (2025). In the steps of central differences: improved algorithms for numerical derivatives. *In progress.*
 
 ## Installation
 

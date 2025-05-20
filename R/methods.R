@@ -25,7 +25,7 @@ print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
     cat("Estimated ", if (nr == 1) "derivative: " else "gradient:\n",
         paste0(xp, "\n"),
         "(", a$step.size.method, " step size: ",
-        if (same.h) printE(a$step.size[1], 1) else pasteAnd(printE(a$step.size, 1)), ").\n", sep = "")
+        if (same.h) printE(a$step.size[1], 1) else toString(printE(a$step.size, 1)), ").\n", sep = "")
   } else { # Jacobian printed by row
     cat("Estimated Jacobian:\n",
     paste0(xp, "\n"),
@@ -93,20 +93,20 @@ print.gradstep <- function(x, ...) {
     print.stepsize(x)
   } else {
     all.equal.ss <- all(diff(x$par) == 0)
-    cat("Gradient step size: [", if (all.equal.ss) printE(x$par[1], 1) else pasteAnd(printE(x$par, 1)), "].\n",
-        "Numerical derivative value: [", pasteAnd(printE(x$value)), "].\n", sep = "")
+    cat("Gradient step size: [", if (all.equal.ss) printE(x$par[1], 1) else toString(printE(x$par, 1)), "].\n",
+        "Numerical derivative value: [", toString(printE(x$value)), "].\n", sep = "")
     all.equal.ec <- all(diff(x$exitcode) == 0)
     if (x$method == "plug-in") {
       cat("Plug-in calculations terminated with code ",
-          if (all.equal.ec) x$exitcode[1] else pasteAnd(x$exitcode), ".\n", sep = "")
+          if (all.equal.ec) x$exitcode[1] else toString(x$exitcode), ".\n", sep = "")
     } else if (x$method %in% c("Mathur", "Kink")) {
       cat(x$method, " grid searches across ", x$counts, " step sizes ended with codes ",
-          pasteAnd(x$exitcode), ".\n", sep = "")
+          toString(x$exitcode), ".\n", sep = "")
     } else {
-      cat(x$method, " searches terminated with codes ", pasteAnd(x$exitcode), ".\n", sep = "")
+      cat(x$method, " searches terminated with codes ", toString(x$exitcode), ".\n", sep = "")
     }
-    cat("Estimated errors: truncation [", pasteAnd(sprintf("%1.0e", x$abs.error[, 1])),
-        "], rounding [", pasteAnd(sprintf("%1.0e", x$abs.error[, 2])), "].\n", sep = "")
+    cat("Estimated errors: truncation [", toString(sprintf("%1.0e", x$abs.error[, 1])),
+        "], rounding [", toString(sprintf("%1.0e", x$abs.error[, 2])), "].\n", sep = "")
   }
 }
 

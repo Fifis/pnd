@@ -34,7 +34,7 @@ test_that("missing values are treated properly", {
     x
   }
   f <- function(x) ifelse(abs(x-2) < 1e-3, x^2, NA)
-  expect_equal(suppressWarnings(unname(noAttr(GenD(f, 1:3, side = 1)))), c(NA, 4, NA))
+  expect_equal(suppressWarnings(unname(noAttr(GenD(f, 1:3, side = 1)))), c(NA, 4, NA), tolerance = 1e-8)
   expect_warning(Grad(f, 1:3, side = 1), "some non-numeric")
   f <- function(x) if (abs(x-2) < 1e-3) x^2 else "falsy"
   expect_warning(GenD(f, 1:3, side = 1, elementwise = TRUE, vectorised = FALSE,

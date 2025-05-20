@@ -20,11 +20,11 @@ test_that("Hessians are correct", {
   }
   hes <- Hessian(f, x)
   true.hes <- h(x)
-  expect_equal(isSymmetric.matrix(hes), TRUE)
+  expect_true(isSymmetric.matrix(hes))
   expect_equal(as.numeric(hes), as.numeric(true.hes), tolerance = 1e-7)
 
-  expect_equal(attr(Hessian(f, x), "step.size.method"), "default")
-  expect_equal(attr(Hessian(f, x, h = 0.01), "step.size.method"), "user-supplied")
+  expect_identical(attr(Hessian(f, x), "step.size.method"), "default")
+  expect_identical(attr(Hessian(f, x, h = 0.01), "step.size.method"), "user-supplied")
 })
 
 test_that("1x1 Hessians are handled correctly", {
@@ -45,8 +45,8 @@ test_that("named arguments are handled correctly", {
 
   names(x) <- LETTERS[1:4]
   hes.named <- Hessian(f, x)
-  expect_equal(colnames(hes.named), names(x))
-  expect_equal(rownames(hes.named), names(x))
+  expect_identical(colnames(hes.named), names(x))
+  expect_identical(rownames(hes.named), names(x))
 
   x2 <- x
   names(x2) <- LETTERS[1:4]
@@ -73,8 +73,8 @@ test_that("Higher-order accuracy works", {
   expect_lt(max(abs(true.hes - hes6)), max(abs(true.hes - hes4)))
 
   # The auto-selected step must increase
-  expect_equal(all(attr(hes2, "step.size") < attr(hes4, "step.size")), TRUE)
-  expect_equal(all(attr(hes4, "step.size") < attr(hes6, "step.size")), TRUE)
+  expect_true(all(attr(hes2, "step.size") < attr(hes4, "step.size")))
+  expect_true(all(attr(hes4, "step.size") < attr(hes6, "step.size")))
 })
 
 test_that("function dimension check works", {
@@ -84,7 +84,7 @@ test_that("function dimension check works", {
 
 test_that("input check works", {
   f <- function(x) prod(sin(x))
-  expect_equal(Hessian(f, 1:4, side = NULL), Hessian(f, 1:4, side = 0))
+  expect_identical(Hessian(f, 1:4, side = NULL), Hessian(f, 1:4, side = 0))
 
   expect_error(Hessian(x = 1:3, FUN = "sin"), "must be a function")
   expect_error(Hessian(f, 1:4, side = 2), "'side' argument")
@@ -110,7 +110,7 @@ test_that("compatibility with numDeriv", {
 
 test_that("parallelisation of Hessian works", {
   f <- function(x) mean(x^2)
-  expect_equal(Hessian(x = 1:10, FUN = f, cores = 1),
+  expect_identical(Hessian(x = 1:10, FUN = f, cores = 1),
                Hessian(x = 1:10, FUN = f, cores = 2))
 })
 
