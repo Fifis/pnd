@@ -69,7 +69,7 @@ print.stepsize <- function(x, ...) {
   cat("Step size: ", x$par, " (numerical derivative value: ", x$value, ").\n", sep = "")
   if (x$method == "plug-in") {
     cat(x$counts, " plug-in calculations terminated with code ", x$exitcode, ".\n", sep = "")
-  } else if (x$method %in% c("Mathur", "Kink")) {
+  } else if (x$method %in% c("Mathur", "Kostyrka")) {
     cat(x$method, " grid search across ", x$counts, " step sizes ended with code ", x$exitcode, ".\n", sep = "")
   } else {
     cat(x$method, " search terminated after ", paste(x$counts, collapse = "+"),
@@ -99,7 +99,7 @@ print.gradstep <- function(x, ...) {
     if (x$method == "plug-in") {
       cat("Plug-in calculations terminated with code ",
           if (all.equal.ec) x$exitcode[1] else toString(x$exitcode), ".\n", sep = "")
-    } else if (x$method %in% c("Mathur", "Kink")) {
+    } else if (x$method %in% c("Mathur", "Kostyrka")) {
       cat(x$method, " grid searches across ", x$counts, " step sizes ended with codes ",
           toString(x$exitcode), ".\n", sep = "")
     } else {
@@ -119,3 +119,42 @@ print.checkDimensions <- function(x, ...) {
       if (!x["vectorised"]) "NOT ", "vectorised, ",
       if (!x["multivalued"]) "single-valued." else "multi-valued.", sep = "")
 }
+
+#' Step-size selection visualisation
+#'
+#' Plots the estimated truncation error and total errors, highlighting various
+#' ranges obtained during step-size selection for numerical differentiation.
+#' Works for all implemented methods.
+#'
+#' @param x List returned by \code{step...} functions.
+#' @param ... Additional graphical parameters passed to \code{plot()}.
+#'
+#' @returns Nothing (invisible null).
+#' @export
+#'
+#' @examples
+#'
+#' sCR <- step.CR(sin, 1)
+#' sK <- step.K(sin, 1)
+#' plot(sCR)
+#' plot(sK)
+plot.stepsize <- function(x, ...) {
+  method <- x$method
+  if (method %in% c("Curtis--Reid", "Modified Curtis--Reid")) {
+    plotCR(x, ...)
+  } else if (method == "Dumontet--Vignes") {
+    plotDV(x, ...)
+  } else if (method == "plug-in") {
+    plotPlugin(x, ...)
+  } else if (method == "Stepleman--Winarsky") {
+    plotSW(x, ...)
+  } else if (method == "Mathur") {
+    plotM(x, ...)
+  } else if (method == "Kostyrka") {
+    plotK(x, ...)
+  } else {
+    stop("plot: Unsupported 'method' component in the step-size object.")
+  }
+}
+
+
