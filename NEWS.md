@@ -1,6 +1,5 @@
 # pnd 0.dev roadmap (2025-XX-XX)
 
-- BUG: Matching in the Hessian is too slow -- de-duplicate first
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
 - FEATURE: add a plotting method for all step-size searches
 - FEATURE: add options for default accuracy (maybe 4?)
@@ -15,13 +14,14 @@
 - MISC: Check which packages depend on `numDeriv` and check compatibility with 10 top!
 - MISC: Add links to documentation and tutorials onto the GitHub page.
 - MISC: Detailed vignette explaining the mathematics behind the functions with full transparency about the choice of parameters
-- DEV: add examples for large matrices (200 x 200)
 - DEV: ensure that `Grad` takes all the arguments of `GenD` and `Jacobian`, and vice versa
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.0 (2015-XX-XX)
+# pnd 0.1.1 (2025-XX-XX)
+
+# pnd 0.1.0 (2025-05-20)
 - Feature: original kink-based algorithm for step size selection `step.K()`
 - Feature: added safety shrinking if `FUN(x)` is finite but `FUN(x+h)` is not in all SSS routines
 - Feature: added S3 printing methods for derivatives and step sizes
