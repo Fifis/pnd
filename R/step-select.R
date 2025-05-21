@@ -39,24 +39,6 @@ stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$do
 }
 
 
-# h corresponding to the median of 3 lowest points with a fall-back
-med3lowest <- function (y, hgrid, hnaive, tstar) {
-  # Hnaive is necessary for index calculation
-  i.min3 <- rank(y, ties.method = "first", na.last = "keep") %in% 1:3
-  if (sum(i.min3) >= 3) {
-    hopt0 <- sort(hgrid[i.min3])[2]
-    i.hopt <- which(hgrid == hopt0)
-    hopt <- hopt0 * (1 / tstar)^(1/3)  # TODO: any power
-    exitcode <- 2L
-  } else {
-    hopt0 <- hopt <- hnaive  # At least something should be returned
-    i.hopt <- if (sum(i.min3) > 0) min(hgrid[is.finite(y)]) else which.min(abs(hgrid - hnaive))
-    exitcode <- 3L
-  }
-  return(list(hopt0 = hopt0, hopt = hopt, i.hopt = i.hopt, exitcode = exitcode))
-}
-
-
 #' Automatic step selection for gradients
 #'
 #' @param x Numeric vector or scalar: the point at which the derivative is computed

@@ -243,19 +243,19 @@ plotDV <- function(x, ...) {
        pch = ifelse(f3inf > 0, 16, 0), col = cols[1],
        ylab = "Est. f''' and its bounds", xlab = "Step size",
        main = "Dumontet--Vignes step-size selection", ...)
-  points(it$k, f3sup, pch = ifelse(f3sup > 0, 16, 0), col = cols[2])
-  abline(h = 0, v = x$par, lty = 2)
+  graphics::points(it$k, f3sup, pch = ifelse(f3sup > 0, 16, 0), col = cols[2])
+  graphics::abline(h = 0, v = x$par, lty = 2)
 
-  points(it$k, f3, pch = 1, cex = 0.8, col = cols[3])
+  graphics::points(it$k, f3, pch = 1, cex = 0.8, col = cols[3])
   if (length(it$k) > 1) {
-    for (i in 2:length(it$k)) arrows(it$k[i-1], f3[i-1], it$k[i], f3[i], angle = 20, length = 0.12, col = cols[3])
+    for (i in 2:length(it$k)) graphics::arrows(it$k[i-1], f3[i-1], it$k[i], f3[i], angle = 20, length = 0.12, col = cols[3])
   }
   labs <- pretty(yl)
   labs <- sign(labs) * expm1(abs(labs))
   ratios <- sprintf("%1.1f", it$ratio)
   ratios[sign(f3inf) * sign(f3sup) < 0] <- "X"
-  text(it$k, f3sup, labels = ratios, pos = c(1, 3))
-  axis(2, pretty(yl), sprintf("%1.1e", labs))
+  graphics::text(it$k, f3sup, labels = ratios, pos = c(1, 3))
+  graphics::axis(2, pretty(yl), sprintf("%1.1e", labs))
 
   graphics::mtext(paste0("target sup/inf ratio: [", toString(round(it$args$ratio.limits, 1)),
                          "]; max. rel. err.: ", printE(it$args$max.rel.error, 1)),

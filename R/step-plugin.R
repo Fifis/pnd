@@ -159,7 +159,7 @@ plotPlugin <- function(x, ...) {
   yl <- range(it$f)
   plot(it$x, it$f, bty = "n", xlim = xl, ylim = yl, col = c(rep("black", 4), rep("#FF0022", 2)),
        pch = 16, ylab = "Function values", xlab = "Step size", main = "Plug-in step-size selection", ...)
-  abline(a = mean(it$f[5:6]) - it$deriv["cd"]*mean(it$x[5:6]), b = it$deriv["cd"], lty = 2)
+  graphics::abline(a = mean(it$f[5:6]) - it$deriv["cd"]*mean(it$x[5:6]), b = it$deriv["cd"], lty = 2)
   graphics::mtext(paste0("max. rel. err.: ", printE(it$args$max.rel.error, 1)), cex = 0.8, line = 0.5)
   return(invisible(x))
 }

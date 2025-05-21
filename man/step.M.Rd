@@ -30,6 +30,13 @@ step.M(
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
+\item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
+\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+
+\item{acc.order}{Integer or vector of integers specifying the desired accuracy order
+for each element of \code{x}.
+The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
 \item{shrink.factor}{A scalar less than 1 that is used to create a sequence of

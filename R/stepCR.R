@@ -265,18 +265,18 @@ plotCR <- function(x, ...) {
        ylab = "Estimated abs. error in df/dx", xlab = "Step size",
        main = paste0(if (it$args$version == "modified") "Modified " else NULL,
                      "Curtis--Reid step-size selection"), ...)
-  points(it$h, er, pch = 16, col = cols[2])
+  graphics::points(it$h, er, pch = 16, col = cols[2])
   if (length(it$h) > 1) {
     for (i in 2:length(it$h)) {
-      arrows(it$h[i-1], et[i-1], it$h[i], et[i], angle = 20, length = 0.12, col = cols[1])
-      arrows(it$h[i-1], er[i-1], it$h[i], er[i], angle = 20, length = 0.12, col = cols[2])
+      graphics::arrows(it$h[i-1], et[i-1], it$h[i], et[i], angle = 20, length = 0.12, col = cols[1])
+      graphics::arrows(it$h[i-1], er[i-1], it$h[i], er[i], angle = 20, length = 0.12, col = cols[2])
     }
   }
   ratios <- it$est.error[, "trunc"] / it$est.error[, "round"]
   ratios[ratios > 10] <- round(ratios[ratios > 10])
   ratios[1 < ratios & ratios < 10] <- round(ratios[1 < ratios & ratios < 10], 1)
   ratios[ratios < 1] <- round(ratios[ratios < 1], 3)
-  text(it$h, et, labels = as.character(ratios), pos = ifelse(et > er, 1, 3))
+  graphics::text(it$h, et, labels = as.character(ratios), pos = ifelse(et > er, 1, 3))
 
   graphics::mtext(paste0("target T/R ratio: [", round(it$args$aim/it$args$tol, 2),
                          ", ", round(it$args$aim*it$args$tol, 2),
