@@ -1,7 +1,6 @@
 # pnd 0.dev roadmap (2025-XX-XX)
 
 - UX: make the warnings once-per-session; print the first error in runParallel in Grad
-- FEATURE: add a plotting method for all step-size searches
 - FEATURE: add options for default accuracy (maybe 4?)
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
@@ -20,6 +19,7 @@
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
 # pnd 0.1.1 (2025-XX-XX)
+- Feature: added plotting methods for `step...` functions
 
 # pnd 0.1.0 (2025-05-20)
 - Feature: original kink-based algorithm for step size selection `step.K()`

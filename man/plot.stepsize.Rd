@@ -2,14 +2,19 @@
 % Please edit documentation in R/methods.R
 \name{plot.stepsize}
 \alias{plot.stepsize}
+\alias{plot.gradstep}
 \title{Step-size selection visualisation}
 \usage{
 \method{plot}{stepsize}(x, ...)
+
+\method{plot}{gradstep}(x, index, ...)
 }
 \arguments{
 \item{x}{List returned by \code{step...} functions.}
 
 \item{...}{Additional graphical parameters passed to \code{plot()}.}
+
+\item{index}{Integer index of character name of the coordinate of \code{x} to plot.}
 }
 \value{
 Nothing (invisible null).
@@ -25,4 +30,7 @@ sCR <- step.CR(sin, 1)
 sK <- step.K(sin, 1)
 plot(sCR)
 plot(sK)
+f <- function(x) prod(sin(x))
+s <- gradstep(f, 1:4, method = "CR")
+plot(s, 3)
 }

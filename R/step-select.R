@@ -103,8 +103,14 @@ stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$do
 #' gradstep(x = 1, FUN = sin, method = "DV")
 #' gradstep(x = 1, FUN = sin, method = "SW")
 #' gradstep(x = 1, FUN = sin, method = "M")
+#' gradstep(x = 1, FUN = sin, method = "K")
 #' # Works for gradients
-#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)))
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "CR")
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "CRm")
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "DV")
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "SW")
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "M")
+#' gradstep(x = 1:4, FUN = function(x) sum(sin(x)), method = "K")
 gradstep <- function(FUN, x, h0 = NULL,
                      method = c("plugin", "SW", "CR", "CRm", "DV", "M", "K"), control = NULL,
                      cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
@@ -196,7 +202,7 @@ gradstep <- function(FUN, x, h0 = NULL,
               message = do.call(c, lapply(ret.list, "[[", "message")),
               abs.error = if (length(x) == 1) unlist(lapply(ret.list, "[[", "abs.error")) else do.call(rbind, lapply(ret.list, "[[", "abs.error")),
               method = method,
-              iterations = lapply(ret.list, "[[", "iterations"))
+              original = ret.list)
   valid.names <- setdiff(names(ret), c("counts", "abs.error", "method"))
   ret[valid.names] <- lapply(ret[valid.names], function(z) {
     if (is.matrix(z)) rownames(z) <- names(x) else

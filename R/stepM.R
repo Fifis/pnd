@@ -191,11 +191,11 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   slopes <- dletrunc / dlh
 
   # Rounding error for later
-  delta <- .Machine$double.eps / 2 # Error of h|f'(x)true - f'(x)| / |f(x)true|
-  fmax <- pmax(abs(fplus), abs(fminus))
-  fw <- fdCoef(deriv.order = 1, side = 0, acc.order = 2)  # TODO: generalise later
-  f.eps <- max.rel.error * (abs(fw$weights[1]*fminus) + abs(fw$weights[2]*fplus))
-  f.delta <- delta*fmax
+  stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order)
+  l <- length(stc$stencil) / 2
+  fmax <- apply(abs(cbind(fpos[, 1:l], fneg[, 1:l])), 1, max)
+  f.eps <- max.rel.error * sum(abs(stc$weights)) * fmax
+  f.delta <- 0.5 * .Machine$double.eps * fmax
   eround <- (f.eps + f.delta) / hgrid
 
   # Prepaging an error message for the future

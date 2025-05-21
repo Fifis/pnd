@@ -130,6 +130,7 @@ print.checkDimensions <- function(x, ...) {
 #' @param ... Additional graphical parameters passed to \code{plot()}.
 #'
 #' @returns Nothing (invisible null).
+#' @order 1
 #' @export
 #'
 #' @examples
@@ -157,4 +158,16 @@ plot.stepsize <- function(x, ...) {
   }
 }
 
+#' @rdname plot.stepsize
+#' @param index Integer index of character name of the coordinate of \code{x} to plot.
+#' @order 2
+#' @export
+#'
+#' @examples
+#' f <- function(x) prod(sin(x))
+#' s <- gradstep(f, 1:4, method = "CR")
+#' plot(s, 3)
+plot.gradstep <- function(x, index, ...) {
+  plot(x$original[[index]], ...)
+}
 

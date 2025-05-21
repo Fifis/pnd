@@ -31,7 +31,7 @@ test_that("Gradient step is auto-selected well", {
   g <- Grad(x = 1:3, FUN = f, h = "SW", elementwise = FALSE,
             vectorised = FALSE, multivalued = FALSE)
   expect_equal(attr(g, "step.search")[["exitcode"]], rep(0L, 3), tolerance = 1e-15)
-  expect_length(attr(g, "step.search")[["iterations"]], 3)
+  expect_length(attr(g, "step.search")[["original"]], 3)
 })
 
 test_that("parallelisation of Grad works", {
