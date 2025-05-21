@@ -13,7 +13,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 
 
 # Grid value generator for Mathur and Kostyrka
-gridM <- function(x, h0, range, shrink.factor = 0.5) {
+gridM <- function(x, range, shrink.factor = 0.5) {
   inv.sf <- 1/shrink.factor
   hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
   xgrid   <- x + c(-hgrid, hgrid)
@@ -25,6 +25,7 @@ gridM <- function(x, h0, range, shrink.factor = 0.5) {
 #'
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
+#' @inheritParams GenD
 #' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
@@ -139,7 +140,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   exitcode <- 0L
 
   # Creating a sequence of step sizes for evaluation
-  g <- gridM(x = x, h0 = h0, range = range, shrink.factor = shrink.factor)
+  g <- gridM(x = x, range = range, shrink.factor = shrink.factor)
   hgrid <- g$h
   xgrid <- g$x
   n <- length(hgrid)
@@ -188,7 +189,6 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   dletrunc <- c(NA, diff(log2etrunc))
   dlh <- c(NA, diff(log2(hgrid)))
   slopes <- dletrunc / dlh
-  signs.rle <- do.call(data.frame, rle(sign(dletrunc)))
 
   # Rounding error for later
   delta <- .Machine$double.eps / 2 # Error of h|f'(x)true - f'(x)| / |f(x)true|
@@ -218,6 +218,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   # If there is only one run, return its indices
   # Otherwise, return the indices of the first run of length 5 and more
   findFirstLongEnough <- function(x, min.len) {
+    x[is.na(x)] <- FALSE
     if (sum(x, na.rm = TRUE) < 1) return(NULL)  # Nothing is finite = no runs
     r <- rle(x)
     tr <- which(r$values)
@@ -246,7 +247,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
       hopt0 <- hgrid[i.hopt]
       exitcode <- 1L
       warning("The estimated truncation error has a slightly wrong reduction rate (~",
-              round(stats::median(slopes), 2), ", but should be ~2). ", err1)
+              round(stats::median(slopes[positive.slopes], na.rm = TRUE), 2), ", but should be ~2). ", err1)
     } else {
       if (any(is.finite(slopes))) {
         warning("The estimated truncation error has a wrong reduction rate (~", round(stats::median(slopes), 2),
@@ -262,39 +263,34 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
     i.hopt <- which(hgrid == hopt0)
     hopt <- hopt0 * (1 / tstar)^(1/3)
   } else {  # Fail-safe return for cases like x^2 at 0
-    m3 <- med3lowest(y = log2etrunc, hgrid = hgrid, hnaive = hnaive, tstar = tstar)
-    i.hopt <- m3$i.hopt
-    hopt0 <- min(h0, m3$hopt0)  # Fail-safe: the bandwidth cannot be too large; hopt0 can be gigantic
-    hopt  <- min(h0, m3$hopt)
-    exitcode <- m3$exitcode
-
-    if (!is.finite(hopt)) { # Worst case: nothing was computed
+    # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
+    # which implies that a large fail-safe step can be chosen
+    f.er <- is.finite(eround)
+    mean.sign <- if (sum(f.er) > 1) mean(sign(diff(eround[f.er]))) else 1
+    # If the rounding error is growing, prefer a slightly larger step size
+    if (mean.sign > 0.5) {
+      hopt0 <- hopt <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order,
+                                 zero.tol = .Machine$double.eps^(1/3))
+      i.hopt <- which.min(abs(log2(hgrid) - log2(hopt)))
+    } else {
+      # Otherwise, for an eround that does not grow convincingly,
+      # find the step yielding the theoretical expected round-off value
       complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
       f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
-      if (!is.finite(f0)) stop(paste0("Could not compute the function value at ", x, "."))
-      if (f0 < .Machine$double.eps) f0 <- .Machine$double.eps
       expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
-      # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
-      # which implies that a large fail-safe step can be chosen
-      f.er <- is.finite(eround)
-      mean.sign <- if (sum(f.er) > 1) mean(sign(diff(eround[f.er]))) else 1
-      if (mean.sign > 0.5) {  # Preferring a slightly larger step size
-        hopt <- hopt0 <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order)
-      } else {
-        # Otherwise, for an eround that does not grow convincingly, find the step that approximates
-        # the theoretical expected value
-        hopt <- hopt0 <- hgrid[which.min(abs(eround - expected.eround))]
-      }
-      # TODO: generalise; do the theory!
+      # TODO: generalise
+      i.hopt <- which.min(abs(eround - expected.eround))
+      hopt0 <- hopt <- hgrid[i.hopt]
     }
 
-    exitcode <- m3$exitcode
+    exitcode <- 2L
+    if (sum(is.finite(fgrid)) < 3) exitcode <- 3L
 
     if (exitcode == 2L)
       warning(paste0("Could not find a sequence of ", min.valid.slopes, " reductions ",
                      "of the truncation error. ", err1,
                      " Finally, try setting 'min.valid.slopes' to 4 or even 3. For now, ",
-                     "returning the approximate argmin of the total error."))
+                     "returning a very rough value based on the expected round-off error."))
     if (exitcode == 3L)
       warning(paste0("There are <3 finite function values on the grid. ",
                      "Try setting 'shrink.factor' to 0.9 (close to 1) or checking why the ",
@@ -307,11 +303,11 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   msg <- switch(exitcode + 1L,
                 "successfully found the optimal step size",
                 "successfully found the optimal step size but allowed inaccurate slopes",
-                "truncation error reduction rate is too wrong, returning the approximate best step",
+                "truncation error reduction rate is too wrong, returning the naive step",
                 "Fewer than 3 finite function values on the grid, returning the naive step")
 
   diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cds[[1]],
-                    est.error = rbind(NA, cbind(trunc = etrunc, round = eround)),
+                    est.error = cbind(trunc = etrunc, round = eround),
                     slopes = slopes, max.rel.error = max.rel.error)
 
   himin <- suppressWarnings(min(i.hopt, i.good, i.okay, i.increasing))

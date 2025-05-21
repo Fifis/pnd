@@ -105,7 +105,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   exitcode <- 0L
 
   # Creating a sequence of step sizes for evaluation
-  g <- gridM(x = x, h0 = h0, range = range, shrink.factor = shrink.factor)
+  g <- gridM(x = x, range = range, shrink.factor = shrink.factor)
   hgrid <- g$h
   xgrid <- g$x
   n <- length(hgrid)
@@ -205,7 +205,13 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       # Extending it because the local regression used +-1 points at the ends
       i.trunc.valid <- sort(unique(c(i.trunc.valid-1, i.trunc.valid, i.trunc.valid+1)))
 
-      # Edge case: if the slope of etrunc is always acc.order, then, there is no check
+      # Checking monotonicity after this addition to tackle edge cases like
+      # slopes = c(-1, 2, -1, -1, 2, -1) due to merging
+      # there are at least 3 points for sure, so the middle ones need to be taken out
+      nonmonot.i <- which(local.slopes[i.trunc.valid[2:(length(i.trunc.valid)-1)]] < 0) + 1
+      if (length(nonmonot.i) > 0) i.trunc.valid <- i.trunc.valid[-nonmonot.i]
+
+      # Another edge case: if the slope of etrunc is always acc.order, then, there is no check
       if (0 %in% i.trunc.valid) {
         only.right.branch <- FALSE
         i.trunc.valid <- i.trunc.valid[i.trunc.valid > 0]
@@ -272,7 +278,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     # lines(log2h, log2(hat.check), lty = 2)
 
     if (length(i.trunc.valid) < 5) {
-      warning("Fewer than 3 observations in the truncation branch! Resorting to a safe option.")
+      warning("Fewer than 5 observations in the truncation branch! Resorting to a safe option.")
       # At the optimum, the rounding error should be approx. |(e^(2/3) f^(2/3) f'''^(1/3))/(2^(2/3) 3^(1/3))|
       # However, if f''' ~ 0, we use only the rounding branch and compare it to the optimal value
       # if f''' ~ 1
@@ -289,16 +295,18 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     if (!is.finite(f0)) stop(paste0("Could not compute the function value at ", x, "."))
     if (f0 < .Machine$double.eps) f0 <- .Machine$double.eps
     expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
+    # TODO: generalise
     # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
     # which implies that a large fail-safe step can be chosen
     f.er <- is.finite(eround)
     mean.sign <- if (sum(f.er) > 1) mean(sign(diff(eround[f.er]))) else 1
-    if (mean.sign > 0.5) {  # Preferring a slightly larger step size
+    # If the rounding error is growing, prefer a slightly larger step size
+    if (mean.sign > 0.5) {
       hopt <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order,
                         zero.tol = .Machine$double.eps^(1/3))
     } else {
-      # Otherwise, for an eround that does not grow convincingly, find the step that approximates
-      # the theoretical expected value
+      # Otherwise, for an eround that does not grow convincingly,
+      # find the step that approximates the theoretical expected value
       hopt  <- hgrid[which.min(abs(eround - expected.eround))]
     }
     log2hopt <- log2(hopt)
