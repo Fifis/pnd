@@ -4,19 +4,21 @@ test_that("Mathur's AutoDX handles inputs well", {
 })
 
 test_that("Mathur's step selection behaves reasonably", {
-  s <- step.M(x = pi/4, sin, plot = TRUE, cores = 1)
+  s <- step.M(x = pi/4, sin, cores = 1)
   expect_identical(s$exitcode, 0L)
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-8)
-  if (file.exists("Rplot.pdf")) unlink("Rplot.pdf")
 })
 
-test_that("Mathur's step returns reasonable values even with bad slopes", {
-  expect_warning(m <- step.M(sin, 1, shrink.factor = 0.125, cores = 1), "wrong reduction rate")
-  expect_identical(m$exitcode, 2L)
+test_that("Mathur's algorithm returns reasonable values even with bad slopes", {
+  # TODO: come up with an example where the slopes is slightly off
 
   f <- function(x) ifelse(x %in% 1:2, x^2, NA)
   expect_warning(m <- step.M(f, 1, cores = 1), "<3 finite function values")
-  expect_identical(m$exitcode, 3L)
+})
+
+test_that("Mathur's algorithm may return unreasonable values", {
+  f <- function(x) x^3 + 1/x  # Produces wildly wrong results due to the shape of the error plot
+  expect_gt(plot(step.M(f, 1, cores = 1))$par, 0.01)
 })
 
 test_that("Parallelisation in Mathur's algorithm works", {

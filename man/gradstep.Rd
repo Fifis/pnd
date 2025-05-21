@@ -4,7 +4,7 @@
 \alias{gradstep}
 \alias{print.stepsize}
 \alias{print.gradstep}
-\title{Automatic step selection for numerical derivatives}
+\title{Automatic step selection for gradients}
 \usage{
 gradstep(
   FUN,
@@ -77,7 +77,7 @@ those grids, estimated error ratios, and estimated derivative values for
 each coordinate.
 }
 \description{
-Automatic step selection for numerical derivatives
+Automatic step selection for gradients
 }
 \details{
 We recommend using the Stepleman--Winarsky algorithm because it does not suffer

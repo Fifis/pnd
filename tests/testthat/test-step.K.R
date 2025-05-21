@@ -4,10 +4,9 @@ test_that("Kostyrka's step selection handles inputs well", {
 })
 
 test_that("Kostyrka's step selection behaves reasonably", {
-  s <- step.K(x = pi/4, sin, plot = TRUE, cores = 1)
+  s <- step.K(x = pi/4, sin, cores = 1)
   expect_identical(s$exitcode, 0L)
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-10)
-  if (file.exists("Rplot.pdf")) unlink("Rplot.pdf")
 })
 
 test_that("Kostyrka's step selection works for gradients", {
@@ -26,9 +25,9 @@ test_that("Kostyrka's method returns reasonable values with unfortunate inputs",
 })
 
 test_that("Kostyrka's method returns reasonable values with tricky functions", {
-  s <- step.K(function(x) x^3+1/x, 1, plot = TRUE)
+  s <- step.K(function(x) x^3+1/x, 1)
   expect_identical(s$exitcode, 0L)
-  s <- step.K(function(x) 6*x^5 - 56*x^3 + 1/x^2, 1, plot = TRUE)
+  s <- step.K(function(x) 6*x^5 - 56*x^3 + 1/x^2, 1)
   expect_identical(s$exitcode, 0L)
   expect_equal(s$value, -140, tolerance = 1e-10)
 })
