@@ -32,6 +32,13 @@ test_that("Kostyrka's method returns reasonable values with tricky functions", {
   expect_equal(s$value, -140, tolerance = 1e-10)
 })
 
+test_that("Mathur's algorithm returns expected non-zero exit codes", {
+  # Very noisy right branch
+  expect_identical(suppressWarnings(step.K(function(x) x^2, x = 1e-8)$exitcode), 1L)
+  # No right branch at all
+  expect_identical(suppressWarnings(step.K(function(x) x^2, x = 0)$exitcode), 2L)
+})
+
 test_that("Parallelisation in Kostyrka's algorithm works", {
   expect_identical(step.K(sin, 1, cores = 1), step.K(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)

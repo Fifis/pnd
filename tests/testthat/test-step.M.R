@@ -14,6 +14,7 @@ test_that("Mathur's algorithm returns reasonable values even with bad slopes", {
 
   f <- function(x) ifelse(x %in% 1:2, x^2, NA)
   expect_warning(m <- step.M(f, 1, cores = 1), "<3 finite function values")
+  expect_identical(m$exitcode, 3L)
 })
 
 test_that("Mathur's algorithm may return unreasonable values", {
@@ -21,14 +22,16 @@ test_that("Mathur's algorithm may return unreasonable values", {
   expect_gt(plot(step.M(f, 1, cores = 1))$par, 0.01)
 })
 
+test_that("Mathur's algorithm returns expected non-zero exit codes", {
+  # Noisy right branch
+  expect_identical(suppressWarnings(step.M(function(x) x^2, x = 1e-8)$exitcode), 2L)
+  # No branches at all
+  expect_identical(suppressWarnings(step.M(function(x) x^2, x = 0)$exitcode), 2L)
+})
+
 test_that("Parallelisation in Mathur's algorithm works", {
   expect_identical(step.M(sin, 1, cores = 1), step.M(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)
   expect_identical(step.M(sin, 1, cores = 1), step.M(sin, 1, cl = clus))
   parallel::stopCluster(clus)
-
-  # Testing a slow function
-  # f <- function(x) {Sys.sleep(0.1); sin(x)}
-  # system.time(step.M(f, 1))
-  # system.time(step.M(f, 1, cores = 12))
 })
