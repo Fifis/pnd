@@ -31,6 +31,7 @@ belong to the same order of magnitude, this step is near-optimal. For small x,
 returns a hard bound to prevent large machine-rounding errors.
 }
 \examples{
-stepx(10^(-10:2))
+# The step-selection function is piecewise linear in log-coordinates
+plot(-12:4, stepx(10^(-12:4)), log = "y", type = "l")
 stepx(10^(-10:2), deriv.order = 2, acc.order = 4)
 }

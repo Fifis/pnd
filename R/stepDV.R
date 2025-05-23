@@ -95,7 +95,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                     ratio.limits = c(2, 15), maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+  if (length(x) != 1) stop(paste0("Direct step-size selection can handle only univariate inputs. ",
                                   "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names

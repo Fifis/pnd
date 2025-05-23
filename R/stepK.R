@@ -66,7 +66,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                    range = NULL, shrink.factor = 0.5,
                    max.rel.error = .Machine$double.eps^(7/8),
                    cores = 1, preschedule = getOption("pnd.preschedule", TRUE), cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+  if (length(x) != 1) stop(paste0("Direct step-size selection can handle only univariate inputs. ",
                                   "For 'x' longer than 1, use 'gradstep'."))
   if (!is.numeric(shrink.factor) || shrink.factor <= 0 || shrink.factor >= 1)
     stop("'shrink.factor' must be strictly greater than 0 and less than 1. Recommended: 0.5.")

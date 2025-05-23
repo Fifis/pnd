@@ -105,7 +105,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                     seq.tol = 1e-4, max.rel.error = .Machine$double.eps/2, maxit = 40L,
                     cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                     cl = NULL, ...) {
-  if (length(x) != 1) stop(paste0("The step-size selection can handle only univariate inputs. ",
+  if (length(x) != 1) stop(paste0("Direct step-size selection can handle only univariate inputs. ",
                                   "For 'x' longer than 1, use 'gradstep'."))
   cores <- checkCores(cores)
   h0 <- unname(h0)  # To prevent errors with derivative names
@@ -306,14 +306,14 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                    "is invalid; (3) the range is too narrow. Please try a slightly larger ",
                    "and a slightly smaller h0, or expand the range."))
 
-  if (hopt > 0.01*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
+  if (hopt > 0.1*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
     exitcode <- 3L
-    warning(paste0("The found step size, ", hopt, ", exceeds 1% of |x|, ",
+    warning(paste0("The found step size, ", printE(hopt), ", exceeds 10% of |x|, ",
                    abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
                    "and x-h due to large steps. Try a different starting value h0 to be sure. ",
-                   "Returning 0.01|x| ."))
+                   "Returning 0.01|x|."))
     i <- i + 1
-    hopt <- 0.01*abs(x)
+    hopt <- 0.1*abs(x)
     res.i <- getValsSW(FUN = FUN, x = x, h = hopt, max.rel.error = max.rel.error,
                        do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
                        ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
