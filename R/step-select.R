@@ -11,7 +11,8 @@
 #' @export
 #'
 #' @examples
-#' stepx(10^(-10:2))
+#' # The step-selection function is piecewise linear in log-coordinates
+#' plot(-12:4, stepx(10^(-12:4)), log = "y", type = "l")
 #' stepx(10^(-10:2), deriv.order = 2, acc.order = 4)
 stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$double.eps)) {
   x <- abs(x)
@@ -144,11 +145,11 @@ gradstep <- function(FUN, x, h0 = NULL,
                                      range = h0[1] / c(1e4, 1e-4),
                                      cores = cores, preschedule = preschedule, cl = cl),
                        CR = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
-                                 version = "original", aim = 100, acc.order = 2, tol = 10,
+                                 deriv.order = 1, acc.order = 1, aim = 100, tol = 10,
                                  range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                                  cores = cores, preschedule = preschedule, cl = cl),
                        CRm = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
-                                  version = "modified", aim = 1, acc.order = 2, tol = 4,
+                                  deriv.order = 1, acc.order = 2, aim = 1/2, tol = 4,
                                   range = h0[1] / c(1e5, 1e-5), maxit = 20L, seq.tol = 1e-4,
                                   cores = cores, preschedule = preschedule, cl = cl),
                        DV = list(h0 = h0[1], range = h0[1] / c(1e6, 1e-6), max.rel.error = .Machine$double.eps^(7/8),

@@ -1,9 +1,7 @@
 test_that("Curtis-Reid step selection handles inputs well", {
   f <- function(x) return(NA)
   expect_error(step.CR(x = 2, f), "Could not compute the function value")
-  expect_error(step.CR(sin, 1, version = "new"), "should be one of")
   expect_error(step.CR(sin, 1, tol = 1e-4), "must be >=")
-  expect_warning(step.CR(sin, 1, acc.order = 4), "Using acc.order")
   expect_error(step.CR(sin, 1, range = c(0, 1)), "must be a positive vector of length 2")
 })
 
@@ -18,17 +16,25 @@ test_that("Curtis-Reid step selection behaves reasonably", {
   expect_gt(u, 10)
   expect_lt(u, 1000)
 
-  s2 <-  step.CR(x = 2, f, version = "modified")
-  expect_lt(sum(s2$abs.error), 1e-7)
+  s2 <-  step.CR(x = 2, f, acc.order = 2)
+  expect_lt(sum(s2$abs.error), 1e-5)
   expect_equal(s2$value, 32, tolerance = 1e-8)
 
-  s3 <- step.CR(x = 2, f, version = "modified", acc.order = 4)
-  expect_lt(sum(s2$abs.error), 5e-8)
+  s3 <- step.CR(x = 2, f, acc.order = 4)
+  expect_lt(sum(s2$abs.error), 1e-6)
   expect_equal(s3$value, 32, tolerance = 1e-8)
 
-  s4 <- step.CR(x = sqrt(2), FUN = function(x) x^6 -2*x^4 - 4*x^2, h0 = 2^-16)
+  s4 <- step.CR(x = sqrt(2), FUN = function(x) x^6 - 2*x^4 - 4*x^2, h0 = 2^-16)
   expect_lt(abs(s4$value), 1e-8)
 
+  s5 <- step.CR(x = 2, function(x) 0, deriv.order = 3, acc.order = 4)
+  expect_identical(s5$exitcode, 1L)
+})
+
+test_that("Curtis--Reid can handle higher-order derivatives and accuracy", {
+  f <- function(x) sin(x)
+  expect_equal(step.CR(x = 2, f, deriv.order = 2)$value, -sin(2), tolerance = 1e-5)
+  expect_equal(step.CR(x = 2, f, deriv.order = 3, acc.order = 4)$value, -cos(2), tolerance = 1e-7)
 })
 
 test_that("Curtis--Reid algorithm stops if the function returns NA for all allowed step sizes", {
@@ -47,7 +53,9 @@ test_that("Large and small initial values in Curtis--Reid cause range problems",
   expect_identical(step.CR(x = 2, f, h0 = 1e-12)$exitcode, 1L)  # In theory, it should be 3,
   # but the truncation error estimate is really zero...
   expect_identical(step.CR(x = 2, f, h0 = 9e-9, range = c(1e-8, 2e-8))$exitcode, 3L)
-  expect_identical(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 2, range = c(1e-12, 1))$exitcode, 4L)
+  # For linear functions, the target ratio may not be reached
+  expect_identical(step.CR(x = 2, f, deriv.order = 3, acc.order = 4)$exitcode, 5L)
+  expect_identical(step.CR(x = 2, FUN = f, h0 = 1000, maxit = 2, range = c(1e-12, 1))$exitcode, 5L)
 })
 
 # test_that("Parallelisation speeds things up for Curtis--Reid", {

@@ -7,13 +7,13 @@
 step.CR(
   FUN,
   x,
-  h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
+  deriv.order = 1,
+  acc.order = 1,
+  h0 = NULL,
   max.rel.error = .Machine$double.eps^(7/8),
-  version = c("original", "modified"),
-  aim = if (version[1] == "original") 100 else 1,
-  acc.order = c(2L, 4L),
-  tol = if (version[1] == "original") 10 else 4,
-  range = h0/c(1e+05, 1e-05),
+  aim = NULL,
+  tol = NULL,
+  range = NULL,
   maxit = 20L,
   seq.tol = 1e-04,
   cores = 1,
@@ -27,6 +27,14 @@ step.CR(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
+\item{deriv.order}{Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
+for which a numerical approximation is needed.}
+
+\item{acc.order}{Order of accuracy: defines how the approximation error scales
+with the step size \eqn{h}{h}, specifically \eqn{O(h^{a+1})}{O(h^(a+1))}, where
+\eqn{a}{a} is the accuracy order and depends on the higher-order derivatives
+of the function.}
+
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
@@ -36,17 +44,9 @@ If the function is relying on numerical optimisation routines, consider setting 
 \code{sqrt(.Machine$double.eps)}.
 If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.}
 
-\item{version}{Character scalar: \code{"original"} for the original 1974 version by
-Curtis and Reid; \code{"modified"} for Kostyrka’s 2025 modification, which adds an
-extra evaluation for a more accurate estimate of the truncation error.}
-
-\item{aim}{Positive real scalar: desired ratio of truncation-to-rounding error. The \code{"original"}
+\item{aim}{Positive real scalar: desired ratio of truncation-to-rounding error. The original
 version over-estimates the truncation error, hence a higher \code{aim} is recommended.
-For the \code{"modified"} version, aim should be close to 1.}
-
-\item{acc.order}{Numeric scalar: in the modified version, allows searching for a
-step size that would be optimal for a 4th-order-accurate central difference
-See the Details section below.}
+For the modernised version, aim should be equal to \code{deriv.order / acc.order}.}
 
 \item{tol}{Numeric scalar greater than 1: tolerance multiplier for determining when to stop
 the algorithm based on the current estimate being between \code{aim/tol} and \code{aim*tol}.}
@@ -87,7 +87,8 @@ especially useful for computationally expensive functions).
 \item \code{1} – Third derivative is zero; large step size preferred.
 \item \code{2} – No change in step size within tolerance.
 \item \code{3} – Solution lies at the boundary of the allowed value range.
-\item \code{4} – Maximum number of iterations reached.
+\item \code{3} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+\item \code{5} – Maximum number of iterations reached.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the full step size search path, argument grids,
@@ -103,12 +104,12 @@ This function computes the optimal step size for central differences using the
 If the estimated third derivative is exactly zero, then, the initial step size
 is multiplied by 4 and returned.
 
-If 4th-order accuracy (4OA) is requested, then, two things happen. Firstly,
-since 4OA differences requires a larger step size and the truncation error for
-the 2OA differences grows if the step size is larger than the optimal one,
+If 4th-order accuracy is requested, then, two things happen. Firstly,
+since 4th-order-accurate differences requires a larger step size and the truncation error for
+the 2nd-order-accurate differences grows if the step size is larger than the optimal one,
 a higher ratio of truncation-to-rounding errors should be targeted. Secondly,
-a 4OA numerical derivative is returned, but the truncation and rounding errors
-are still estimated for the 2OA differences. Therefore, the estimating truncation
+a 4th-order-accurate numerical derivative is returned, but the truncation and rounding errors
+are still estimated for the 2nd-order-accurate differences. Therefore, the estimated truncation
 error is higher and the real truncation error of 4OA differences is lower.
 
 TODO: mention that f must be one-dimensional
@@ -118,13 +119,16 @@ The arguments passed to \code{...} must not partially match those of \code{\link
 \code{step.CR(f, x, h = 1e-4, cl = cl, a = a)} will result in an error: \code{a} matches \code{aim}
 and \code{acc.order}. Redefine the function for this argument to have a name that is not equal
 to the beginning of one of the arguments of \code{\link[=step.CR]{step.CR()}}.
+
+The original version of the article uses \code{deriv.order = 1}, \code{acc.order = 1}, \code{aim = 100}.
 }
 \examples{
 f <- function(x) x^4
-step.CR(x = 2, f)
+step.CR(x = 2, f)  # Wrap plot(...) around each of these functions
 step.CR(x = 2, f, h0 = 1e-3)
-step.CR(x = 2, f, version = "modified")
-step.CR(x = 2, f, version = "modified", acc.order = 4)
+step.CR(x = 2, f, acc.order = 2)
+step.CR(x = 2, f, deriv.order = 2)
+step.CR(x = 2, f, deriv.order = 3, acc.order = 4)
 
 # A bad start: too far away
 step.CR(x = 2, f, h0 = 1000)  # Bad exit code + a suggestion to extend the range

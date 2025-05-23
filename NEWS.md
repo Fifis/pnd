@@ -1,12 +1,11 @@
 # pnd 0.dev roadmap (2025-XX-XX)
 
-- UX: make the warnings once-per-session; print the first error in runParallel in Grad
+- UX: make the warnings once-per-session; print the first error in `runParallel` in Grad
 - FEATURE: add options for default accuracy (maybe 4?)
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
-- FEATURE: SW, M, K algorithm for arbitrary derivative and accuracy orders
-- FEATURE: if any algorithm returns a step size larger than `0.5*|x|`, throw a warning
-- FEATURE: Add a vector of step sizes for different arguments
+- FEATURE: CR, DW, SW, M, K algorithm for arbitrary derivative and accuracy orders
+- FEATURE: if any algorithm returns a step size larger than `|x| / max(stencil)`, throw a warning
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
 - FEATURE: Arbitrary mixed orders
 - MISC: Write the list of controls on the help page of `gradstep()` explicitly!
@@ -18,8 +17,10 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.1 (2025-XX-XX)
+# pnd 0.1.1 (2025-07-XX)
+- Fix: added a simpler and more reliable fall-back option for `step.M`
 - Feature: added plotting methods for `step...` functions
+- Feature: added arbitrary derivation and accuracy order to Curtis--Reid method
 
 # pnd 0.1.0 (2025-05-20)
 - Feature: original kink-based algorithm for step size selection `step.K()`
