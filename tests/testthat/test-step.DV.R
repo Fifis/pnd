@@ -18,16 +18,19 @@ test_that("Dumontet-Vignes step selection behaves reasonably", {
 
   s2 <- step.DV(x = 2, f, range = c(1e-10, 1e-7))
   expect_identical(s2$exitcode, 3L)
-  expect_true(grepl("too close to the right end", s2$message))
 
-  s3 <- step.DV(x = 2, f, range = c(1e-3, 1e-1))
-  expect_identical(s3$exitcode, 5L)
-  expect_true(grepl("on the right end", s3$message))
+  s3 <- step.DV(x = 2, f, range = c(1e-3, 1e-1), maxit = 10)
+  expect_identical(s3$exitcode, 6L)
 
-  s4 <- step.DV(x = 2, f, h0 = 100, maxit = 5)
-  expect_identical(s4$exitcode, 5L)
+  s4 <- step.DV(x = 2, f, h0 = 1000, maxit = 5)
+  expect_identical(s4$exitcode, 6L)
 
-  expect_identical(step.DV(x = 2, f, maxit = 1)$exitcode, 6L)
+  # Too large a size must be limited -- the range must be over-ridden
+  s5 <- step.DV(x = 2, f, h0 = 1000, range = c(1e2, 1e4), maxit = 5)
+  expect_equal(s5$par, 0.2, tolerance = 1e-12)
+  expect_identical(s5$exitcode, 6L)
+
+  expect_identical(step.DV(x = 2, f, maxit = 1)$exitcode, 7L)
 })
 
 test_that("Dumontet--Vignes algorithm stops if the function returns NA for all allowed step sizes", {

@@ -68,10 +68,11 @@ getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
 #'         \item \code{0} – Optimal termination within tolerance.
 #'         \item \code{1} – Third derivative is zero; large step size preferred.
 #'         \item \code{3} – Solution lies at the boundary of the allowed value range.
-#'         \item \code{4} – Maximum number of iterations reached; optimal step size is within the allowed range.
-#'         \item \code{5} – Maximum number of iterations reached; optimal step size
-#'           was outside allowed range and had to be snapped to a boundary.
-#'         \item \code{6} – No search was performed (used when \code{maxit = 1}).
+#'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+#'         \item \code{5} – Maximum number of iterations reached; optimal step size is within the allowed range.
+#'         \item \code{6} – Maximum number of iterations reached; optimal step size
+#'           was outside allowed range and had to be snapped to a boundary or to 0.1|x|.
+#'         \item \code{7} – No search was performed (used when \code{maxit = 1}).
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the full step size search path (note: for the third derivative),
@@ -136,7 +137,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
 
     # Quick rule of thumb: stop after the first iteration
     if (maxit == 1) {
-      exitcode <- 6L
+      exitcode <- 7L
       break
     }
 
@@ -184,9 +185,19 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     side <- "right"
   }
 
+  if (h > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    # The found step size exceeds 10% of |x|, and x is not too small
+    # FUN might poorly behave at x+h and x-h due to large steps.
+    # Magic constant: threshold because stepx(4.712e-7) = 4.712e-8, i.e. 10%
+    # No iteration update because h is merely a by-product of optimisation
+    h <- 0.1*abs(x)
+    exitcode <- 4L
+  }
+
   # Was the procedure systematically unsuccsessful?
+  # This error code is more severe than
   if (i >= maxit && maxit > 1) {  # Did it waste many iterations in vain?
-    exitcode <- if (h == range[1] || h == range[2]) 5L else 4L
+    exitcode <- if (h <= range[1] || h >= range[2]) 6L else 5L
     side <- if (ndownwards >= maxit/2) "right" else "left"
   }
 
@@ -199,17 +210,17 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   eround <- max.rel.error * max(abs(fgrid)) / h  # Formula for 'ed' ibid.
 
   msg <- switch(exitcode + 1L,
-                "target error ratio reached within tolerance",
-                "truncation error is zero, large step is favoured",
-                "",
+                "target error ratio reached within tolerance",  # 0
+                "truncation error is zero, large step is favoured",  # 1
+                "",  # 2 -- not used yet
                 paste0("step size too close to the ", side,
                        " end of the range [", printE(range[1]), ", ",
-                       printE(range[2]), "]; consider extending it"),
-                "maximum number of iterations reached",
+                       printE(range[2]), "]; consider extending it"),  # 3
+                "maximum number of iterations reached",  # 4
                 paste0("maximum number of iterations reached and step size occured on the ",
                        side, " end of the range [", printE(range[1]), ", ",
-                       printE(range[2]), "]; consider expanding it"),
-                "only one iteration requested; rough values returned")
+                       printE(range[2]), "]; consider expanding it"),  # 5
+                "only one iteration requested; rough values returned")  # 6
 
   diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
                     x = do.call(rbind, lapply(iters, "[[", "x")),

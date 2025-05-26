@@ -71,10 +71,11 @@ A list similar to the one returned by \code{optim()}:
 \item \code{0} – Optimal termination within tolerance.
 \item \code{1} – Third derivative is zero; large step size preferred.
 \item \code{3} – Solution lies at the boundary of the allowed value range.
-\item \code{4} – Maximum number of iterations reached; optimal step size is within the allowed range.
-\item \code{5} – Maximum number of iterations reached; optimal step size
-was outside allowed range and had to be snapped to a boundary.
-\item \code{6} – No search was performed (used when \code{maxit = 1}).
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+\item \code{5} – Maximum number of iterations reached; optimal step size is within the allowed range.
+\item \code{6} – Maximum number of iterations reached; optimal step size
+was outside allowed range and had to be snapped to a boundary or to 0.1|x|.
+\item \code{7} – No search was performed (used when \code{maxit = 1}).
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the full step size search path (note: for the third derivative),

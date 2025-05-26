@@ -286,15 +286,27 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     close.left <- TRUE
   }
 
-  if (i >= maxit) exitcode <- 4L
+  if (hopt > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    exitcode <- 4L
+    i <- i + 1
+    hopt <- 0.1*abs(x)
+    res.i <- getValsSW(FUN = FUN, x = x, h = hopt, max.rel.error = max.rel.error,
+                       do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
+                       ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
+                       cores = cores, cl = cl, preschedule = preschedule, ...)
+    iters[[i]] <- res.i
+  }
+
+  if (i >= maxit) exitcode <- 5L
 
   msg <- switch(exitcode + 1L,
-                "successfully found a monotonicity violation",
+                "successfully found a monotonicity violation",  # 0
                 "", # The code cannot be 1 here
-                "step size did not change between iterations",
+                "step size did not change between iterations",  # 2
                 paste0("step size too close to the ", if (close.left)
                   "left" else "right", " end of the range; consider extending the range ",
-                  "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),
+                  "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),  # 3
+                "step size too large relative to x, using |x|/10 instead",  # 4
                 "maximum number of iterations reached")
 
   if (exitcode == 2L) warning(paste0("The step size did not change between iterations. ",
@@ -303,24 +315,9 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     warning(paste0("The algorithm terminated at the right range of allowed step sizes. ",
                    "Possible reasons: (1) h0 is too low and the bisection step overshot ",
                    "the next value; (2) h0 was too large and the truncation error estimate ",
-                   "is invalid; (3) the range is too narrow. Please try a slightly larger ",
+                   "is invalid; (3) the range is too narrow. Try a slightly larger ",
                    "and a slightly smaller h0, or expand the range."))
 
-  if (hopt > 0.1*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
-    exitcode <- 3L
-    warning(paste0("The found step size, ", printE(hopt), ", exceeds 10% of |x|, ",
-                   abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
-                   "and x-h due to large steps. Try a different starting value h0 to be sure. ",
-                   "Returning 0.01|x|."))
-    i <- i + 1
-    hopt <- 0.1*abs(x)
-    res.i <- getValsSW(FUN = FUN, x = x, h = hopt, max.rel.error = max.rel.error,
-                       do.f0 = FALSE, ratio.last = if (i > 1) iters[[i-1]] else NULL,
-                       ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
-                       cores = cores, cl = cl, preschedule = preschedule, ...)
-
-    iters[[i]] <- res.i
-  }
 
   diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
                     x = do.call(rbind, lapply(iters, "[[", "x")),

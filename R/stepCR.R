@@ -23,7 +23,10 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
   if (vanilla) {
     less.acc <- sum(fgrid[-1] * stc1$weights) / h^deriv.order
   } else {
-    less.acc <- sum(fgrid[2:(n-1)] * stc1$weights) / h^deriv.order
+    idx <- match(stc1$stencil, stc2$stencil)
+    if (!isTRUE(all.equal(idx, 2:(n-1))))
+      stop("stepCR error: wrong indices, should never happen. Please file a bug report on GitHub.")
+    less.acc <- sum(fgrid[idx] * stc1$weights) / h^deriv.order
   }
   more.acc <- sum(fgrid * stc2$weights) / h^deriv.order
   etrunc <- abs(less.acc - more.acc)
@@ -91,7 +94,7 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
 #'         \item \code{1} – Third derivative is zero; large step size preferred.
 #'         \item \code{2} – No change in step size within tolerance.
 #'         \item \code{3} – Solution lies at the boundary of the allowed value range.
-#'         \item \code{3} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+#'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 #'         \item \code{5} – Maximum number of iterations reached.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
@@ -226,12 +229,11 @@ step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
   i <- length(iters)
   if (i >= maxit) exitcode <- 5L
 
-  if (hnew > 0.1*abs(x) && abs(x) > sqrt(.Machine$double.eps)) {
+  if (hnew > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    # The found step size exceeds 10% of |x|, and x is not too small
+    # FUN might poorly behave at x+h and x-h due to large steps.
+    # Magic constant: threshold because stepx(4.712e-7) = 4.712e-8, i.e. 10%
     exitcode <- 4L
-    # warning(paste0("The found step size, ", printE(hnew), ", exceeds 10% of |x|, ",
-    #                abs(x), ", where x is not too small. FUN might poorly behave at x+h ",
-    #                "and x-h due to large steps. Try a different starting value h0 to be sure. ",
-    #                "Returning 0.1|x|."))
     i <- i + 1
     hnew <- 0.1*abs(x)
     res.i <- getValsCR(FUN = FUN, x = x, h = hnew, deriv.order = deriv.order,
@@ -241,13 +243,13 @@ step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
   }
 
   msg <- switch(exitcode + 1L,
-                "target error ratio reached within tolerance",
-                "truncation error is close to zero, large step is favoured",
-                "step size did not change between iterations",
+                "target error ratio reached within tolerance",  # 0
+                "truncation error is close to zero, large step is favoured",  # 1
+                "step size did not change between iterations",  # 2
                 paste0("step size landed on the range ", if (res.i$h == range[1]) "left" else
-                  "right", " end; consider extending the range"),
-                "step size too large relative to x, using |x|/4 instead",
-                "maximum number of iterations reached")
+                  "right", " end; consider extending the range"),  # 3
+                "step size too large relative to x, using |x|/10 instead",  # 4
+                "maximum number of iterations reached")  # 5
 
   diag.list <- list(h = do.call(c, lapply(iters, "[[", "h")),
                     x = do.call(rbind, lapply(iters, "[[", "x")),

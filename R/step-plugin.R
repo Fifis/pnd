@@ -44,7 +44,8 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
 #'         \item \code{0} – Termination with checks passed tolerance.
 #'         \item \code{1} – Third derivative is exactly zero; large step size preferred.
 #'         \item \code{2} – Third derivative is too close to zero; large step size preferred.
-#'         \item \code{3} – Solution lies at the boundary of the allowed value range.
+#'         \item \code{3} – Solution lies at the boundary of the allowed value range or had.
+#'           to be snapped to 0.1|x|.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the two-step size search path, argument grids,
@@ -59,7 +60,7 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
 #' f <- function(x) x^4
 #' step.plugin(x = 2, f)
 #' step.plugin(x = 0, f)  # f''' = 0, setting a large one
-step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
+step.plugin <- function(FUN, x, h0 = max(1e-5*abs(x), stepx(x, deriv.order = 3)),
                         max.rel.error = .Machine$double.eps^(7/8), range = h0 / c(1e4, 1e-4),
                         cores = 1, preschedule = getOption("pnd.preschedule", TRUE),
                         cl = NULL, ...) {
@@ -116,6 +117,7 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
     h <- abs(1.5 * f0/cd3 * max.rel.error)^(1/3)
   }
 
+  # x beyond the boundary
   if (h < range[1]) {
     h <- range[1]
     exitcode <- 3L
@@ -125,17 +127,25 @@ step.plugin <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps))
     exitcode <- 3L
     side <- "right"
   }
+  if (h > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    # The found step size exceeds 10% of |x|, and x is not too small
+    # FUN might poorly behave at x+h and x-h due to large steps.
+    # Magic constant: threshold because stepx(4.712e-7) = 4.712e-8, i.e. 10%
+    exitcode <- 4L
+    h <- 0.1*abs(x)
+  }
 
   iters[[2]] <- getValsPlugin(FUN = FUN, x = x, h = h, stage = 2,
                               cores = cores, cl = cl, preschedule = preschedule, ...)
 
   msg <- switch(exitcode + 1L,
-                "successfully computed non-zero f''' and f'",
-                "truncation error is zero, large step is favoured",
-                "truncation error is near-zero, large step is favoured",
+                "successfully computed non-zero f''' and f'",  # 0
+                "truncation error is zero, large step is favoured",  # 1
+                "truncation error is near-zero, large step is favoured",  # 2
                 paste0("step size too close to the ", side,
                        " end of the reasonable range [", printE(range[1]), ", ",
-                       printE(range[2]), "]"))
+                       printE(range[2]), "]"),  # 3
+                "step size too large relative to x, using |x|/10 instead")  # 4
 
   diag.list <- list(h = c(f3 = h0 * .Machine$double.eps^(-2/15), f1 = h),
                     x = unlist(lapply(iters, "[[", "x")),

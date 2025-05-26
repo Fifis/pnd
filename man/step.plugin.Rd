@@ -7,7 +7,7 @@
 step.plugin(
   FUN,
   x,
-  h0 = 1e-05 * max(abs(x), sqrt(.Machine$double.eps)),
+  h0 = max(1e-05 * abs(x), stepx(x, deriv.order = 3)),
   max.rel.error = .Machine$double.eps^(7/8),
   range = h0/c(10000, 1e-04),
   cores = 1,
@@ -61,7 +61,8 @@ A list similar to the one returned by \code{optim()}:
 \item \code{0} – Termination with checks passed tolerance.
 \item \code{1} – Third derivative is exactly zero; large step size preferred.
 \item \code{2} – Third derivative is too close to zero; large step size preferred.
-\item \code{3} – Solution lies at the boundary of the allowed value range.
+\item \code{3} – Solution lies at the boundary of the allowed value range or had.
+to be snapped to 0.1|x|.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the two-step size search path, argument grids,

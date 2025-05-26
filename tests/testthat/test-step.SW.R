@@ -49,8 +49,7 @@ test_that("SW algorithm stops if the function returns NA for all allowed step si
 
 
 test_that("SW fails when a large h0 invalidates the est. trunc. error", {
-  expect_warning(step.SW(x = pi/4, FUN = sin, h0 = 1000),
-                 "exceeds 1% of |x|")
+  expect_identical(step.SW(x = pi/4, FUN = sin, h0 = 1000)$exitcode, 4L)
 })
 
 test_that("Parallelisation in SW works", {

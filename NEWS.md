@@ -1,9 +1,10 @@
 # pnd 0.dev roadmap (2025-XX-XX)
 
 - UX: make the warnings once-per-session; print the first error in `runParallel` in Grad
+- FEATURE: use higher zero tolerances `stepx()` for higher-order derivatives, update all `step...` functions using it
 - FEATURE: add options for default accuracy (maybe 4?)
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
-- FEATURE: disable parallelisation if `f(x)` takes less than 0.002 s
+- FEATURE: suggest parallelisation if `f(x)` takes more than 0.002 s
 - FEATURE: CR, DW, SW, M, K algorithm for arbitrary derivative and accuracy orders
 - FEATURE: if any algorithm returns a step size larger than `|x| / max(stencil)`, throw a warning
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection

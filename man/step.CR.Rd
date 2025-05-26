@@ -87,7 +87,7 @@ especially useful for computationally expensive functions).
 \item \code{1} – Third derivative is zero; large step size preferred.
 \item \code{2} – No change in step size within tolerance.
 \item \code{3} – Solution lies at the boundary of the allowed value range.
-\item \code{3} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 \item \code{5} – Maximum number of iterations reached.
 }
 \item \code{message} – A summary message of the exit status.
