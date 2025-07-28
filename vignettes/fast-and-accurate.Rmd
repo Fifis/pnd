@@ -875,6 +875,57 @@ The current version of the package contains no implementation of the implicit sy
 However, facilities to choose between the quicker (no symmetrisation) and the more accurate (average of the full matrix and its transpose) exist.
 
 
+# Derivatives from existing function values
+
+This problem may be encountered in calculus of variations problem when optimising the objective function.
+Given function values on a grid of equally spaced points, one needs to estimate the derivatives quite accurately, and second-order-accurate derivatives are not exact enough.
+
+1. Generate a grid $x$ of $n+1$ points on the interval [0, 1]. This grid is fixed and will not change throughout the whole process. Therefore, the step size is constant: $h=1/n$. The length $n$ should not be too small and not be too large. It is the number of variables in the objective function that determines the accuracy of the
+finite-difference derivatives. The grid points have to be fixed and equidistant because otherwise, computing the integral will be more complex.
+2. The function values $y$ at the grid points $x$ are unknown; the initialisation is $\forall i,\ y_i=0$. The optimisation routine will gradually change these values. For each such configuration, it will apply the objective function to minimise the integral $I$.
+3. The objective function takes the configuration $(x, y)$, $x$ being constant, and calculates the finite-difference derivatives at each grid point.  The accuracy of the derivatives at the endpoints of the interval is especially concerning because they are estimated on asymmetric stencils. 
+4. With $(x, y)$ and the derivatives $dy$ the objective function sets up the integrand of the integral to be minimised.
+5. Finally, the objective function applies the trapezoidal formula (or the Romberg integral) and computes a value for this configuration. Based on this information, the optimisation solver will change the $y$-values and go to the next iteration.
+
+The number $n$ of grid points is also the number of independent variables in the optimization process and should not be too big ($n=8000$ may take hours of computation time), but sufficiently large for providing a good estimate of the derivatives.
+
+Since calculus of variations is outside the scope of this vignette, we show how to set up step (3) that calculates numerical derivatives.
+```{r}
+n <- 100
+h <- pi/n  # Like interval [0, 1]; the step size between grid points is pi/100
+n1 <- n + 1  # Total points
+x <- seq(0, pi, by = h)  # 101 grid points
+y <- sin(x)  # Original function values at grid points
+dy <- cos(x)  # True derivative at grid points (for comparison only)
+```
+
+Now we locate the indices of observations that will participate in derivative approximation at every point. For central differences, these are symmetric indices. Near the ends, it is the full chunk of $a$ end points.
+
+On each of these sets of points, we compute the stencil and the corresponding weights. The end points use full one-sided stencils; points near the end use asymmetric stencils, and closer to the centre, symmetric ones.
+```{r}
+a <- 9  # Odd; one more than the accuracy order for symmetric stencils
+aa <- floor(a/2)
+inds <- lapply(1:n1, function(i) (i-aa):(i+aa))  # Symmetric indices
+inds <- lapply(inds, function(x) {
+  if (min(x) < 1) x <- x - min(x) + 1
+  if (max(x) > n1) x <- x - max(x) + n1
+  x
+})
+stncls <- lapply(seq_along(inds), function(i) inds[[i]] - i)
+wgts <- lapply(stncls, function(s) fdCoef(stencil = s, zero.action = "round")$weights)
+```
+
+Now we compute the highly accurate derivative with these stencils and optimal weights and measure the accuracy. Turns out, this computation is no less accurate than `1e-13`, and the median accuracy is `4e-15`!
+```{r}
+ndy <- sapply(seq_along(inds), function(i) sum(y[inds[[i]]] * wgts[[i]])) / h
+
+ae <- abs(dy - ndy)
+plot(x, log(ae), type = "l", bty = "n", main = "Log(approx. error)")  # The error is tiny
+median(ae)  # 4e-15!
+head(ae)  # At most 1e-13
+tail(ae)  # At most 2e-14
+```
+
 # Common issues with numerical derivatives
 
 ## Stencil choice
