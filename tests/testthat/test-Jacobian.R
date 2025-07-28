@@ -36,6 +36,25 @@ test_that("Jacobian works for scalar functions", {
   expect_identical(colnames(h2.jac), c("A", "B", "C"))
 })
 
+test_that("Jacobian works well with multi-valued functions", {
+  set.seed(1)
+  X <- rchisq(20, 3)
+  Y <- 1 + X + rnorm(20)
+  d <- data.frame(Y, X)
+  mod <- lm(Y ~ X, data = d)
+  # Least-squares moment conditions
+  g <- function(theta, data) {
+    res <- Y - theta[1] - theta[2]*X
+    cbind(U = res, UX = res*data$X)
+  }
+  # colMeans(g(mod$coefficients, d))  # Around 1e-16
+  ghat <- function(theta) colMeans(g(theta, data = d))
+  # ghat(mod$coefficients)
+  jac <- Jacobian(ghat, x = mod$coefficients, elementwise = FALSE, multivalued = TRUE, vectorised = FALSE)
+  expect_equal(-c(1, mean(X), mean(X), mean(X^2)), as.numeric(jac), tolerance = 1e-8)
+  # TODO: make it work without checks
+})
+
 test_that("Jacobian works with automatic step sizes", {
   f <- function(x) c(x^2 - 2*x + 2, exp(x))
   expect_error(Jacobian(f, x = 0.75, h = "CR"), "step selection works only when")
