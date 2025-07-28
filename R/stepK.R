@@ -33,6 +33,7 @@
 #'         \item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
 #'         \item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
 #'         \item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
+#'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
@@ -320,6 +321,15 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
   h.closest <- hgrid[i.closest]
 
+  # Final step size check: not too large
+  if (max(h.closest) > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    exitcode <- 4L
+    hopt <- 0.1*abs(x)
+    log2hopt <- log2(hopt)
+    i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
+    h.closest <- hgrid[i.closest]
+  }
+
   # The grid with the largest stencil remains in memory
 
   cd.closest <- cds[[1]][i.closest]  # Derivatives at 2 closest points
@@ -336,14 +346,15 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   } else {
     et <- med.te
   }
-  er <- if (!zero.trunc) et * acc.order else mean(eround[i.closest])
-  # TODO: fix this formula, double-check the calculations
+  er <- if (!zero.trunc) et * acc.order / deriv.order else mean(eround[i.closest])
+  # T/R = d/a --> R = Ta/d
 
   msg <- switch(exitcode + 1L,
-                "target error ratio reached within tolerance",
-                "truncation branch slope is close to zero, relying on the expected rounding error",
-                "truncation error is near-zero, relying on the expected rounding error",
-                "there is no left branch of the combined error, fitting impossible"
+                "target error ratio reached within tolerance",  # 0
+                "truncation branch slope is close to zero, relying on the expected rounding error",  # 1
+                "truncation error is near-zero, relying on the expected rounding error",  # 2
+                "there is no left branch of the combined error, fitting impossible",  # 3
+                "step size too large relative to x, using |x|/10 instead"  # 4
 
   )
 

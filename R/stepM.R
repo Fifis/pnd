@@ -75,6 +75,7 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #'         \item \code{1} – Reductions are slightly outside the tolerance.
 #'         \item \code{2} – Tolerances are significantly violated; an approximate minimum is returned.
 #'         \item \code{3} – Not enough finite function values; a rule-of-thumb value is returned.
+#'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
@@ -300,11 +301,20 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
                      "not even yield a finite numerical derivative."))
   }
 
+  # Final step size check
+  if (hopt > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
+    exitcode <- 4L
+    h.target <- 0.1*abs(x)
+    i.hopt <- which.min(abs(hgrid - h.target))
+    hopt0 <- hopt <- hgrid[i.hopt]
+  }
+
   msg <- switch(exitcode + 1L,
-                "successfully found the optimal step size",
-                "successfully found the optimal step size but allowed inaccurate slopes",
-                "truncation error reduction rate is too wrong, returning the naive step",
-                "Fewer than 3 finite function values on the grid, returning the naive step")
+                "successfully found the optimal step size",  # 0
+                "successfully found the optimal step size but allowed inaccurate slopes",  # 1
+                "truncation error reduction rate is too wrong, returning the naive step",  # 2
+                "fewer than 3 finite function values on the grid, returning the naive step",  # 3
+                "step size too large relative to x, using |x|/10 instead")  # 4
 
   diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cds[[1]],
                     est.error = cbind(trunc = etrunc, round = eround),

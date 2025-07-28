@@ -73,7 +73,8 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 #'         \item \code{0} – Optimal termination within tolerance.
 #'         \item \code{2} – No change in step size within tolerance.
 #'         \item \code{3} – Solution lies at the boundary of the allowed value range.
-#'         \item \code{4} – Maximum number of iterations reached.
+#'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+#'         \item \code{5} – Maximum number of iterations reached.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the full step size search path, argument grids,
@@ -307,7 +308,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                   "left" else "right", " end of the range; consider extending the range ",
                   "or starting from a ", if (close.left) "larger" else "smaller", " h0 value."),  # 3
                 "step size too large relative to x, using |x|/10 instead",  # 4
-                "maximum number of iterations reached")
+                "maximum number of iterations reached")  # 5
 
   if (exitcode == 2L) warning(paste0("The step size did not change between iterations. ",
                                     "This should not happen. Send a bug report to https://github.com/Fifis/pnd/issues"))
