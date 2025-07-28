@@ -374,6 +374,137 @@ Near the optimum, store
 
 \textcolor{red}{!!! TO BE COMPLETED!}
 
+# Non-uniform grid spacing
+
+So far, only uniform spacing for second-order-accurate numerical approximation of $f'(x)$ has been concerned.
+However, in many situations, higher-order accuracy is required, e.g. in computing Hessians for subsequent inversion to obtain asymptotic variance for statistical inference.
+Usually, uniform grids of the form $\{x_0, x_0\pm h, x_0\pm2h, x_0\pm3h, \ldots\}$ or $\{x_0\pm h, x_0\pm3h, x_0\pm5h, \ldots\}$ are used to evaluate $f$ and obtain an interpolating polynomial of the desired degree.
+Nevertheless, the choice of uniform grids is mostly a historical artefact rather than a modelling choice.
+
+## First-order derivatives
+
+@oliver1975selection proposed a method of selection of interpolation points on a non-uniform grid for first derivatives, and @oliver1980selection extended it to second and third derivatives.
+It is, indeed, not clear, which grid is better for fourth-order derivatives: $\{-3, -1, 1, 3\}$, $\{-2, -1, 1, 2\}$, or $\{-1.01, -1, 1, 1.01\}$.
+On one hand, shrinking the step size reduces numerical error; on the other hand, if $\pm h$ if contaminated by a certain level of rounding noise, then, $\pm 1.01 h$ does not seem ample enough to reduce the effect of the machine-related error.
+Therefore, there should be a trade-off between the truncation and rounding error as a non-trivial function of the grid spacing magnitude.
+
+**Problem.** Given the desired accuracy order of a first derivative, find the optimal symmetric grid $x_0 \pm h, x_0 \pm c_1 h, x_0 \pm c_2 h$, $1 < c_1 < c_2 < \ldots$ for finite differencing to minimise the expected combined rounding and truncation errors.
+
+**Solution.** There are many mathematically equivalent ways of writing down the derivative $f'(x_0)$ as the derivative of an approximating polynomial.
+Earlier authors, e.g. @rutishauser1963ausdehnung deemed that the most convenient approach, due to its simplicity, is Romberg-like iterative extrapolation.
+Modern textbooks, like @sauer2017numerical, prefer deriving the total error by bounding Fornberg sums.
+
+Firstly, assume that the first two grid points are $x \pm h$, and the task consists in finding the scaling factors $1 < c_1, c_2, \ldots$ for $h$ to obtain the optimal grid.
+As in previous analyses, it is somewhat impractical to minimise the sum of two errors $|\varepsilon_{\mathrm{t}}| + \varepsilon_{\mathrm{r}}|$ directly as $\varepsilon_{\mathrm{t}}(h) = \frac{f^{d+a}(\xi)}{6}h^{a}$ ($\alpha\in[-1, 1]$) is not observed directly. (Note that $\xi = x + \alpha h$, $\alpha \in [0, 1]$ for $f'_{\mathrm{CD}}(x_0)$, but  this is not true for higher-order derivatives due to the fact that the Generalised Intermediate Value Theorem yields more than one term.)
+
+To shorten notation for the grid around the point of interest $x_0$, denote $x_{2i-1} = x_0 + c_i h$, $x_{2i} = x_0 - c_i h$, $i = 1, \ldots, a/2$, so $\{x_0, \ldots, x_n\}$ becomes the full evaluation grid.
+
+It is possible to make two observations:
+
+1. If the truncation error is valid, then, it is proportional to $(x_0 - x_1)\cdots(x_0 - x_n) / (n+1)! f^{d+a}(\xi)$;
+2. Moving $c_1$ closer to unity reduced the truncation error but increases the rounding error $|R| \le M\cdot E$ by a magnitude factor
+\[
+M = \sum_{i=1}^n |L'_i(x_0)|, \quad E = \max\{|\varepsilon_i|, \quad i = 1, \ldots, n\},
+\]
+where $L_i$'s are the Lagrange basis polynomials and $\epsilon_i := f(x_i) - \hat f(x_i)$ is the individual rounding error.
+
+To remove the dependence of $\xi$ on $\{x_1, \ldots, x_n\}$, assume that $f^{(d+a)}(x)$ is relatively constant over the interval containing the points $x_1,\ldots, x_n$ -- require that $\Psi = (x_0 - x_1) \cdots (x_0 - x_n)$ is constant.
+Then, the scaling factor for the error is equal to
+\[
+S  = M \sqrt[n]{\Psi} = (c_1 \dots c_{n/2})^{2/n} \sum_{i=1}^{n/2} \left|c_i^{-1} \prod_{j\ne i}^{n/2} \frac{r_j^2}{r_j^2 - r_i^2}  \right|
+\]
+
+Now we implement this objective function in R and minimise it.
+
+```{r}
+S <- function(r) {
+  if (is.unsorted(r)) r <- sort(r)
+  n_2 <- length(r)
+  n <- length(r) * 2
+  s <- numeric(n_2)
+  for (k in 1:n_2) {
+    j <- setdiff(1:n_2, k)
+    s[k] <- prod(abs(r[j]^2 / (r[k]^2 - r[j]^2))) / r[k]
+  }
+  prod(r)^(1/n_2) * sum(s)
+} 
+```
+
+At first, we can establish that $(-2, -1, 1, 2)$ is marginally inferior to $(-3, -1, 1, 3)$:
+```{r}
+S(c(1, 2))
+S(c(1, 3))    # Better
+S(c(1, 2.6))  # Even better
+```
+
+Here is how the curve looks for a 4-point grid, suggesting that the optimal $c_1 \approx 2.6$:
+```{r}
+ff <- Vectorize(function(x) S(c(1, x)))
+oldpar <- par(mar = c(4, 4, 0, 0) + .1)
+curve(ff, 1.2, 5, bty = "n", xlab = expression(c[1]), ylab = "S")
+```
+
+Now we reproduce Table 2b from @oliver1975selection:
+```{r}
+optim(par = 2, fn = ff, method = "BFGS")$par
+# THE optimal length-4 grid is x0 + (-2.62, -1, 1, 2.62)h
+
+# Finding the optimum for multiple lengths
+nn <- 9
+res <- vector("list", nn)
+for (i in seq_along(res)) {
+  set.seed(i)
+  n <- 2 + 2*i
+  # init.val <- (1:i)*2
+  ff <- function(x) S(c(1, x))
+  lower <- 1:i
+  upper <- (1+(1:i)*3)^0.9
+  init.pop <- sapply(1:i, function(j) runif(n*20, lower[j], upper[j]))
+  init.pop <- apply(init.pop, 1, sort)
+  if (NCOL(init.pop) == 1) init.pop <- matrix(init.pop) else 
+    if (ncol(init.pop) > nrow(init.pop)) init.pop <- t(init.pop)
+  ff0 <- apply(init.pop, 1, ff)
+  x0 <- init.pop[which.min(ff0), ]
+  res[[i]] <- sort(optim(par = x0, fn = ff, method = "BFGS",
+                         control = list(reltol = 1e-8, maxit = 100))$par)
+}
+
+# Table 2b from Oliver & Ruffhead (1975)
+tab <- matrix(nrow = length(res), ncol = nn)
+for (i in 1:nn) tab[i, 1:i] <- res[[i]]
+```
+
+If one needs to devise a fixed-size grid, collapsing a triangular array into a one-size-fits-all may also be useful.
+```{r}
+bmean <- round(colMeans(tab, na.rm = TRUE), 2)
+print(bmean)
+ff(bmean)  # Close to 10
+ff(bmean[1])  # Close to 2
+```
+
+The optimal sequences can be visualised, which reveals the shrinkage of two subsequent points, implying that $c_{i+1} - c_{i} < c_{i} - c_{i-1}$ and $c_{i+1}/c_i < c_i / c_{i-1}$.
+```{r}
+par(mar = c(4, 4, 0, 0) + .1)
+plot(NULL, NULL, xlim = c(0, max(res[[i]]) + .5), ylim = c(0, nn+1),
+     xlab = "Evaluation points", ylab = expression(n/2-1), bty = "n")
+for (i in 1:9) points(c(1, res[[i]]), rep(i, length(res[[i]])+1), pch = 16, type = "b")
+for (i in 1:9) points(sapply(res, "[", i), rep(1:nn), pch = 16, type = "b")
+abline(v = 0, lty = 2)
+abline(v = seq(1, max(bmean)+1), lty = 3, col = "#00000044")
+```
+
+Finally, the near-optimal sequence of points can be generated by the estimated non-linear relationship $c_{i-1} \approx -4.37 + 5.03 i^{0.55}$ for $i = 2, \ldots, n/2$:
+```{r}
+b <- c(1, bmean)  # Nodes
+x <- 1:10
+plot(x, b, bty = "n", xlab = expression(n/2-1), ylim = c(0, max(bmean)+1),
+     ylab = expression("Approximate"~c[i]))
+ft <- nls(b ~ d + c*x^a, start = c(d = 0, c = 2.5, a = 0.75), weights = 1:10)
+lines(x, -4.37 + 5.03 * x^0.55)
+lines(x, predict(ft), col = 2)
+par(oldpar)
+```
+
 
 # References
 
