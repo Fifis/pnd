@@ -1,7 +1,7 @@
 #' @importFrom Rdpack reprompt
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Parallel numerical derivatives v.0.1.0 (2025-05-20).")
+  packageStartupMessage("Parallel numerical derivatives v.0.1.1 (2025-05-20).")
 
   # The number of cores is auto-detected based on the OS
   os <- Sys.info()[["sysname"]]

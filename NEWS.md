@@ -18,7 +18,7 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.1 (2025-07-XX)
+# pnd 0.1.1 (2025-09-04)
 - Fix: added a simpler and more reliable fall-back option for `step.M`
 - Feature: added plotting methods for `step...` functions
 - Feature: added arbitrary derivation and accuracy order to Curtis--Reid method

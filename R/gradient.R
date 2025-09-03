@@ -102,7 +102,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   l <- length(f0)
 
   # The element-wise mapping by definition is having equal lengths of input and output
-  # TODO: This is NOT guaranteed, however, to guess correctly:
+  # This is NOT guaranteed, however, to guess correctly:
   # f(x) := c(sum(x), prod(x), sd(x)) evaluated at x = 1:3 would SEEM vectorised; more checks needed
 
   # 5 valid cases remain after ruling out such things as parallelised + multivalued
@@ -529,7 +529,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   attr(jac, "step.size") <- h
   if (autostep) {
     attr(jac, "step.size.method") <- hmethod
-    # TODO: use in printing
     attr(jac, "step.search") <- h.auto
   } else if (all(h == h.default)) {
     attr(jac, "step.size.method") <- "default"

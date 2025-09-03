@@ -8,7 +8,7 @@
 #' # Printing whilst preserving names
 #' x <- structure(1:3, names = c("Andy", "Bradley", "Ca"))
 #' print(Grad(function(x) prod(sin(x)), 1))  # 1D derivative
-#' print(Grad(function(x) prod(sin(x)), x))
+#' print(Grad(function(x) prod(sin(x)), x, h = "CR"))
 #' print(Jacobian(function(x) c(prod(sin(x)), sum(exp(x))), x))
 print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
                        begin = "", sep = "  ", end = "", ...) {
