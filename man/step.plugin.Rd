@@ -61,8 +61,8 @@ A list similar to the one returned by \code{optim()}:
 \item \code{0} – Termination with checks passed tolerance.
 \item \code{1} – Third derivative is exactly zero; large step size preferred.
 \item \code{2} – Third derivative is too close to zero; large step size preferred.
-\item \code{3} – Solution lies at the boundary of the allowed value range or had.
-to be snapped to 0.1|x|.
+\item \code{3} – Solution lies at the boundary of the allowed value range.
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the two-step size search path, argument grids,

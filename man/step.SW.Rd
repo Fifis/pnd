@@ -71,7 +71,8 @@ A list similar to the one returned by \code{optim()}:
 \item \code{0} – Optimal termination within tolerance.
 \item \code{2} – No change in step size within tolerance.
 \item \code{3} – Solution lies at the boundary of the allowed value range.
-\item \code{4} – Maximum number of iterations reached.
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+\item \code{5} – Maximum number of iterations reached.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the full step size search path, argument grids,

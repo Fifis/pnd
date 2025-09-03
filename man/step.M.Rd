@@ -89,6 +89,7 @@ A list similar to the one returned by \code{optim()}:
 \item \code{1} – Reductions are slightly outside the tolerance.
 \item \code{2} – Tolerances are significantly violated; an approximate minimum is returned.
 \item \code{3} – Not enough finite function values; a rule-of-thumb value is returned.
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,

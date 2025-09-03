@@ -73,6 +73,7 @@ A list similar to the one returned by \code{optim()}:
 \item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
 \item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
 \item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
+\item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,
