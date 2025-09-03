@@ -197,7 +197,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   fmax <- apply(abs(cbind(fpos[, 1:l], fneg[, 1:l])), 1, max)
   f.eps <- max.rel.error * sum(abs(stc$weights)) * fmax
   f.delta <- 0.5 * .Machine$double.eps * fmax
-  eround <- (f.eps + f.delta) / hgrid
+  eround <- (f.eps + f.delta) / hgrid^deriv.order
 
   # Prepaging an error message for the future
   sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
