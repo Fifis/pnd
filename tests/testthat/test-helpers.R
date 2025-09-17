@@ -20,9 +20,10 @@ test_that("step size is valid for various values of x", {
   h0 <- stepx(10^(-16:3))
   h <- attr(GenD(sin, x = 10^(-16:3)), "step.size")
   expect_identical(h0, h)
-  expect_true(all(diff(h) >= 0))
-  expect_identical(h[1], h[2])  # Constant step for small x
-  expect_identical(h[length(h)], 1000*.Machine$double.eps^(1/3))
+  expect_true(all(diff(h0) >= 0))
+  expect_identical(h0[1], h0[2])  # Constant step for small x
+  # The following depends on the defaults in stepx!
+  expect_identical(h0[length(h0)], 1000*.Machine$double.eps^(1/3))
 
   expect_true(all(diff(stepx(10^(-16:3), deriv.order = 2, acc.order = 4)) >= 0))
 })

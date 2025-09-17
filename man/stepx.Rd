@@ -4,7 +4,7 @@
 \alias{stepx}
 \title{Default step size at given points}
 \usage{
-stepx(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$double.eps))
+stepx(x, deriv.order = 1, acc.order = 2, zero.tol = NULL)
 }
 \arguments{
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
@@ -18,8 +18,8 @@ for each element of \code{x}.
 The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-procedure is requested; otherwise, it is absolute.}
+guessed step size is relative or near-relative (\code{x} multiplied by the step),
+unless an auto-selection procedure is requested; otherwise, it is absolute.}
 }
 \value{
 A numeric vector of the same length as \code{x} with positive step sizes.

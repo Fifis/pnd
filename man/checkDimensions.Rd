@@ -17,7 +17,7 @@ checkDimensions(
   acc.order = 2,
   side = 0,
   h = NULL,
-  zero.tol = sqrt(.Machine$double.eps),
+  zero.tol = NULL,
   cores = 1,
   preschedule = TRUE,
   cl = NULL,
@@ -73,8 +73,8 @@ difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"
 described in \code{?GenD}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-procedure is requested; otherwise, it is absolute.}
+guessed step size is relative or near-relative (\code{x} multiplied by the step),
+unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}

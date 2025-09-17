@@ -36,7 +36,7 @@
 checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
                             elementwise = NA, vectorised = NA, multivalued = NA,
                             deriv.order = 1, acc.order = 2, side = 0, h = NULL,
-                            zero.tol = sqrt(.Machine$double.eps), cores = 1, preschedule = TRUE, cl = NULL, ...) {
+                            zero.tol = NULL, cores = 1, preschedule = TRUE, cl = NULL, ...) {
   if (missing(FUN)) {
     if (is.function(func)) {
       FUN <- func
@@ -273,8 +273,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   \code{"DV"}, or \code{"SW"} to be used in [gradstep()]). The default value is
 #'   described in \code{?GenD}.
 #' @param zero.tol Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-#'   guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-#'   procedure is requested; otherwise, it is absolute.
+#'   guessed step size is relative or near-relative (\code{x} multiplied by the step),
+#'   unless an auto-selection procedure is requested; otherwise, it is absolute.
 #' @param f0 Optional numeric: if provided, used to determine the vectorisation type
 #'   to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.
 #' @param h0 Numeric scalar of vector: initial step size for automatic search with
@@ -368,7 +368,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' system.time(GenD(fslow, x, side = 1, acc.order = 2))
 GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2L, stencil = NULL,
-                 h = NULL, zero.tol = sqrt(.Machine$double.eps),  h0 = NULL, control = list(),
+                 h = NULL, zero.tol = NULL,  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
                  func = NULL, method = NULL, method.args = list(), ...) {
   if (is.function(x) && !is.function(FUN)) {
@@ -629,7 +629,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' Grad(LReLU, seq(-1, 1, 0.1))
 Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  deriv.order = 1L, side = 0, acc.order = 2, stencil = NULL,
-                 h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL, control = list(),
+                 h = NULL, zero.tol = NULL, h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
                  func = NULL, method = NULL, method.args = list(), ...) {
   if (is.function(x) && !is.function(FUN)) {
@@ -714,7 +714,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' @export
 Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                      deriv.order = 1L, side = 0, acc.order = 2, stencil = NULL,
-                     h = NULL, zero.tol = sqrt(.Machine$double.eps), h0 = NULL,
+                     h = NULL, zero.tol = NULL, h0 = NULL,
                      control = list(), f0 = NULL,
                      cores = 1, preschedule = TRUE, cl = NULL,
                      func = NULL, method = NULL, method.args = list(), ...) {

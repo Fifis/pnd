@@ -16,7 +16,7 @@ GenD(
   acc.order = 2L,
   stencil = NULL,
   h = NULL,
-  zero.tol = sqrt(.Machine$double.eps),
+  zero.tol = NULL,
   h0 = NULL,
   control = list(),
   f0 = NULL,
@@ -83,8 +83,8 @@ difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"
 described in \code{?GenD}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
-guessed step size is relative (\code{x} multiplied by the step), unless an auto-selection
-procedure is requested; otherwise, it is absolute.}
+guessed step size is relative or near-relative (\code{x} multiplied by the step),
+unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
 \item{h0}{Numeric scalar of vector: initial step size for automatic search with
 \code{gradstep()}.}

@@ -14,27 +14,32 @@
 #' # The step-selection function is piecewise linear in log-coordinates
 #' plot(-12:4, stepx(10^(-12:4)), log = "y", type = "l")
 #' stepx(10^(-10:2), deriv.order = 2, acc.order = 4)
-stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = sqrt(.Machine$double.eps)) {
+stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = NULL) {
   x <- abs(x)
   n <- length(x)
-  i1 <- x < zero.tol
-  i3 <- x > 1
-  i2 <- (!i1) & (!i3)
-  ret <- rep(zero.tol, length(x))
 
   if (length(deriv.order) == 1) deriv.order <- rep(deriv.order, n)
   if (length(acc.order) == 1) acc.order <- rep(acc.order, n)
   if (length(deriv.order) != n) stop("The argument 'deriv.order' must have length 1 or length(x).")
   if (length(acc.order) != n) stop("The argument 'acc.order' must have length 1 or length(x).")
-
   ad <- deriv.order + acc.order
+
+  if (is.null(zero.tol)) zero.tol <- .Machine$double.eps^(1/(ad-0.5))
+  if (length(zero.tol) == 1) zero.tol <- rep(zero.tol, n)  # When it is passed from outside
+  i1 <- x < zero.tol
+  i3 <- x > 1
+  i2 <- (!i1) & (!i3)
+  ret <- zero.tol  # Initialised with i1 case everywhere
+
   if (any(i3)) ret[i3] <- x[i3] * .Machine$double.eps^(1/ad[i3])
   if (any(i2)) {  # Exponential interpolation via log(y) ~ a + b*log(x)
-    # f(sqrt(macheps)) = macheps^0.5, f(1) = macheps^(1/(a+d))
-    leps <- log(.Machine$double.eps)
-    a <- leps / ad[i2]
-    b <- 1 - a / leps * 2
-    ret[i2] <- exp(a + b * log(x[i2]))
+    # f(zero.tol) = macheps^(1/(a+d-0.5)), f(1) = macheps^(1/(a+d))
+    leps  <- log(.Machine$double.eps)
+    b0    <- leps / ad[i2]  # Passes through (x=1, y = eps^(1/ad))
+    lz    <- log(zero.tol[i2])
+    y0log <- leps / (ad[i2] - 0.5)  # log y at x = zero.tol
+    b1    <- (y0log - b0) / lz  # Slope in log-log space
+    ret[i2] <- exp(b0 + b1 * log(x[i2]))
   }
   return(ret)
 }

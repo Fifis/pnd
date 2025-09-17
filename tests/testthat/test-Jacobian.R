@@ -27,7 +27,7 @@ test_that("Jacobian works for scalar functions", {
   }
   p0 <- structure(c(0.1, 0.2, 0.3), names = c("A", "B", "C"))
   h1.jac <- Jacobian(h1, p0)
-  h2.jac <- pnd::Jacobian(h2, p0)
+  h2.jac <- Jacobian(h2, p0)
   expect_true(inherits(h1.jac, "GenD"))
   expect_true(inherits(h2.jac, "GenD"))
   expect_identical(dim(h1.jac), c(1L, 3L))
