@@ -8,7 +8,7 @@
 
 An R package for computing fast and accurate numerical derivatives.
 
-<img src="https://kostyrka.lu/user/pages/05.programming/05.pnd.package/parallel-numerical-derivatives-R-package.png" alt="Parallel numerical derivatives in R" width="640"/>
+<img src="https://kostyrka.lu/user/pages/50.programming/05.pnd.package/parallel-numerical-derivatives-R-package.png" alt="Parallel numerical derivatives in R" width="640"/>
 
 In the past, I was using [numDeriv](https://CRAN.R-project.org/package=numDeriv) to compute numerical gradients.
 However, the results were not stable for some function, and I could not investigate the source of this instability.
