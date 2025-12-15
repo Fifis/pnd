@@ -167,7 +167,7 @@ plot.stepsize <- function(x, ...) {
 #' f <- function(x) prod(sin(x))
 #' s <- gradstep(f, 1:4, method = "CR")
 #' plot(s, 3)
-plot.gradstep <- function(x, index, ...) {
+plot.gradstep <- function(x, index = 1, ...) {
   plot(x$original[[index]], ...)
 }
 

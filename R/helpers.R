@@ -5,7 +5,7 @@ safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(
 checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(attributes(x)), "error")
 
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234
-printE <- function(x, d = 2) sprintf(paste0("%1.", d, ifelse(x >= 0.01 & x <= 10^d, "f", "e")), x)
+printE <- function(x, d = 2) sprintf(paste0("%1.", d, ifelse(x >= 1/10^d & x <= 10^d, "f", "e")), x)
 
 # Split a vector into contiguous runs
 splitRuns <- function(x) {
