@@ -77,6 +77,7 @@ The numerical gradients and Jacobian are simple numeric vectors and matrices wit
 
 ## Learning resources
 
+- [PDF of a 2025 presentation at the ‘Rencontres R’ in Mons.](https://kostyrka.lu/en/education/presentations/2025-rencontres-r-umons-make-a-difference.pdf)
 - [PDF of a 2025 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2025-dem-internal-seminar.pdf)
 - [PDF of an early 2024 presentation at the University of Luxembourg.](https://kostyrka.lu/en/education/presentations/2024-brown-bag-seminar.pdf) *(Obsolete – check the one above or the vignettes for up-to-date examples!)*
 
