@@ -1,4 +1,4 @@
-# pnd 0.dev roadmap (2025-XX-XX)
+# pnd 0.dev roadmap (2026-XX-XX)
 
 - UX: make the warnings once-per-session; print the first error in `runParallel` in Grad
 - FEATURE: use higher zero tolerances `stepx()` for higher-order derivatives, update all `step...` functions using it
@@ -17,6 +17,10 @@
 - DEV: Ensure unit-test coverage >90%
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
+
+# pnd 0.1.2 (2026-02-12)
+- Fix: relaxed tolerances in some tests
+- Fix: made a better default zero tolerance for generic derivative and accuracy orders
 
 # pnd 0.1.1 (2025-09-04)
 - Fix: added a simpler and more reliable fall-back option for `step.M`
