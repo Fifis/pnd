@@ -7,7 +7,7 @@
 \usage{
 \method{plot}{stepsize}(x, ...)
 
-\method{plot}{gradstep}(x, index, ...)
+\method{plot}{gradstep}(x, index = 1, ...)
 }
 \arguments{
 \item{x}{List returned by \code{step...} functions.}

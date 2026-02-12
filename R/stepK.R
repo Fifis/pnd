@@ -256,6 +256,8 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
       # Initial value: median of 5 lowest points, but not farther than the the rightmost point of the valid truncation range
       theta0 <- c(stats::median(log2h[rank(log2e, ties.method = "first") <= 5]), min(log2e[sbst], na.rm = TRUE))
       if (theta0[1] > log2h[max(i.trunc.valid)]) theta0 <- c(log2h[min(i.trunc.valid)], log2e[min(i.trunc.valid)])
+      # If the rounding error was not available, use a rough fall-back
+      if (is.na(theta0[2])) theta0[2] <- stats::quantile(log2e, 0.25, na.rm = TRUE)
 
       # ui <- rbind(diag(2), -diag(2))
       # ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
