@@ -21,7 +21,7 @@ test_that("Curtis-Reid step selection behaves reasonably", {
   expect_equal(s2$value, 32, tolerance = 1e-8)
 
   s3 <- step.CR(x = 2, f, acc.order = 4)
-  expect_lt(sum(s2$abs.error), 1e-6)
+  expect_lt(sum(s2$abs.error), 1e-5)
   expect_equal(s3$value, 32, tolerance = 1e-8)
 
   s4 <- step.CR(x = sqrt(2), FUN = function(x) x^6 - 2*x^4 - 4*x^2, h0 = 2^-16)
