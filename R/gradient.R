@@ -668,7 +668,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
 
 #' Jacobian matrix computation with parallel capabilities
-#'s
+#'
 #' Computes the numerical Jacobian for vector-valued functions. Its columns are
 #' partial derivatives of the function with respect to the input elements.
 #' This function supports both two-sided (central, symmetric) and
@@ -727,6 +727,15 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
 
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
+
+  # Edge case: Rn -> Rn function, vector input, vector output, equal lengths
+  if (is.null(f0)) f0 <- safeF(FUN, x, ...)
+  if (!checkBadSafeF(f0) && length(x) > 1L && length(f0) == length(x) && length(f0) > 1L &&
+      identical(elementwise, NA) && identical(vectorised, NA) && identical(multivalued, NA)) {
+    elementwise <- FALSE
+    vectorised  <- FALSE
+    multivalued <- TRUE
+  }
 
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {

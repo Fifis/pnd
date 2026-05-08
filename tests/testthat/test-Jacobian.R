@@ -80,6 +80,14 @@ test_that("Jacobian can work on an arbitrary stencil", {
   expect_true(all(dd2[!zeros] > dd4[!zeros]))
 })
 
+test_that("Jacobians correctly handle ambiguous cases Rn -> Rn", {
+  f <- function(x) c(sin(x[1]) + cos(x[2]), exp(x[1]*x[2]))
+  x0 <- c(1, 1.5)
+  d2 <- matrix(as.numeric(Jacobian(f, x0)), nrow = 2)
+  jac <- matrix(c(cos(1), 1.5*exp(1.5), -sin(1.5), exp(1.5)), nrow = 2)
+  expect_equal(d2, jac, tolerance = 1e-8)
+})
+
 # TODO: compatibility with numDeriv
 
 # TODO: parallelisation
