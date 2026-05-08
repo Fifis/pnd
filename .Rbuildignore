@@ -3,3 +3,5 @@
 ^\.Rproj\.user$
 ^\.lintr$
 ^\.github$
+^\.positai$
+^\.claude$
