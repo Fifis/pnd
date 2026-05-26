@@ -18,6 +18,10 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
+# pnd 0.1.13 (2026-05-26)
+- Fix: GitHub issue #5 -- simplified the dimension check for Jacobians
+- Fix: eliminated a typo in the documentation
+
 # pnd 0.1.2 (2026-02-12)
 - Fix: relaxed tolerances in some tests
 - Fix: made a better default zero tolerance for generic derivative and accuracy orders
