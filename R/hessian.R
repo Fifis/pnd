@@ -104,30 +104,28 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #' of the argument vector are supported.
 #'
 #' @param FUN A function returning a numeric scalar.
-#'   If the function returns a vector, the output will be is a Jacobian.
-#'   If instead of \code{FUN}, \code{func} is passed, as in \code{numDeriv::grad},
+#'   Vector-valued functions are not supported; use [Jacobian()] instead.
+#'   If instead of \code{FUN}, \code{func} is passed,
 #'   it will be reassigned to \code{FUN} with a warning.
 #' @param x Numeric vector or scalar: point at which the derivative is estimated.
 #'   \code{FUN(x)} must return a finite value.
-#' @param h Numeric scalar, vector, or character specifying the step size for the numerical
-#'   difference. If character (\code{"CR"}, \code{"CRm"}, \code{"DV"}, or \code{"SW"}),
-#'   calls \code{gradstep()} with the appropriate step-selection method.
+#' @param h Numeric scalar or vector specifying the step size for the numerical
+#'   difference. Automatic step-size selection via character values is not implemented
+#'   for Hessians.
 #'   Must be length 1 or match \code{length(x)}. Matrices of step sizes are not
 #'   supported. Suggestions how to handle all pairs of coordinates are welcome.
-#' @param acc.order Integer specifying the desired accuracy order.
+#' @param acc.order Integer scalar or vector specifying the desired accuracy order
+#'   for each input coordinate.
 #'   The error typically scales as \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
 #' @param side Integer scalar or vector indicating difference type:
 #'   \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 #'   Central differences are recommended unless computational cost is prohibitive.
-#' @param f0 Optional numeric scalar or vector: if provided and applicable, used
-#'   where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
-#'   to save time.
-#'   TODO: Currently ignored.
-#' @param h0 Numeric scalar of vector: initial step size for automatic search with
-#'   \code{gradstep()}.Hessian(f, 1:100)
-#' @param control A named list of tuning parameters passed to \code{gradstep()}.
+#' @param f0 Reserved for a precomputed function value. Currently ignored.
+#' @param h0 Reserved for an initial step size for automatic step-size selection.
+#'   Currently ignored.
+#' @param control Reserved for automatic step-size selection controls. Currently ignored.
 #' @inheritParams runParallel
-#' @param func Deprecated; for \code{numDeriv::grad()} compatibility only.
+#' @param func Deprecated; for \code{numDeriv::hessian()} compatibility only.
 #' @param ... Additional arguments passed to \code{FUN}.
 #'
 #' @details
@@ -139,9 +137,6 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #' However, selecting the best step size typically requires knowledge
 #' of higher-order cross derivatives and is highly technically involved. Future releases
 #' will allow character arguments to invoke automatic data-driven step-size selection.
-#'
-#' The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
-#' and \code{f.upper} in \code{uniroot()}.
 #'
 #' Some numerical packages use the option (or even the default behaviour) of computing
 #' not only the \code{i < j} cross-partials for the Hessian, but all pairs of \code{i}
@@ -200,12 +195,14 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
   compat <- FALSE
   nd.method <- ell[["method"]]
   nd.method.args <- ell[["method.args"]]
+  # Compatibility controls are not arguments to FUN.
+  ell[["method"]] <- ell[["method.args"]] <- NULL
   has.nd.args <- any(names(nd.method.args) %in% c("eps", "d", "zero.tol", "r", "v", "show.details"))
   if ((!is.null(nd.method)) || has.nd.args) {
     compat <- TRUE
     if (is.null(nd.method) && has.nd.args) nd.method <- "Richardson"
     if (length(nd.method) == 1 && nd.method %in% c("simple", "complex", "Richardson")) {
-      margs <- ell$method.args
+      margs <- nd.method.args
       ma <- list(eps = 1e-4, d = NA, zero.tol = 1e-5, r = 4, v = NA, show.details = FALSE)
       # Using a slightly smaller step size for one-sided differences
       if (nd.method == "simple") ma$eps <- ma$eps * .Machine$double.eps^(1/4 - 1/5)
@@ -227,7 +224,6 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
         is.small <- abs(x) < ma$zero.tol
         h <- (ma$d * abs(x) * !is.small) + (ma$eps * is.small)
       }
-      ell[["method"]] <- NULL
     }
     if (length(acc.order) != n) stop("The 'r' method argument must have length 1.")
     warning("You are using numDeriv-like syntax. We recommend using the new syntax ",
@@ -272,7 +268,9 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
   weights <- grid$weights
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
-  fvals <- runParallel(FUN = FUN, x = xvals, cores = cores, cl = cl, preschedule = preschedule)
+  FUN.eval <- if (length(ell)) bindFunctionArgs(FUN, ell) else FUN
+  fvals <- runParallel(FUN = FUN.eval, x = xvals,
+                       cores = cores, cl = cl, preschedule = preschedule)
   fvals <- fvals[grid$uniq.i]  # Restoring duplicates
   nonfinite.f   <- !sapply(fvals, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals, is.na)) & (!sapply(fvals, is.infinite))

@@ -51,32 +51,30 @@ in nearly fixed-width output (almost).}
 \item{...}{Additional arguments passed to \code{FUN}.}
 
 \item{FUN}{A function returning a numeric scalar.
-If the function returns a vector, the output will be is a Jacobian.
-If instead of \code{FUN}, \code{func} is passed, as in \code{numDeriv::grad},
+Vector-valued functions are not supported; use \code{\link[=Jacobian]{Jacobian()}} instead.
+If instead of \code{FUN}, \code{func} is passed,
 it will be reassigned to \code{FUN} with a warning.}
 
 \item{side}{Integer scalar or vector indicating difference type:
 \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 Central differences are recommended unless computational cost is prohibitive.}
 
-\item{acc.order}{Integer specifying the desired accuracy order.
+\item{acc.order}{Integer scalar or vector specifying the desired accuracy order
+for each input coordinate.
 The error typically scales as \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
-\item{h}{Numeric scalar, vector, or character specifying the step size for the numerical
-difference. If character (\code{"CR"}, \code{"CRm"}, \code{"DV"}, or \code{"SW"}),
-calls \code{gradstep()} with the appropriate step-selection method.
+\item{h}{Numeric scalar or vector specifying the step size for the numerical
+difference. Automatic step-size selection via character values is not implemented
+for Hessians.
 Must be length 1 or match \code{length(x)}. Matrices of step sizes are not
 supported. Suggestions how to handle all pairs of coordinates are welcome.}
 
-\item{h0}{Numeric scalar of vector: initial step size for automatic search with
-\code{gradstep()}.Hessian(f, 1:100)}
+\item{h0}{Reserved for an initial step size for automatic step-size selection.
+Currently ignored.}
 
-\item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
+\item{control}{Reserved for automatic step-size selection controls. Currently ignored.}
 
-\item{f0}{Optional numeric scalar or vector: if provided and applicable, used
-where the stencil contains zero (i.e. \code{FUN(x)} is part of the sum)
-to save time.
-TODO: Currently ignored.}
+\item{f0}{Reserved for a precomputed function value. Currently ignored.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
@@ -90,7 +88,7 @@ or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if 
 is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
 (fork cluster) on everything else.}
 
-\item{func}{Deprecated; for \code{numDeriv::grad()} compatibility only.}
+\item{func}{Deprecated; for \code{numDeriv::hessian()} compatibility only.}
 }
 \value{
 A matrix with as many rows and columns as \code{length(x)}. Unlike the output of
@@ -108,9 +106,6 @@ to balance the Taylor series truncation error with the rounding error.
 However, selecting the best step size typically requires knowledge
 of higher-order cross derivatives and is highly technically involved. Future releases
 will allow character arguments to invoke automatic data-driven step-size selection.
-
-The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
-and \code{f.upper} in \code{uniroot()}.
 
 Some numerical packages use the option (or even the default behaviour) of computing
 not only the \code{i < j} cross-partials for the Hessian, but all pairs of \code{i}

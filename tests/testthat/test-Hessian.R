@@ -31,6 +31,42 @@ test_that("1x1 Hessians are handled correctly", {
   expect_equal(as.numeric(Hessian(FUN = sin, x = 1)), -sin(1), tolerance = 1e-8)
 })
 
+test_that("Hessian forwards additional function arguments", {
+  x <- c(A = 1, B = 2)
+  f <- function(x, scale = 1) scale * sum(x^2)
+  f.required <- function(x, scale) scale * sum(x^2)
+  expected <- diag(6, 2)
+
+  expect_equal(as.numeric(Hessian(f, x, scale = 3, h = 1e-3)),
+               as.numeric(expected), tolerance = 1e-6)
+  expect_equal(as.numeric(Hessian(f.required, x, scale = 3, h = 1e-3)),
+               as.numeric(expected), tolerance = 1e-6)
+  expect_equal(as.numeric(Hessian(f.required, x, scale = 3, h = 1e-3,
+               method.args = list())), as.numeric(expected), tolerance = 1e-6)
+  expect_equal(as.numeric(suppressWarnings(Hessian(f.required, x, scale = 3,
+                 method = "Richardson", method.args = list(r = 2)))),
+               as.numeric(expected), tolerance = 1e-6)
+
+  f.call <- function(x, expr) {
+    stopifnot(is.call(expr))
+    sum(x^2)
+  }
+  expect_equal(as.numeric(Hessian(f.call, x, h = 1e-3,
+                 expr = quote(stop("This expression must remain unevaluated")))),
+               as.numeric(diag(2, 2)), tolerance = 1e-6)
+})
+
+test_that("Hessian forwards additional arguments to cluster workers", {
+  cl <- parallel::makePSOCKcluster(2)
+  on.exit(parallel::stopCluster(cl))
+  f <- function(x, scale) scale * sum(x^2)
+
+  for (preschedule in c(TRUE, FALSE)) {
+    h <- Hessian(f, 1:2, scale = 3, h = 1e-3, cl = cl, preschedule = preschedule)
+    expect_equal(as.numeric(h), as.numeric(diag(6, 2)), tolerance = 1e-6)
+  }
+})
+
 test_that("named arguments are handled correctly", {
   x <- 1:4
   f <- function(x) prod(sin(x))

@@ -2,6 +2,13 @@
 
 safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(structure(NA, error = e)))
 
+# Bind arguments without retaining the caller's evaluation grid on cluster workers.
+bindFunctionArgs <- function(FUN, args) {
+  force(FUN)
+  force(args)
+  function(x) do.call(FUN, c(list(x), args), quote = TRUE)
+}
+
 checkBadSafeF <- function(x) identical(as.logical(x), NA) && identical(names(attributes(x)), "error")
 
 # Print in scientific (exponential) format like 1.23e-03 for 0.001234

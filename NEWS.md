@@ -18,7 +18,11 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.13 (2026-05-26)
+# pnd 0.1.4 (2026-10-XX)
+- Fix: `Hessian()` returned wrong results with additional function arguments
+
+
+# pnd 0.1.3 (2026-05-26)
 - Fix: GitHub issue #5 -- simplified the dimension check for Jacobians
 - Fix: eliminated a typo in the documentation
 
