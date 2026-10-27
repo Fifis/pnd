@@ -40,3 +40,23 @@ test_that("missing values are treated properly", {
   expect_warning(GenD(f, 1:3, side = 1, elementwise = TRUE, vectorised = FALSE,
                       multivalued = FALSE), "not even NA")
 })
+
+test_that("custom stencils respect each coordinate's derivative order", {
+  x <- c(A = 1, B = 2)
+  h <- c(1/32, 1/16)
+  orders <- c(1, 2)
+
+  d <- GenD(function(x) sum(x^2), x, deriv.order = orders, stencil = -1:1, h = h)
+  expect_equal(as.numeric(d), c(2, 2), tolerance = 1e-10)
+  expect_named(d, names(x))
+
+  d <- GenD(function(x) x^4, x, deriv.order = orders, stencil = -2:2, h = h)
+  expect_equal(as.numeric(d), c(4, 48), tolerance = 1e-10)
+
+  f <- function(x) c(sum(x^2), sum(x^3), sum(x^4))
+  d <- GenD(f, x, deriv.order = orders, stencil = -2:2, h = h)
+  expect_equal(as.numeric(d), c(2, 3, 4, 2, 12, 48), tolerance = 1e-10)
+
+  expect_error(GenD(function(x) sum(x^2), x, deriv.order = orders,
+                     stencil = c(-1, 1), h = h), "unique stencil points")
+})

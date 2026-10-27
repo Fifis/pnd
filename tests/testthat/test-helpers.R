@@ -55,3 +55,21 @@ test_that("Matrices are formatted and printed correctly", {
                 end = ")", print = FALSE, format = TRUE)
   expect_identical(o[3], "c(1.2e+2,  0  , -1.2e-6)")
 })
+
+test_that("non-finite values remain visible when formatting and printing", {
+  nonfinite <- c(NA_real_, NaN, Inf, -Inf)
+  labels <- c("NA", "NaN", "Inf", "-Inf")
+  cases <- list(nonfinite, matrix(nonfinite, ncol = 1),
+                rbind(nonfinite, c(1, -2e-6, 0, -123)))
+
+  for (x in cases) {
+    for (shave in c(TRUE, FALSE)) {
+      xf <- formatMat(x, shave.spaces = shave)
+      expect_identical(xf[!is.finite(x)], labels)
+      expect_identical(dim(xf), if (is.null(dim(x))) c(1L, 4L) else dim(x))
+    }
+  }
+
+  expect_identical(printMat(matrix(nonfinite, nrow = 1), sep = " | ", print = FALSE),
+                   "NA | NaN | Inf | -Inf")
+})

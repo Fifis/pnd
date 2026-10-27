@@ -465,9 +465,9 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (length(h) == 1) h <- rep(h, n)
   if (length(h) != n) stop("The argument 'h' (step size) must have length 1 or length(x).")
 
-  # If all deriv.order, acc.order, side are the same, invert Vandermonde matrices only once
-  if ((length(unique(deriv.order)) == 1 && length(unique(acc.order)) == 1 &&
-      length(unique(side)) == 1) || !is.null(stencil)) {
+  # Reuse weights for matching derivative orders on the same stencil.
+  if (length(unique(deriv.order)) == 1 &&
+      (!is.null(stencil) || (length(unique(acc.order)) == 1 && length(unique(side)) == 1))) {
     # Default stencil or, if not null, the user-supplied one
     stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1], stencil = stencil)
     stencils <- replicate(n, stencil1, simplify = FALSE)

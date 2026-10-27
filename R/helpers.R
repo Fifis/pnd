@@ -118,7 +118,7 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
   if (any(has.exp) && !all(has.exp)) xout[(!has.exp) & fcond] <- paste0(xout[(!has.exp) & fcond],  "   ")
 
   # Restoring non-finite values
-  x[!fcond] <- xi
+  xout[!fcond] <- format(xi, trim = TRUE)
 
   dim(xout) <- dim(x)
   if (is.null(dim(x))) xout <- matrix(xout, nrow = 1)
@@ -126,7 +126,7 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
   # Removing extra spaces by column
   if (shave.spaces) {
     nhead <-  gsub("^( *).+", "\\1", xout)
-    ntrail <- gsub("^ *[.0-9e+-]+", "", xout)
+    ntrail <- sub("^.*[^ ]", "", xout)
     nch <- nchar(xout)
     nh <- nchar(nhead)
     nt <- nchar(ntrail)
