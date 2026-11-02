@@ -88,6 +88,33 @@ test_that("Jacobians correctly handle ambiguous cases Rn -> Rn", {
   expect_equal(d2, jac, tolerance = 1e-8)
 })
 
-# TODO: compatibility with numDeriv
+# Tombs of the ancients: numDeriv compatibility
+
+test_that("Jacobian resolves func before checking square mappings", {
+  f <- function(x, scale0) c(total = scale0*sum(x), product = scale0*prod(x))
+  x <- 1:2
+  expect_warning(d <- Jacobian(func = f, x = x, scale0 = 3, h = 1/32), "Use the argument 'FUN'")
+  expect_equal(as.numeric(d), c(3, 6, 3, 3), tolerance = 1e-10)
+  expect_identical(d, Jacobian(FUN = f, x = x, scale0 = 3, h = 1/32))
+})
+
+test_that("Jacobian preserves names and supplied values with func", {
+  f <- function(x, scale0) c(total = scale0*sum(x), product = scale0*prod(x))
+  x <- c(A = 1, B = 2)
+  direct <- Jacobian(FUN = f, x = x, scale0 = 3, h = 1/32)
+  for (f0 in list(NULL, f(x, scale0 = 3))) {
+    expect_warning(d <- Jacobian(func = f, x = x, scale0 = 3, h = 1/32, f0 = f0), "Use the argument 'FUN'")
+    expect_identical(d, direct)
+  }
+})
+
+test_that("Jacobian validates function arguments and gives FUN precedence", {
+  f <- function(x) c(sum(x), prod(x))
+  unused <- function(x) stop("The compatibility alias should not be used.")
+  expect_identical(Jacobian(FUN = f, func = unused, x = 1:2, h = 1/32), Jacobian(FUN = f, x = 1:2, h = 1/32))
+  expect_error(Jacobian(x = 1:2), "Pass the function")
+  expect_error(Jacobian(func = 1, x = 1:2), "Pass the function")
+  expect_error(Jacobian(FUN = 1, func = f, x = 1:2), "must be a function")
+})
 
 # TODO: parallelisation

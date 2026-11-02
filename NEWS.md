@@ -25,6 +25,7 @@
 - Fix: corrected Dumontet--Vignes exit messages and iteration book-keeping
 - Fix: corrected the third-derivative scaling in plug-in step selection
 - Fix: preserve fractional stencil offsets in Mathur and kink-based step selection
+- Fix: resolve the `func` compatibility argument before checking Jacobian dimensions
 
 
 # pnd 0.1.3 (2026-05-26)

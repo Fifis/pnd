@@ -725,6 +725,15 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
     x <- x0
   }
 
+  if (missing(FUN)) {
+    if (is.function(func)) {
+      FUN <- func
+      warning("Use the argument 'FUN' to pass the function for differencing instead of 'func'.")
+    } else {
+      stop("Pass the function for differencing as the named argument 'FUN'.")
+    }
+  }
+
   cores <- checkCores(cores)
   if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
