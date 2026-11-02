@@ -21,6 +21,11 @@
 #' Unlike other algorithms, if the estimated third derivative is too small, the function shape
 #' will be different, and two checks are made for the existence of two branches.
 #'
+#' If only one neighbouring grid point has a finite derivative estimate, it is reused.
+#' If neither neighbour has a finite estimate, the finite derivative estimate closest
+#' to the middle of the step-size grid is used. The function stops with an error if
+#' no finite derivative estimate is available.
+#'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
@@ -335,11 +340,14 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # The grid with the largest stencil remains in memory
 
   cd.closest <- cds[[1]][i.closest]  # Derivatives at 2 closest points
-  if (sum(is.na(cd.closest)) == 1) cd.closest <- rep(cd.closest[is.finite(cd.closest)[1]], 2)
-  # If there are no finite values, take the value that is the closest to the centre
-  if (sum(is.na(cd.closest)) == 2) {
+  finite.closest <- is.finite(cd.closest)
+  if (sum(finite.closest) == 1L) cd.closest <- rep(cd.closest[finite.closest], 2)
+  # If neither neighbour is finite, reuse a derivative near the middle of the grid.
+  if (!any(finite.closest)) {
     i.mid <- which(is.finite(cds[[1]]))
-    cd.closest <- rep(hgrid[which.min(abs(i.mid - n/2))], 2)
+    if (length(i.mid) == 0L) stop("Could not compute a finite derivative on the grid.")
+    i.mid <- i.mid[which.min(abs(i.mid - n/2))]
+    cd.closest <- rep(cds[[1]][i.mid], 2)
   }
   cd <- stats::approx(x = h.closest, y = cd.closest, xout = hopt)$y
   if (is.na(cd)) cd <- mean(cd.closest)

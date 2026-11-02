@@ -48,6 +48,36 @@ test_that("Mathur's algorithm returns expected non-zero exit codes", {
   expect_identical(suppressWarnings(step.K(function(x) x^2, x = 0)$exitcode), 2L)
 })
 
+test_that("Kostyrka's fallback uses a finite upper neighbour", {
+  f <- function(z) ifelse(abs(z-1) < 1e-10 | abs(z-1) >= 0.1, z^3, NA_real_)
+  s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
+  # Only h = 1/8 has a finite derivative among the two neighbours
+  expect_equal(s$value, 3 + (1/8)^2, tolerance = 1e-10)
+})
+
+test_that("Kostyrka's fallback uses a finite lower neighbour", {
+  f <- function(z) {
+    r <- abs(z-1)
+    ifelse(r < 1e-10 | r >= 0.15 | (r >= 1/16 & r < 1/8), z^3, NA_real_)
+  }
+  s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
+  # Only h = 1/16 has a finite derivative among the two neighbours.
+  expect_equal(s$value, 3 + (1/16)^2, tolerance = 1e-10)
+})
+
+test_that("Kostyrka's fallback uses a derivative from the full grid", {
+  f <- function(z) ifelse(abs(z-1) < 1e-10 | abs(z-1) >= 0.15, z^3, NA_real_)
+  s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
+  # Both neighbours are missing; h = 1/4 is the finite point nearest the grid's centre.
+  expect_equal(s$value, 3 + (1/4)^2, tolerance = 1e-10)
+})
+
+test_that("Kostyrka's fallback fails explicitly without a finite derivative", {
+  f <- function(z) ifelse(abs(z) < 1e-160, sign(z)*1e150, NA_real_)
+  # Function values are finite on part of the grid, but every available derivative overflows
+  expect_error(suppressWarnings(step.K(f, 0, range = c(1e-170, 1), cores = 1)), "finite derivative")
+})
+
 test_that("Parallelisation in Kostyrka's algorithm works", {
   expect_identical(step.K(sin, 1, cores = 1), step.K(sin, 1, cores = 2))
   clus <- parallel::makePSOCKcluster(2)

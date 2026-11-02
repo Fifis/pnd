@@ -26,6 +26,7 @@
 - Fix: corrected the third-derivative scaling in plug-in step selection
 - Fix: preserve fractional stencil offsets in Mathur and kink-based step selection
 - Fix: resolve the `func` compatibility argument before checking Jacobian dimensions
+- Fix: use finite derivative estimates in kink-based step-selection fallbacks
 
 
 # pnd 0.1.3 (2026-05-26)

@@ -99,6 +99,11 @@ that fits the data the best on a bounded 2D rectangle using derivative-free (Nel
 optimisation.
 Unlike other algorithms, if the estimated third derivative is too small, the function shape
 will be different, and two checks are made for the existence of two branches.
+
+If only one neighbouring grid point has a finite derivative estimate, it is reused.
+If neither neighbour has a finite estimate, the finite derivative estimate closest
+to the middle of the step-size grid is used. The function stops with an error if
+no finite derivative estimate is available.
 }
 \examples{
 plot(step.K(sin, 1))
