@@ -9,6 +9,15 @@ test_that("Mathur's step selection behaves reasonably", {
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-8)
 })
 
+test_that("Mathur's step selection respects non-integer stencil offsets", {
+  expect_equal(step.M(exp, 1, shrink.factor = 0.6, cores = 1)$value, exp(1), tolerance = 1e-7)
+  expect_equal(step.M(exp, 1, shrink.factor = 0.8, cores = 1)$value, exp(1), tolerance = 1e-7)
+  expect_equal(step.M(exp, 1, shrink.factor = 1/sqrt(2), cores = 1)$value, exp(1), tolerance = 1e-7)
+
+  # Higher accuracy order also works
+  expect_equal(suppressWarnings(step.M(identity, 1, acc.order = 4, shrink.factor = 0.6, cores = 1))$value, 1, tolerance = 1e-10)
+})
+
 test_that("Mathur's algorithm returns reasonable values even with bad slopes", {
   # TODO: come up with an example where the slopes is slightly off
 

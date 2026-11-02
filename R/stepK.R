@@ -119,7 +119,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # Stencil of powers of 1/shrink.factor because the step is shrunk in this manner
   # Rounding near-integers to integers to handle cases such as sqrt(2)^2 - 2 = 2*MachEps
   s2 <- inv.sf^(0:(acc.order/2 + 1))
-  near.int <- (s2/round(s2) - 1) < 16 * .Machine$double.eps
+  near.int <- abs(s2/round(s2) - 1) < 16 * .Machine$double.eps
   s2[near.int] <- round(s2[near.int])
   s2 <- c(-rev(s2), s2)
   s1 <- s2[2:(length(s2)-1)]

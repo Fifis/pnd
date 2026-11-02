@@ -9,6 +9,15 @@ test_that("Kostyrka's step selection behaves reasonably", {
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-10)
 })
 
+test_that("Kostyrka's step selection respects non-integer stencil offsets", {
+  expect_equal(step.K(exp, 1, shrink.factor = 0.6, cores = 1)$value, exp(1), tolerance = 1e-7)
+  expect_equal(step.K(exp, 1, shrink.factor = 0.8, cores = 1)$value, exp(1), tolerance = 1e-7)
+  expect_equal(step.K(exp, 1, shrink.factor = 1/sqrt(2), cores = 1)$value, exp(1), tolerance = 1e-7)
+
+  # Higher accuracy order also works
+  expect_equal(suppressWarnings(step.K(identity, 1, acc.order = 4, shrink.factor = 0.6, cores = 1))$value, 1, tolerance = 1e-10)
+})
+
 test_that("Kostyrka's step selection works for gradients", {
   f <- function(x) sin(x[1]) * cos(x[2]) + exp(x[3])
   s <- gradstep(f, 1:3, method = "K")
