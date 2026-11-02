@@ -47,6 +47,31 @@ test_that("SW algorithm stops if the function returns NA for all allowed step si
   expect_error(step.SW(f, 2, range = c(1e-7, 1e-2)), "attempts of step shrinkage")
 })
 
+test_that("SW retains zero differences during an otherwise defined search", {
+  s <- step.SW(exp, 1, h0 = 1e-20, range = c(1e-24, 0.1), cores = 1)
+  expect_identical(s$iterations$deriv[1], 0)
+  expect_equal(s$value, exp(1), tolerance = 1e-8)
+  expect_identical(s$exitcode, 0L)
+  expect_identical(step.SW(function(z) 1+z^3, 0, cores = 1)$value, 0)
+})
+
+test_that("SW reports an undefined cancellation measure at zero", {
+  msg <- "cancellation measure is undefined"
+  expect_error(step.SW(function(z) z^2, 0, cores = 1), msg)
+  expect_error(step.SW(function(z) (z-2)^2, 2, h0 = 1/4, cores = 1), msg)
+})
+
+test_that("SW follows the paper's shrinking branch for zero endpoints", {
+  expect_identical(step.SW(function(z) 0, 1, cores = 1)$value, 0)
+  s <- step.SW(function(z) z+z^2, 0, h0 = 1, cores = 1)
+  expect_equal(s$value, 1)
+  expect_identical(s$exitcode, 0L)
+  # Equal sampled values do not imply a zero derivative: here f'(0) = -1.
+  s <- step.SW(function(z) z*(z^2-1), 0, h0 = 1, cores = 1)
+  expect_identical(s$iterations$deriv[1], 0)
+  expect_equal(s$value, -1, tolerance = 1e-8)
+})
+
 test_that("SW initial recovery evaluates and records the reduced spacing", {
   seen <- numeric()
   f <- function(z) {

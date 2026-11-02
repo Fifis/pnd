@@ -86,6 +86,13 @@ Stepleman--Winarsky automatic step selection
 \details{
 This function computes the optimal step size for central differences using the
 \insertCite{stepleman1979adaptive}{pnd} algorithm.
+
+Preliminary cancellation control applies only when the endpoint values have
+the same non-zero sign, as in Figure 1 of the paper. If both \code{FUN(x)} and
+the central difference are zero in this case, the cancellation measure
+(equations 3.10--3.11) is undefined and the function stops with an error.
+Try a different \code{h0} or another step-selection method:
+equal function values on a grid do not establish that the derivative is zero.
 }
 \examples{
 f <- function(x) x^4  # The derivative at 1 is 4

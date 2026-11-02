@@ -61,6 +61,12 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 #' This function computes the optimal step size for central differences using the
 #' \insertCite{stepleman1979adaptive}{pnd} algorithm.
 #'
+#' Preliminary cancellation control applies only when the endpoint values have
+#' the same non-zero sign, as in Figure 1 of the paper. If both \code{FUN(x)} and
+#' the central difference are zero in this case, the cancellation measure
+#' (equations 3.10--3.11) is undefined and the function stops with an error.
+#' Try a different \code{h0} or another step-selection method:
+#' equal function values on a grid do not establish that the derivative is zero.
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
@@ -153,15 +159,18 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
       }
       iters[[i]] <- res.i
 
-      # First check: are the function values of different signs?
-      # If yes, h is too large -- jump to the step-shrinking main loop:
-      if (prod(sign(res.i$f)) < 0) { # f(x+h) should be close to f(x-h)
+      # Flowchart (Fig. 1 in SW1979): cancellation control requires values of the
+      # same non-zero sign. Otherwise, jump to the step-shrinking main loop:
+      if (prod(sign(res.i$f)) <= 0) {
         main.loop <- TRUE
         i.prelim <- i
         next
       } else { # The bisection part
         while (!main.loop && i <= maxit) {
           hold <- hnew
+          if (f0 == 0 && res.i$deriv == 0)
+            stop("The Stepleman--Winarsky cancellation measure is undefined when FUN(x) and the central difference are both zero. ",
+                 "Try a different 'h0' or another step-selection method.")
           # N: approx. number of inaccurate digits due to rounding at h0 and hopt
           Nh0 <- log10(abs(f0)) - log10(2) - log10(hnew) - log10(abs(res.i$deriv))
           Nhopt <- -log10(max.rel.error) / 3
