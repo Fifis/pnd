@@ -112,13 +112,11 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   iters <- list()
   i <- 1
   exitcode <- 0L
-  ndownwards <- 0L # For counting the number of downwards shrinkages
 
   while (i <= maxit) {
     if (i == 1) k <- k0
     res.i <- getValsDV(FUN = FUN, x = x, k = k, max.rel.error = max.rel.error,
                        cores = cores, cl = cl, preschedule = preschedule, ...)
-    iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       bad.iters <- 0
       while (TRUE) {
@@ -134,6 +132,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
         if (!any(bad <- !is.finite(res.i$f))) break
       }
     }
+    iters[[i]] <- res.i
 
     # Quick rule of thumb: stop after the first iteration
     if (maxit == 1) {
@@ -159,7 +158,6 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
       if (res.i$ratio < ratio.limits[1] || f.opposite.sign) {
         # The rounding error is too small; the step size must be decreased
         range3[2] <- k
-        ndownwards <- ndownwards + 1
       } else {
         # The numerical error is in the good range, the step size is optimal
         break
@@ -168,9 +166,10 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     k <- sqrt(prod(range3)) # The interval has been sub-divided; take its geometric mean
     i <- i+1
   }
+  exhausted <- i > maxit
   i <- length(iters)
 
-  f3 <- if (exitcode != 1L) sum(res.i$f * c(-0.5, 1, -1, 0.5)) / k^3 else 1
+  f3 <- if (exitcode != 1L) res.i$deriv[["f3"]] else 1
   f0 <- mean(res.i$f[2:3]) # Approximately f(x); the error is small for small h
   h <- (1.68 * max.rel.error * abs(f0/f3))^(1/3) # Formula 36 from Dumontet & Vignes (1977)
 
@@ -194,11 +193,10 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
     exitcode <- 4L
   }
 
-  # Was the procedure systematically unsuccsessful?
-  # This error code is more severe than
-  if (i >= maxit && maxit > 1) {  # Did it waste many iterations in vain?
+  # Report exhaustion only if the loop advanced past the last allowed iteration.
+  if (exhausted && maxit > 1) {
     exitcode <- if (h <= range[1] || h >= range[2]) 6L else 5L
-    side <- if (ndownwards >= maxit/2) "right" else "left"
+    side <- if (h <= range[1]) "left" else "right"
   }
 
   h <- h + x # Minimising the representation error
@@ -216,11 +214,12 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
                 paste0("step size too close to the ", side,
                        " end of the range [", printE(range[1]), ", ",
                        printE(range[2]), "]; consider extending it"),  # 3
-                "maximum number of iterations reached",  # 4
-                paste0("maximum number of iterations reached and step size occured on the ",
+                "step size trimmed to 10% of |x|",  # 4
+                "maximum number of iterations reached",  # 5
+                paste0("maximum number of iterations reached and step size occurred on the ",
                        side, " end of the range [", printE(range[1]), ", ",
-                       printE(range[2]), "]; consider expanding it"),  # 5
-                "only one iteration requested; rough values returned")  # 6
+                       printE(range[2]), "]; consider expanding it"),  # 6
+                "only one iteration requested; rough values returned")  # 7
 
   diag.list <- list(k = do.call(c, lapply(iters, "[[", "k")),
                     x = do.call(rbind, lapply(iters, "[[", "x")),

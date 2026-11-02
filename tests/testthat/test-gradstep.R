@@ -82,3 +82,12 @@ test_that("gradstep checks for conflicting arguments of FUN and methods", {
   expect_error(gradstep(f, 0.5, tol = 1e-4, method = "CR"), "coincide with the arguments")
 })
 
+test_that("gradstep retains DV messages after a single iteration", {
+  x <- c(A = 1, B = 2)
+  s <- gradstep(function(x) sum(x^3), x, method = "DV", control = list(maxit = 1))
+  expect_identical(s$exitcode, c(A = 7L, B = 7L))
+  expect_named(s$message, names(x))
+  expect_true(all(grepl("one iteration", s$message)))
+  expect_equal(s$value, 3*x^2, tolerance = 1e-6)
+})
+

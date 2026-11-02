@@ -22,6 +22,7 @@
 - Fix: `Hessian()` returned wrong results with additional function arguments
 - Fix: custom stencils now respect different derivative orders across coordinates
 - Fix: non-finite values remain visible when formatting and printing derivatives
+- Fix: corrected Dumontet--Vignes exit messages and iteration book-keeping
 
 
 # pnd 0.1.3 (2026-05-26)

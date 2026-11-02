@@ -62,3 +62,48 @@ test_that("Parallelisation in DV works", {
   expect_identical(step.DV(sin, 1, cores = 1), step.DV(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })
+
+test_that("DV exit messages match the termination status", {
+  single <- step.DV(sin, 1, maxit = 1)
+  expect_identical(single$exitcode, 7L)
+
+  capped <- step.DV(function(x) x^3, 1, h0 = 1, range = c(1e-10, 1), max.rel.error = 0.1, maxit = 1)
+  expect_identical(capped$exitcode, 4L)
+
+  boundary <- step.DV(function(x) x^4, 2, range = c(1e-3, 1e-1), maxit = 10)
+  expect_identical(boundary$exitcode, 6L)
+  expect_match(boundary$message, "left end")
+
+  right <- step.DV(function(x) x^3, 1, h0 = 1e-3, range = c(1e-5, 1e-3), max.rel.error = 0.01, maxit = 2)
+  expect_identical(right$exitcode, 6L)
+  expect_match(right$message, "right end")
+})
+
+test_that("DV uses the last evaluated spacing when iterations are exhausted", {
+  scale <- .Machine$double.eps^(-2/15)
+  s <- step.DV(function(x) x^3, 1, h0 = (1/8)/scale, range = c(1/128, 8)/scale, max.rel.error = 1e-8, maxit = 2)
+  k <- tail(s$iterations$k, 1)
+  # For x^3 at x = 1, f''' = 6 and the mean of f(1-k), f(1+k) is 1 + 3*k^2.
+  expected <- (1.68 * 1e-8 * (1 + 3*k^2) / 6)^(1/3)
+  expect_identical(s$counts, 2L)
+  expect_identical(s$exitcode, 5L)
+  expect_equal(s$par, expected, tolerance = 1e-8)
+})
+
+test_that("DV retains convergence on the last permitted iteration", {
+  limits <- c(1.5, 10)
+  s <- step.DV(function(x) x^3, 1, h0 = 1e-3, range = c(1e-5, 0.1), max.rel.error = 1e-6, ratio.limits = limits, maxit = 2)
+  expect_identical(s$counts, 2L)
+  expect_gte(tail(s$iterations$ratio, 1), limits[1])
+  expect_lte(tail(s$iterations$ratio, 1), limits[2])
+  expect_identical(s$exitcode, 0L)
+})
+
+test_that("DV history records accepted evaluations after shrinking", {
+  f <- function(x) ifelse(abs(x-1) < 0.5, x^3, NA_real_)
+  s <- step.DV(f, 1, h0 = 0.01, maxit = 1)
+  expect_true(all(is.finite(s$iterations$f)))
+  expect_true(all(abs(s$iterations$x-1) < 0.5))
+  expect_equal(unname(s$iterations$f[1, ]), unname(s$iterations$x[1, ]^3), tolerance = 1e-10)
+  expect_equal(unname(s$iterations$deriv3[1, "f3"]), 6, tolerance = 1e-8)
+})
