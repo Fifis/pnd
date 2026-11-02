@@ -18,7 +18,7 @@
 - DEV: Check the compatibility between the function and its documentation
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.4 (2026-10-XX)
+# pnd 0.1.4 (2026-11-XX)
 - Fix: `Hessian()` returned wrong results with additional function arguments
 - Fix: custom stencils now respect different derivative orders across coordinates
 - Fix: non-finite values remain visible when formatting and printing derivatives
