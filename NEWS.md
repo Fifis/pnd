@@ -27,6 +27,8 @@
 - Fix: preserve fractional stencil offsets in Mathur and kink-based step selection
 - Fix: resolve the `func` compatibility argument before checking Jacobian dimensions
 - Fix: use finite derivative estimates in kink-based step-selection fallbacks
+- Fix: use reduced spacing and accepted history in initial Stepleman--Winarsky recovery
+- Fix: return matching steps, derivatives and errors from Stepleman--Winarsky selection
 
 
 # pnd 0.1.3 (2026-05-26)

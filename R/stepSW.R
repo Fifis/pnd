@@ -129,7 +129,6 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
         res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
                            ratio.last = NULL, ratio.beforelast = NULL,
                            cores = cores, cl = cl, preschedule = preschedule, ...)
-        iters[[i]] <- res.i
         f0 <- res.i$f0
         hnew <- res.i$h
       }
@@ -146,12 +145,13 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                         " after ", bad.iters, " attempts of step shrinkage",
                         ".\nChange the range, which is currently [", toString(range),
                         "], and/or\ntry a different starting h0, which is currently ", h0, "."))
-          res.i <- getValsSW(FUN = FUN, x = x, h = h0, max.rel.error = max.rel.error, do.f0 = TRUE,
+          res.i <- getValsSW(FUN = FUN, x = x, h = hnew, max.rel.error = max.rel.error, do.f0 = TRUE,
                              ratio.last = NULL, ratio.beforelast = NULL,
                              cores = cores, cl = cl, preschedule = preschedule, ...)
           if (!any(bad <- !is.finite(res.i$f))) break
         }
       }
+      iters[[i]] <- res.i
 
       # First check: are the function values of different signs?
       # If yes, h is too large -- jump to the step-shrinking main loop:
@@ -267,7 +267,8 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
 
     if (any(!res.i$monotone)) break
   }
-  hopt <- iters[[i-1]]$h # No monotonicity = bad
+  best.i <- i-1 # No monotonicity = bad
+  hopt <- iters[[best.i]]$h
   hprev <- iters[[i-2]]$h
   # Error codes ordered by severity
   if (abs(hopt / hprev - 1) < seq.tol) exitcode <- 2L
@@ -278,6 +279,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
     abs.error.opt  <- unname(iters[[i-1]]$est.error["trunc"] + iters[[i-1]]$est.error["round"])
     if (abs.error.prev < abs.error.opt) { # The two-times reduction was unnecessary
       exitcode <- 3L
+      best.i <- i-2
       hopt <- hprev
       iters[[i-2]]$est.error["trunc"] <- unname(iters[[i-1]]$est.error["trunc"] / shrink.factor)
     }
@@ -296,6 +298,7 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                        ratio.beforelast = if (i > 2) iters[[i-2]] else NULL,
                        cores = cores, cl = cl, preschedule = preschedule, ...)
     iters[[i]] <- res.i
+    best.i <- i
   }
 
   if (i >= maxit) exitcode <- 5L
@@ -330,7 +333,6 @@ step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),
                                 seq.tol = seq.tol, max.rel.error = max.rel.error, maxit = maxit))
 
 
-  best.i <- if (exitcode == 3L && !close.left) i-2 else i-1
   ret <- list(par = hopt,
               value = iters[[best.i]]$deriv,
               counts = c(preliminary = i.prelim, main = i - i.prelim),
