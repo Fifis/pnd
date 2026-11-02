@@ -21,10 +21,10 @@ step.plugin(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
-size for first derivarives is internallt translated into the initial step size for third
-derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
+\item{h0}{Numeric scalar: initial step-size seed, defaulting to
+\code{max(1e-5*abs(x), stepx(x, deriv.order = 3))}.
+The third derivative is estimated using larger spacing
+\code{h0 * .Machine$double.eps^(-2/15)}.}
 
 \item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
 error of function evaluation. For highly accurate functions with all accurate bits
@@ -75,11 +75,11 @@ Plug-in step selection
 \details{
 This function computes the optimal step size for central differences using the
 plug-in approach.
-The optimal step size is determined as the minimiser of the total error, which for central
-finite differences is (assuming minimal bounds for relative rounding errors)
-\deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x)} \epsilon_{\mathrm{mach}}}.}{(1.5 mach.eps * f' / f''')^(1/3).}
-If the estimated third derivative is too small, the function assumes a third
-derivative of 1 to prevent division-by-zero errors.
+The plug-in step-size rule is
+\deqn{h = \left(1.5 \varepsilon \left|\frac{f(x)}{f'''(x)}\right|\right)^{1/3},}{h = (1.5 * max.rel.error * abs(f / f'''))^(1/3),}
+where \eqn{\varepsilon} is \code{max.rel.error}. The function value and third
+derivative are approximated on the initial evaluation grid.
+Zero or near-zero third-derivative estimates use safeguarded step sizes.
 }
 \examples{
 f <- function(x) x^4

@@ -27,3 +27,9 @@ test_that("User request in plug-in step selection for fewer cores is honoured", 
   expect_identical(step.plugin(sin, 1, cores = 1), step.plugin(sin, 1, cl = clus))
   parallel::stopCluster(clus)
 })
+
+test_that("Plug-in derivatives use the evaluation spacing at each stage", {
+  cubic <- step.plugin(function(x) x^3, 1, h0 = 1e-3)
+  expect_equal(cubic$iterations$deriv[["cd3"]], 6, tolerance = 1e-8)
+  expect_equal(cubic$value, 3 + cubic$par^2, tolerance = 1e-6)
+})

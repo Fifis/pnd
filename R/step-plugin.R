@@ -2,7 +2,9 @@
 getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
   pow <- if (stage == 1) 3 else 1
   s <- fdCoef(deriv.order = pow)
-  xgrid <- x + s$stencil * h * if (stage == 1) .Machine$double.eps^(-2/15) else 1
+  # Use the same spacing for the evaluation grid and the derivative denominator
+  if (stage == 1) h <- h * .Machine$double.eps^(-2/15)
+  xgrid <- x + s$stencil * h
 
   FUNsafe <- function(z) safeF(FUN, z, ...)
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
@@ -23,15 +25,19 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
 #' Plug-in step selection
 #'
 #' @inheritParams step.DV
+#' @param h0 Numeric scalar: initial step-size seed, defaulting to
+#'   \code{max(1e-5*abs(x), stepx(x, deriv.order = 3))}.
+#'   The third derivative is estimated using larger spacing
+#'   \code{h0 * .Machine$double.eps^(-2/15)}.
 #'
 #' @details
 #' This function computes the optimal step size for central differences using the
 #' plug-in approach.
-#' The optimal step size is determined as the minimiser of the total error, which for central
-#' finite differences is (assuming minimal bounds for relative rounding errors)
-#' \deqn{\sqrt[3]{1.5 \frac{f'(x)}{f'''(x)} \epsilon_{\mathrm{mach}}}.}{(1.5 mach.eps * f' / f''')^(1/3).}
-#' If the estimated third derivative is too small, the function assumes a third
-#' derivative of 1 to prevent division-by-zero errors.
+#' The plug-in step-size rule is
+#' \deqn{h = \left(1.5 \varepsilon \left|\frac{f(x)}{f'''(x)}\right|\right)^{1/3},}{h = (1.5 * max.rel.error * abs(f / f'''))^(1/3),}
+#' where \eqn{\varepsilon} is \code{max.rel.error}. The function value and third
+#' derivative are approximated on the initial evaluation grid.
+#' Zero or near-zero third-derivative estimates use safeguarded step sizes.
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
@@ -108,7 +114,7 @@ step.plugin <- function(FUN, x, h0 = max(1e-5*abs(x), stepx(x, deriv.order = 3))
     h <- pmax(me13, abs(x) / 128)
     cd3 <- me13^2 * abs(x)
   } else if (max(abs(f0), me13^2) / abs(cd3) > sqrt(1/max.rel.error)) {
-    # The ratio of f' to f''' is too large -- safeguard against large steps
+    # The ratio of f to f''' is too large -- safeguard against large steps
     # small values of f0 are truncated to macheps^(2/3) ~ 4e-11
     cd3 <- sqrt(max.rel.error) * max(abs(f0), me13^2)
     h <- pmax(me13, abs(x) / 256)

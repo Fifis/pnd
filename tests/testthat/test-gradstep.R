@@ -91,3 +91,13 @@ test_that("gradstep retains DV messages after a single iteration", {
   expect_equal(s$value, 3*x^2, tolerance = 1e-6)
 })
 
+test_that("gradstep uses correctly scaled plug-in derivatives", {
+  x <- c(A = 1, B = 2)
+  h0 <- (1/8) * .Machine$double.eps^(2/15)
+  s <- gradstep(function(x) sum(x^3), x, h0 = h0, method = "plugin",
+                 control = list(max.rel.error = 1e-8))
+  thirds <- vapply(s$original, function(z) z$iterations$deriv[["cd3"]], numeric(1))
+  expect_equal(unname(thirds), c(6, 6), tolerance = 1e-8)
+  expect_equal(s$value, 3*x^2 + s$par^2, tolerance = 1e-6)
+})
+
