@@ -8,6 +8,13 @@ test_that("Stencil and coefficients are the same length", {
                "must be of the same length")
 })
 
+test_that("Singleton Vandermonde systems have unit coefficient matrices", {
+  expect_identical(solveVandermonde(0, 1), 1)
+  expect_identical(solveVandermonde(-3, c(coefficient = 7)), c(coefficient = 7))
+  expect_identical(solveVandermonde(2L, 0L), 0L)
+  expect_error(solveVandermonde(0, 1:2), "must be of the same length")
+})
+
 test_that("Unsorted stencil are bad", {
   expect_warning(solveVandermonde(s = c(0, 1, -2), b = c(0, 0, 1)),
                  "unsorted")

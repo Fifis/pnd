@@ -42,6 +42,7 @@ solveVandermonde <- function(s, b) {
   if (length(s) != length(b)) stop("The input arguments 's' and 'b' must be of the same length.")
   if (is.unsorted(s)) warning("Numerical solutions of Vandermonde systems based on ",
     "unsorted inputs are EXTREMELY unstable. Sort the input in ascending order!")
+  if (length(s) == 1L) return(b)
   # Algorithm 4.6.2 from Golub & Loan (2013) 'Matrix computations', 4th ed.
   n <- length(s) - 1
   for (k in 0:(n-1)) {
@@ -243,7 +244,7 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   }, FUN.VALUE = character(1))
   frac <- paste0(sprintf("%.4e", resulting.terms), flabs)
   # If the interpolation is exact, then, the total error is zero
-  if (identical(stencil, 0)) {
+  if (length(stencil) == 1L && stencil == 0) {
     frac <- "f exactly"
     ea <- Inf
   } else {

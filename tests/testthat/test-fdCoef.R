@@ -70,3 +70,25 @@ test_that("interpolation (degree-0 derivative) works", {
   expect_identical(attr(f0, "accuracy.order"), c(requested = NA, effective = Inf))
   expect_identical(attr(f0, "remainder.coef"), 0)
 })
+
+test_that("Singleton zero stencils interpolate the evaluation point exactly", {
+  f0 <- fdCoef(0)
+  expect_identical(f0$stencil, 0L)
+  expect_identical(attr(f0, "accuracy.order"), c(requested = 2, effective = Inf))
+  cases <- list(f0,
+                fdCoef(0, stencil = 0, zero.action = "round"),
+                fdCoef(0, stencil = c(origin = 0L), zero.action = "none"))
+  for (s in cases) {
+    expect_identical(s$weights, c(x = 1))
+    expect_identical(attr(s, "expansion"), "f exactly")
+    expect_identical(unname(attr(s, "accuracy.order")["effective"]), Inf)
+    expect_identical(attr(s, "remainder.coef"), 0)
+  }
+})
+
+test_that("Singleton non-zero stencils retain finite interpolation accuracy", {
+  s <- fdCoef(0, stencil = 2, acc.order = 1)
+  expect_identical(s$weights, c(`x+2h` = 1))
+  expect_identical(attr(s, "accuracy.order"), c(requested = NA, effective = 1L))
+  expect_identical(attr(s, "remainder.coef"), 2)
+})

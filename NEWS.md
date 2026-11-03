@@ -31,6 +31,7 @@
 - Fix: return matching steps, derivatives and errors from Stepleman--Winarsky selection
 - Fix: follow the Stepleman--Winarsky zero-endpoint branch and explain undefined cancellation tests
 - Fix: record the accepted finite evaluation in Curtis--Reid recovery history
+- Fix: handle singleton Vandermonde systems and exact interpolation on integer zero stencils
 
 
 # pnd 0.1.3 (2026-05-26)
