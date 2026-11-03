@@ -1,7 +1,7 @@
 # Print method for numerical derivatives
 #' @rdname GenD
 #' @inheritParams printMat
-#' @param ... Ignored.
+#' @details Additional arguments to the print method (\code{...}) are ignored.
 #' @order 2
 #' @export
 #' @examples
@@ -38,7 +38,7 @@ print.GenD <- function(x, digits = 4, shave.spaces = TRUE,
 # Print method for Hessians
 #' @rdname Hessian
 #' @inheritParams printMat
-#' @param ... Ignored.
+#' @details Additional arguments to the print method (\code{...}) are ignored.
 #' @order 2
 #' @export
 print.Hessian <- function(x, digits = 4, shave.spaces = TRUE,
@@ -122,14 +122,14 @@ print.checkDimensions <- function(x, ...) {
 
 #' Step-size selection visualisation
 #'
-#' Plots the estimated truncation error and total errors, highlighting various
+#' Plots step-size diagnostics, highlighting various
 #' ranges obtained during step-size selection for numerical differentiation.
 #' Works for all implemented methods.
 #'
 #' @param x List returned by \code{step...} functions.
 #' @param ... Additional graphical parameters passed to \code{plot()}.
 #'
-#' @returns Nothing (invisible null).
+#' @returns The plotted step-size result.
 #' @order 1
 #' @export
 #'
@@ -159,7 +159,7 @@ plot.stepsize <- function(x, ...) {
 }
 
 #' @rdname plot.stepsize
-#' @param index Integer index of character name of the coordinate of \code{x} to plot.
+#' @param index Integer index or character name of the coordinate of \code{x} to plot.
 #' @order 2
 #' @export
 #'

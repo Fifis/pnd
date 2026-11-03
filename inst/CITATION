@@ -35,11 +35,11 @@ bibentry(
 
 bibentry(
   bibtype = "Misc",
-  title = "Compatilibility of pnd with the syntax of numDeriv",
+  title = "Compatibility of pnd with the syntax of numDeriv",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   organization = "University of Luxembourg",
   note = "Vignette for the R package pnd 0.1.4.",
-  textVersion = "Kostyrka, Andreï V. (2025). Compatilibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.1.4.",
+  textVersion = "Kostyrka, Andreï V. (2025). Compatibility of pnd with the syntax of numDeriv. Vignette for the R package pnd 0.1.4.",
   url = "https://github.com/Fifis/pnd/tree/main/vignettes"
 )

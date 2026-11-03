@@ -56,7 +56,7 @@ Therefore, the fact that for small $h$, $\varepsilon(h)$ is dominated by $\varep
 ## Curtis--Reid (1974) bounded ratio approach
 \label{sec:cr}
 
-\textcolor{red}{!!! Chech typos: truncation to the round-off}
+\textcolor{red}{!!! Check typos: truncation to the round-off}
 
 @curtis1974choice propose a solution to choose such a step size for *central differences* that the ratio of the truncation error to the rounding error be confined to a chosen reasonable interval:
 \[
@@ -86,13 +86,13 @@ To the contrary, if $f(x)$ is even around $x$ but not constant, then, the higher
 
 This algorithm is clever because the over-estimation of the truncation error is addressed by setting the desired ratio $\varepsilon_{\mathrm{t}}(h^*) / \varepsilon_{\mathrm{r}}(h^*)= 100$.
 Having $\hat \varepsilon_{\mathrm{t}}(h) = O(h)$ instead of $O(h^2)$ implies that the solution is of the optimal order for one-sided differences.
-The ratio of the optimal step sized for one- and two-sided differences is 
+The ratio of the optimal step sizes for one- and two-sided differences is
 \[
 h^*_{\mathrm{CD}_2} / h^*_{\mathrm{FD}_1} = \frac{\sqrt[3]{1.5 |f| \epsilon_{\mathrm{m}} / |f'''|}}{\sqrt{2|f|\epsilon_{\mathrm{m}} / |f''|}}
-= \frac{2^{-5/6} 3^{1/3} \sqrt[3]{|f'''|}}{\sqrt[6]{|f|} \sqrt[6]{\epsilon_{\mathrm{m}}} \sqrt{|f''|}} 
+= \frac{2^{-5/6} 3^{1/3} \sqrt{|f''|}}{\sqrt[6]{|f|} \sqrt[6]{\epsilon_{\mathrm{m}}} \sqrt[3]{|f'''|}}
 \]
 Since square, cubic etc.\ roots tend to shrink values towards unity, it is reasonable to assume that powers of absolute values of $f$ and its derivatives gravitate towards unity, the numeric constant in the multiplier is $0.81$, therefore, the ratio is approximately equal to $0.81 / \sqrt[6]{\epsilon_{\mathrm{m}}} \approx 329$.
-Subsequent approximations can be done for $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{FD}_2})$ and $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{CD}_2})$ and their ratio, but the general idea of this algorithm -- find a reasonable first-order-accurate step size and inflate it by 1--3 orders of magnitude -- cannot be made more rigorous without further exact calculations, which undermines the point of this quick procedure with as few function evaluations as possible.
+Subsequent approximations can be done for $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{FD}_1})$ and $\varepsilon_{\mathrm{t}}(h^*_{\mathrm{CD}_2})$ and their ratio, but the general idea of this algorithm -- find a reasonable first-order-accurate step size and inflate it by 1--3 orders of magnitude -- cannot be made more rigorous without further exact calculations, which undermines the point of this quick procedure with as few function evaluations as possible.
 
 **Example 1.** $f(x) = \sin(x)$ at $x = 1$ with $h_0 = 10^{-4}$.
 We ignore the argument-rounding error and consider only the function-rounding error.
@@ -147,7 +147,7 @@ fun <- function(x) pi*x + exp(1)
 print(u0 <- getRatio(FUN = fun, x = x0, h = h0))
 h1 <- h0 * sqrt(100 / max(u0, 1))
 print(u1 <- getRatio(FUN = fun, x = x0, h = h1))
-h2 <- h1 * sqrt(100 / max(u0, 1))
+h2 <- h1 * sqrt(100 / max(u1, 1))
 print(u2 <- getRatio(FUN = fun, x = x0, h = h2))
 ```
 
@@ -178,16 +178,16 @@ Remarkably, the optimal step size, being 40 times larger than $h_1$, yields the 
 ## Dumontet--Vignes (1977) plug-in approach
 
 @dumontet1977determination replace $f'''(x)$ in the expression for the optimal $h_{\mathrm{CD}_2}$ by its rough guess.
-First, they suggest that the step size $h$ in $f(x \pm h)$ should belong to $[x\cdot 2^{-n}, x\cdot 2^{n}]$, where $n$ is the number of bits in the mantissa, and the step size in $f'''_{\mathrm{FD}}$ should belong to $[x\cdot 2^{-n+1}, x\cdot 2^{n-1}]$.
+First, they suggest that the step size $h$ in $f(x \pm h)$ should belong to $[x\cdot 2^{-n}, x\cdot 2^{n}]$, where $n$ is the number of bits in the mantissa, and the step size in $f'''_{\mathrm{CD}}$ should belong to $[x\cdot 2^{-n+1}, x\cdot 2^{n-1}]$.
 Estimate the dominating error (truncation or rounding) and, depending on the ratio, bisect the interval for the step size so that neither of the errors in the third derivative is disproportionately large.
 Then, approximation errors can be calculated using various quantities obtained at the steps of this procedure.
 
-These authors also assume that the relative rounding error $[f(x)]/f(x)$ is uniformly distributed between $[-\epsilon_{\mathrm{m}}/2, +\epsilon_{\mathrm{m}}/2]$, but instead of bounding
+These authors also assume that the relative rounding error $([f(x)]-f(x))/f(x)$ is uniformly distributed between $[-\epsilon_{\mathrm{m}}/2, +\epsilon_{\mathrm{m}}/2]$, but instead of bounding
 \[
 \varepsilon_{\mathrm{trunc}} + \varepsilon_{\mathrm{round}} \le \frac{|f'''(x)|}{6}h^2  + \frac{0.5|f(x)| \epsilon_{\mathrm{m}}}{h},
 \]
 they estimate the *expected* absolute sum $|\varepsilon_{\mathrm{trunc}} + \varepsilon_{\mathrm{round}}|$.
-If $\xi$ has a triangular distribution on $[-\varepsilon_{\text{mach}}, \varepsilon_{\text{mach}}]$, then, the variance of $\xi$ is $\varepsilon_{\text{mach}}/6$ and the expected value of $|\xi|$ is $\varepsilon_{\text{mach}}/3$.
+If $\xi$ has a triangular distribution on $[-\varepsilon_{\text{mach}}, \varepsilon_{\text{mach}}]$, then, the variance of $\xi$ is $\varepsilon_{\text{mach}}^2/6$ and the expected value of $|\xi|$ is $\varepsilon_{\text{mach}}/3$.
 However, the distribution of $|\varepsilon_{\text{trunc}} + \varepsilon_{\text{round}}|$ is more complicated, and the authors refer to the result that its expected absolute value is equal to $c_1 /h + c_2 h^5 - c_3 h^8$, where the constants $c_1, c_2, c_3$ depend on $\varepsilon_{\text{mach}}$, $f(x)$, and $f'''(x)$.
 Their optimal step size is
 \[
@@ -201,7 +201,7 @@ Then
 
 ## Stepleman--Winarsky (1979) accurate-digit count estimation
 
-This work suggests starting with a large enough step to ensure that the accurate digits lost at the early steps are due only to the truncation error and shrinking the reduce the truncation error until the change in the number of accurate digits is no longer monotone due to the substantial rounding-error contribution.
+This work suggests starting with a large enough step to ensure that the accurate digits lost at the early steps are due only to the truncation error and shrinking the step to reduce the truncation error until the change in the number of accurate digits is no longer monotone due to the substantial rounding-error contribution.
 The number of digits lost is proportional to the value of the error function, and a change in this number due to a step reduction is the slope of the error curve.
 
 ## Mathur (2012) AutoDX algorithm
@@ -252,7 +252,7 @@ print(diff(log(te)) / diff(log(h)))
 
 Recommendations:
 
-1. For the initial step size $h_0$, choose a power of 2 to avoid representation errors (step sizes other than $2^j$ are not presentable in binary). This ensures that $[x+h]$ and $[x-h]$ have full precision and both are exactly centred at $x$. The default value in the implementation uses a power of two.
+1. For the initial step size $h_0$, choose a power of 2 to avoid representation errors (powers of 2 are exactly representable in binary). This ensures that $[x+h]$ and $[x-h]$ have full precision and both are exactly centred at $x$. The default value in the implementation uses a power of two.
 2. For the step-size reduction ratio, choose a power of 2 (e.g. 0.5).
 
 \textcolor{red}{!!! TODO: crude analytical approximations for step sizes are reliable, see the simulation}
@@ -263,12 +263,12 @@ Recommendations:
 
 \textcolor{red}{!!! Combine the ideas of a valid range check (parallel!) of Mathur with the speed of Stepleman \& Winarsky}
 
-@mathur2012analytical mentions that the @stepleman1979adaptive algorithms performs reliably when the initial step size $h_0$ is chosen well.
-The requirements imposed on $h_0$ are the following: it should be large enough for the truncation error to be dominant, but not too large that the estimated truncated error decreases with the step size growth and ceases to be a valid approximation of the true truncation error.
+@mathur2012analytical mentions that the @stepleman1979adaptive algorithm performs reliably when the initial step size $h_0$ is chosen well.
+The requirements imposed on $h_0$ are the following: it should be large enough for the truncation error to be dominant, but not too large that the estimated truncation error decreases with the step size growth and ceases to be a valid approximation of the true truncation error.
 
 None of the previous algorithms explicitly make use of the parallel capabilities of modern processors.
 The following improvements can be made for speed gains:
-* In the Curtis--Reid approach, the function values at $(x-h, x, x+h)$ can be computed im parallel for forward and central differences at each step, which speeds it up by a factor of 3;
+* In the Curtis--Reid approach, the function values at $(x-h, x, x+h)$ can be computed in parallel for forward and central differences at each step, which speeds it up by a factor of 3;
 * In the Dumontet--Vignes approach, the first and third derivatives can be computed in parallel on the symmetric 2-point and 4-point stencils, respectively, which is 2--3 times faster;
 * The Stepleman--Winarsky algorithm is a sequence of condition checks; the authors remark that the central differences should be computed for at least 3 step sizes, which provides the opportunity for a 6-fold time decrease.
 * Mathur does not specify the limits for the step-size sequence length to determine the range validity; nevertheless, it is trivial to pre-emptively compute the central differences for multiple sizes because this approach is not slower than the serial version even if the algorithm has to terminate immediately.
@@ -287,7 +287,7 @@ In Section~\ref{sec:basic}, we established that more evaluations of a function a
 On one hand, when multiple step sizes are attempted in numerical search procedures, function values at the extra evaluation grid points are basically free bread descending from heaven.
 One can collect all intermediate evaluations and calculate the optimal weights for this empirically driven stencil.
 On the other hand, step-size search iterations usually result in changes of the candidate values of $h$ by orders of magnitude.
-Example 1 in Section~\ref{sec:cr} show two iteration of the search: $h_0 = 10^{-4}$, $h_1 \approx 1.5 \cdot 10^{-7}$.
+Example 1 in Section~\ref{sec:cr} shows two iterations of the search: $h_0 = 10^{-4}$, $h_1 \approx 1.5 \cdot 10^{-7}$.
 Since central differences are evaluated with both step sizes, the researcher has the grid $x + (-h_0, -h_1, 0, h_1, h_0)$ and respective function values.
 Rewriting the grid as a stencil with a human-readable normalisation of the smallest distance between its elements to one yields $b_n \approx \{-671, -1, 0, 1, 671\}$.
 
@@ -301,7 +301,7 @@ print(fc, 3)
 The optimal weights for the outermost elements of this stencil are tiny ($\approx 1.65\cdot 10^{-9}$).
 In addition, the `best' step size is the minimiser of the quantity that depends on the coefficients in the Taylor expansion.
 The further the evaluation points are away from the Taylor polynomial centre, the higher the coefficients on its terms, which are a power function of $(b_i h)$.
-Eliminating the terms not related to the derivative on interest requires, as described above as the intuition of the method, solving a system of linear equations, and numerical solvers can be unstable when the input numbers are huge.
+Eliminating the terms not related to the derivative of interest requires, as described above as the intuition of the method, solving a system of linear equations, and numerical solvers can be unstable when the input numbers are huge.
 As a consequence, the suggested weights $w_i$ may suffer from ill conditioning of the matrix of the Taylor polynomial coefficients that take large values far away from the centre.
 
 This raises the question: how accurate is this four-term weighted sum where two weights are tiny?
@@ -315,15 +315,14 @@ This error value is slightly less than the error of $f'_{\mathrm{CD}_2}(1, h_1)$
 Nevertheless, this error reduction could be a pure coincidence that would not hold for the majority of representable floating-point numbers.
 Therefore, we run a small simulation to determine the potential benefits and dangers owing to the presence of far-away points on the stencil that were recorded at the previous search steps.
 
-Consider a sample of 10\,000 random uniform values on $[0, 2\pi]$ and $f(x) = sin(x)$. For each of these values, compute four numerical derivatives:
+Consider a sample of 10\,000 random uniform values on $[0, 2\pi]$ and $f(x) = \sin(x)$. For each of these values, compute three numerical derivatives:
 1. $f'_{\mathrm{CD}_2}(x, h_{\mathrm{opt}})$ with analytical theoretical $h_{\mathrm{opt}}$ (oracle, infeasible in practice);
 2. $f'_{\mathrm{CD}_2}(x, \sqrt[3]{\epsilon_{\mathrm{m}}})$ (naïve rule of thumb);
-3. $f'_{\mathrm{CD}_2}(x, h^*_{\mathrm{CR}})$ with $h^*_{\mathrm{CR}}$ provided by the Curtis--Reid procedure;
-4. $f'$ with $h_{\mathrm{opt}}$ and the stencil $b = (-500, -1, 1, 500)$.
+3. $f'$ with $h_{\mathrm{opt}}$ and the stencil $b = (-500, -1, 1, 500)$.
 
 \textcolor{red}{!!! TODO: add the true oracle -- stemming from a derivative-free grid search on [1e-12, 1e-2] as f' - f'CD}
 
-This simulation aims to determine the behaviour of the absolute approximation error under difference step-size selection rules and weigh the pros and cons of extra grid points that are far away.
+This simulation aims to determine the behaviour of the absolute approximation error under different step-size selection rules and weigh the pros and cons of extra grid points that are far away.
 
 !!! TODO: add fast functions like sin(1000*x) or slow like log(x) at x = 13 -- and check the convergence radius
 
@@ -366,7 +365,7 @@ From the summary table and the plot, we conclude:
 2. The naïve rule of thumb without extra multipliers works well compared to the oracle because the truncated term containing the third derivative is bounded and the step size itself is small.
 3. The addition of faraway stencil points may improve numerical accuracy, reducing the median absolute error by $\approx16\%$ in this particular case. These gains depend on the behaviour of the function and the remoteness of the outermost points.
 
-The reader is invited to experiment with other function, other argument ranges, and other stencils with large and small gaps produce by more drastic step changes in iterations.
+The reader is invited to experiment with other functions, other argument ranges, and other stencils with large and small gaps produced by more drastic step changes in iterations.
 
 During numerical optimisation, drop, do not store
 
@@ -376,7 +375,7 @@ Near the optimum, store
 
 # Non-uniform grid spacing
 
-So far, only uniform spacing for second-order-accurate numerical approximation of $f'(x)$ has been concerned.
+So far, only uniform spacing for second-order-accurate numerical approximation of $f'(x)$ has been considered.
 However, in many situations, higher-order accuracy is required, e.g. in computing Hessians for subsequent inversion to obtain asymptotic variance for statistical inference.
 Usually, uniform grids of the form $\{x_0, x_0\pm h, x_0\pm2h, x_0\pm3h, \ldots\}$ or $\{x_0\pm h, x_0\pm3h, x_0\pm5h, \ldots\}$ are used to evaluate $f$ and obtain an interpolating polynomial of the desired degree.
 Nevertheless, the choice of uniform grids is mostly a historical artefact rather than a modelling choice.
@@ -384,8 +383,8 @@ Nevertheless, the choice of uniform grids is mostly a historical artefact rather
 ## First-order derivatives
 
 @oliver1975selection proposed a method of selection of interpolation points on a non-uniform grid for first derivatives, and @oliver1980selection extended it to second and third derivatives.
-It is, indeed, not clear, which grid is better for fourth-order derivatives: $\{-3, -1, 1, 3\}$, $\{-2, -1, 1, 2\}$, or $\{-1.01, -1, 1, 1.01\}$.
-On one hand, shrinking the step size reduces numerical error; on the other hand, if $\pm h$ if contaminated by a certain level of rounding noise, then, $\pm 1.01 h$ does not seem ample enough to reduce the effect of the machine-related error.
+It is, indeed, not clear, which grid is better for fourth-order-accurate first derivatives: $\{-3, -1, 1, 3\}$, $\{-2, -1, 1, 2\}$, or $\{-1.01, -1, 1, 1.01\}$.
+On one hand, shrinking the step size reduces numerical error; on the other hand, if $\pm h$ is contaminated by a certain level of rounding noise, then, $\pm 1.01 h$ does not seem ample enough to reduce the effect of the machine-related error.
 Therefore, there should be a trade-off between the truncation and rounding error as a non-trivial function of the grid spacing magnitude.
 
 **Problem.** Given the desired accuracy order of a first derivative, find the optimal symmetric grid $x_0 \pm h, x_0 \pm c_1 h, x_0 \pm c_2 h$, $1 < c_1 < c_2 < \ldots$ for finite differencing to minimise the expected combined rounding and truncation errors.
@@ -395,23 +394,23 @@ Earlier authors, e.g. @rutishauser1963ausdehnung deemed that the most convenient
 Modern textbooks, like @sauer2017numerical, prefer deriving the total error by bounding Fornberg sums.
 
 Firstly, assume that the first two grid points are $x \pm h$, and the task consists in finding the scaling factors $1 < c_1, c_2, \ldots$ for $h$ to obtain the optimal grid.
-As in previous analyses, it is somewhat impractical to minimise the sum of two errors $|\varepsilon_{\mathrm{t}}| + \varepsilon_{\mathrm{r}}|$ directly as $\varepsilon_{\mathrm{t}}(h) = \frac{f^{d+a}(\xi)}{6}h^{a}$ ($\alpha\in[-1, 1]$) is not observed directly. (Note that $\xi = x + \alpha h$, $\alpha \in [0, 1]$ for $f'_{\mathrm{CD}}(x_0)$, but  this is not true for higher-order derivatives due to the fact that the Generalised Intermediate Value Theorem yields more than one term.)
+As in previous analyses, it is somewhat impractical to minimise the sum of two errors $|\varepsilon_{\mathrm{t}}| + |\varepsilon_{\mathrm{r}}|$ directly as $\varepsilon_{\mathrm{t}}(h) = \frac{f^{(d+a)}(\xi)}{6}h^{a}$ ($\alpha\in[-1, 1]$) is not observed directly. (Note that $\xi = x + \alpha h$, $\alpha \in [-1, 1]$ for $f'_{\mathrm{CD}}(x_0)$, but  this is not true for higher-order derivatives due to the fact that the Generalised Intermediate Value Theorem yields more than one term.)
 
 To shorten notation for the grid around the point of interest $x_0$, denote $x_{2i-1} = x_0 + c_i h$, $x_{2i} = x_0 - c_i h$, $i = 1, \ldots, a/2$, so $\{x_0, \ldots, x_n\}$ becomes the full evaluation grid.
 
 It is possible to make two observations:
 
-1. If the truncation error is valid, then, it is proportional to $(x_0 - x_1)\cdots(x_0 - x_n) / (n+1)! f^{d+a}(\xi)$;
-2. Moving $c_1$ closer to unity reduced the truncation error but increases the rounding error $|R| \le M\cdot E$ by a magnitude factor
+1. If the truncation error is valid, then, it is proportional to $(x_0 - x_1)\cdots(x_0 - x_n) / (n+1)! f^{(d+a)}(\xi)$;
+2. Moving $c_1$ closer to unity reduces the truncation error but increases the rounding error $|R| \le M\cdot E$ by a magnitude factor
 \[
 M = \sum_{i=1}^n |L'_i(x_0)|, \quad E = \max\{|\varepsilon_i|, \quad i = 1, \ldots, n\},
 \]
-where $L_i$'s are the Lagrange basis polynomials and $\epsilon_i := f(x_i) - \hat f(x_i)$ is the individual rounding error.
+where $L_i$'s are the Lagrange basis polynomials and $\varepsilon_i := f(x_i) - \hat f(x_i)$ is the individual rounding error.
 
 To remove the dependence of $\xi$ on $\{x_1, \ldots, x_n\}$, assume that $f^{(d+a)}(x)$ is relatively constant over the interval containing the points $x_1,\ldots, x_n$ -- require that $\Psi = (x_0 - x_1) \cdots (x_0 - x_n)$ is constant.
 Then, the scaling factor for the error is equal to
 \[
-S  = M \sqrt[n]{\Psi} = (c_1 \dots c_{n/2})^{2/n} \sum_{i=1}^{n/2} \left|c_i^{-1} \prod_{j\ne i}^{n/2} \frac{r_j^2}{r_j^2 - r_i^2}  \right|
+S  = M \sqrt[n]{|\Psi|} = (c_1 \dots c_{n/2})^{2/n} \sum_{i=1}^{n/2} \left|c_i^{-1} \prod_{j\ne i}^{n/2} \frac{c_j^2}{c_j^2 - c_i^2}  \right|
 \]
 
 Now we implement this objective function in R and minimise it.

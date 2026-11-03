@@ -23,16 +23,16 @@ step.DV(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
-size for first derivarives is internallt translated into the initial step size for third
+\item{h0}{Numeric scalar: initial step size, defaulting to
+\code{1e-5 * max(abs(x), sqrt(.Machine$double.eps))}. This step
+size for first derivatives is internally translated into the initial step size for third
 derivatives by multiplying it by the machine epsilon raised to the power -2/15.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
 \item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
 error of function evaluation. For highly accurate functions with all accurate bits
-is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+it is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
 output of optimisation routines etc.), it is higher, typically
 \code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
 \code{.Machine$double.eps^(3/4) = 2e-12} for common functions.}
@@ -48,14 +48,13 @@ Consider extending the range if this limit is reached.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }

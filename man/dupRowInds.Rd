@@ -11,14 +11,14 @@ dupRowInds(m)
 
 This function is an inverse function to such operations as
 \code{m[c(1:3, 1, 1, 2), ]}: the matrix with potentially duplicated rows is
-taken as input, and repeated indices of the first occurrence of each row
+taken as input, and indices of each row in \code{unique(m)}
 are returned.
 
 This function is faster -- at least in the examples tested so far -- than
 \code{match(data.frame(t(m)), data.frame(t(unique(m))))}.}
 }
 \value{
-A vector of row indices corresponding to the first ocurrence of a given row.
+A vector of row indices in \code{unique(m)}.
 }
 \description{
 Repeated indices of the first unique value

@@ -31,12 +31,12 @@ step.CR(
 for which a numerical approximation is needed.}
 
 \item{acc.order}{Order of accuracy: defines how the approximation error scales
-with the step size \eqn{h}{h}, specifically \eqn{O(h^{a+1})}{O(h^(a+1))}, where
+with the step size \eqn{h}{h}, specifically \eqn{O(h^a)}{O(h^a)}, where
 \eqn{a}{a} is the accuracy order and depends on the higher-order derivatives
 of the function.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
+\item{h0}{Numeric scalar: initial step size, defaulting to
+\code{stepx(x, deriv.order, acc.order)}.}
 
 \item{max.rel.error}{Error bound for the relative function-evaluation error
 (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
@@ -62,14 +62,13 @@ step sizes for declaring convergence.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to \code{FUN}.}
 }
@@ -77,14 +76,14 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
-\item \code{value} – the estimated numerical first derivative (using central differences;
+\item \code{value} – the estimated numerical derivative (using central differences;
 especially useful for computationally expensive functions).
-\item \code{counts} – the number of iterations (each iteration includes three function evaluations).
+\item \code{counts} – the number of recorded iterations.
 \item \code{abs.error} – an estimate of the truncation and rounding errors.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
 \item \code{0} – Optimal termination within tolerance.
-\item \code{1} – Third derivative is zero; large step size preferred.
+\item \code{1} – Estimated truncation error is near zero; a larger step size is preferred.
 \item \code{2} – No change in step size within tolerance.
 \item \code{3} – Solution lies at the boundary of the allowed value range.
 \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
@@ -101,16 +100,10 @@ Curtis--Reid automatic step selection
 \details{
 This function computes the optimal step size for central differences using the
 \insertCite{curtis1974choice}{pnd} algorithm.
-If the estimated third derivative is exactly zero, then, the initial step size
-is multiplied by 4 and returned.
+If the estimated truncation error is near zero, the search stops.
 
-If 4th-order accuracy is requested, then, two things happen. Firstly,
-since 4th-order-accurate differences requires a larger step size and the truncation error for
-the 2nd-order-accurate differences grows if the step size is larger than the optimal one,
-a higher ratio of truncation-to-rounding errors should be targeted. Secondly,
-a 4th-order-accurate numerical derivative is returned, but the truncation and rounding errors
-are still estimated for the 2nd-order-accurate differences. Therefore, the estimated truncation
-error is higher and the real truncation error of 4OA differences is lower.
+For the modified method, error estimates compare accuracy orders
+\code{acc.order} and \code{acc.order + 2}.
 
 TODO: mention that f must be one-dimensional
 

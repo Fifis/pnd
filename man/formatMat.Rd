@@ -2,24 +2,24 @@
 % Please edit documentation in R/helpers.R
 \name{formatMat}
 \alias{formatMat}
-\title{Round a matrix to N signifcant digits in mixed FP/exp notation}
+\title{Round a matrix to N significant digits in mixed FP/exp notation}
 \usage{
 formatMat(x, digits = 3, shave.spaces = TRUE)
 }
 \arguments{
 \item{x}{Numeric matrix.}
 
-\item{digits}{Positive integer: the number of digits after the decimal comma to round to
+\item{digits}{Positive integer: the number of digits after the decimal point in scientific notation
 (i.e. one less than the number of significant digits).}
 
 \item{shave.spaces}{Logical: if true, removes spaces to ensure compact output; if false, results
 in nearly fixed-width output (almost).}
 }
 \value{
-A numeric matrix with all entries of equal width with the same number of characters
+A character matrix of formatted entries.
 }
 \description{
-Round a matrix to N signifcant digits in mixed FP/exp notation
+Round a matrix to N significant digits in mixed FP/exp notation
 }
 \examples{
 x <- matrix(c(1234567, 12345.67, 123.4567,

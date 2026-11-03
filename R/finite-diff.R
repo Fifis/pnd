@@ -12,7 +12,7 @@
 #' which are known for their numerical instability. Unlike Gaussian elimination,
 #' which suffers from ill conditioning, this algorithm achieves numerical stability
 #' through exploiting the ordering of the stencil.
-#' An unsorted stencils will trigger a warning.
+#' An unsorted stencil will trigger a warning.
 #' Additionally, the stencil must contain unique points, as repeated values make
 #' the Vandermonde matrix confluent and therefore non-invertible.
 #'
@@ -31,7 +31,7 @@
 #'
 #' @examples
 #'
-#' # Approximate the 4th derivatives on a non-negative stencil
+#' # Approximate the 4th derivative on a non-negative stencil
 #' solveVandermonde(s = 0:5, b = c(0, 0, 0, 0, 24, 0))
 #'
 #' # Small numerical inaccuracies: note the 6.66e-15 in the 4th position --
@@ -65,36 +65,36 @@ solveVandermonde <- function(s, b) {
 #' For that stencil \eqn{\{b_i\}_{i=1}^n}{{b[i]}, i = 1, ..., n}, it computes
 #' the optimal weights \eqn{\{w_i\}}{{w[i]}} that yield
 #' the numerical approximation of the derivative:
-#' \deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ sum_i w[i] f(x + b[i]*h)}
+#' \deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ h^(-m) * sum_i w[i] f(x + b[i]*h)}
 #'
 #' @param deriv.order Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
 #'   for which a numerical approximation is needed.
 #' @param acc.order Order of accuracy: defines how the approximation error scales
-#'   with the step size \eqn{h}{h}, specifically \eqn{O(h^{a+1})}{O(h^(a+1))}, where
+#'   with the step size \eqn{h}{h}, specifically \eqn{O(h^a)}{O(h^a)}, where
 #'   \eqn{a}{a} is the accuracy order and depends on the higher-order derivatives
 #'   of the function.
 #' @param side Integer that determines the type of finite-difference scheme:
 #'   \code{0} for central (AKA symmetrical or two-sided; the default),
 #'   \code{1} for forward, and \code{-1} for backward.
 #'   Using \code{2} (for 'two-sided') triggers a warning and is treated as \code{0}.
-#'   with a warning. Unless the function is computationally prohibitively,
+#'   Unless the function is prohibitively expensive,
 #'   central differences are strongly recommended for their accuracy.
 #' @param stencil Optional custom vector of points for function evaluation.
 #'   Must include at least \code{m+1} points for the \code{m}-th order derivative.
 #' @param zero.action Character string specifying how to handle near-zero weights:
-#'   \code{"drop"} to omit small (less in absolute value than \code{zero.tol} times
-#'   the median weight) weights and corresponding stencil points, \code{"round"}
+#'   \code{"drop"} to omit small (less in absolute value than \code{zero.tol})
+#'   weights and corresponding stencil points, \code{"round"}
 #'   to round small weights to zero, and \code{"none"} to leave
 #'   all weights as calculated.
 #'   E.g. the stencil for \eqn{f'(x)}{f'(x)} is \code{(-1, 0, 1)} with weights
 #'   \code{(-0.5, 0, 0.5)}; using \code{"drop"} eliminates the zero weight,
 #'   and the redundant \code{f(x)} is not computed.
-#' @param zero.tol Non-negative scalar defining the threshold: weights below
-#'   \code{zero.tol} times the median weight are considered near-zero.
+#' @param zero.tol Non-negative scalar defining the threshold: weights smaller in absolute value than
+#'   \code{zero.tol} are considered near-zero.
 #'
 #' @details
-#' This function relies on the approach of approximating numerical derivarives
-#' by weghted sums of function values described in \insertCite{fornberg1988generation}{pnd}.
+#' This function relies on the approach of approximating numerical derivatives
+#' by weighted sums of function values described in \insertCite{fornberg1988generation}{pnd}.
 #' It reproduces all tables from this paper exactly; see the example below to
 #' create Table 1.
 #'
@@ -122,7 +122,7 @@ solveVandermonde <- function(s, b) {
 #' fdCoef(2) # Simple two-sided second derivative
 #' fdCoef(acc.order = 4)$weights * 12  # Should be (1, -8, 8, -1)
 #'
-#' # Using an custom stencil for the first derivative: x-2h and x+h
+#' # Using a custom stencil for the first derivative: x-2h and x+h
 #' fdCoef(stencil = c(-2, 1), acc.order = 1)
 #'
 #' # Reproducing Table 1 from Fornberg (1988) (cited above)

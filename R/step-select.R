@@ -1,7 +1,7 @@
 #' Default step size at given points
 #'
 #' Compute an appropriate finite-difference step size based on the magnitude of x,
-#' derivation order, and accuracy order. If the function and its higher derivatives
+#' derivative order, and accuracy order. If the function and its higher derivatives
 #' belong to the same order of magnitude, this step is near-optimal. For small x,
 #' returns a hard bound to prevent large machine-rounding errors.
 #'
@@ -49,17 +49,17 @@ stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = NULL) {
 #'
 #' @param x Numeric vector or scalar: the point at which the derivative is computed
 #'   and the optimal step size is estimated.
-#' @param FUN Function for which the optimal numerical derivative step size is needed.
-#' @param h0 Numeric vector or scalar: initial step size, defaulting to a relative step of
-#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#' @param FUN Scalar-valued function for which the optimal numerical derivative step size is needed.
+#' @param h0 Numeric vector or scalar: initial step size, defaulting to [stepx()]
+#'   (rescaled for \code{"M"} and \code{"K"}).
 #' @param method Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 #'   \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 #'   \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, \code{"M"} for
-#'   \insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, exerimental),
+#'   \insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, experimental),
 #'   and \code{"plugin"} for the single-step plug-in estimator.
 #' @param control A named list of tuning parameters for the method. If \code{NULL},
 #'   default values are used. See the documentation for the respective methods. Note that
-#'   full iteration history including all function evaluations is returned, but
+#'   iteration history including function evaluations is returned, but
 #'   different methods have slightly different diagnostic outputs.
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
@@ -68,24 +68,16 @@ stepx <- function(x, deriv.order = 1, acc.order = 2, zero.tol = NULL) {
 #' We recommend using the Stepleman--Winarsky algorithm because it does not suffer
 #' from over-estimation of the truncation error in the Curtis--Reid approach
 #' and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-#' approach. It really tries multiple step sizes and handles missing
-#' values due to bad evaluations for inadequate step sizes really in a robust manner.
+#' approach. It really tries multiple step sizes.
 #'
 #' @return A list similar to the one returned by \code{optim()} and made of
-#'   concatenated individual elements coordinate-wise lists: \code{par} -- the optimal
+#'   concatenated elements of coordinate-wise lists: \code{par} -- the optimal
 #'   step sizes found, \code{value} -- the estimated numerical gradient,
-#'   \code{counts} -- the number of iterations for each coordinate,
-#'   \code{abs.error} -- an estimate of the total approximation error
-#'   (sum of truncation and rounding errors),
-#'   \code{exitcode} -- an integer code indicating the termination status:
-#'   \code{0} indicates optimal termination within tolerance,
-#'   \code{1} means that the truncation error (CR method) or the third derivative
-#'   (DV method) is zero and large step size is preferred,
-#'   \code{2} is returned if there is no change in step size within tolerance,
-#'   \code{3} indicates a solution at the boundary of the allowed value range,
-#'   \code{4} signals that the maximum number of iterations was reached.
+#'   \code{counts} -- method-specific counts for each coordinate,
+#'   \code{abs.error} -- estimates of the truncation and rounding errors,
+#'   \code{exitcode} -- method-specific termination codes; see the respective methods.
 #'   \code{message} -- summary messages of the exit status.
-#'   \code{iterations} is a list of lists
+#'   \code{original} is a list of lists
 #'   including the full step size search path, argument grids, function values on
 #'   those grids, estimated error ratios, and estimated derivative values for
 #'   each coordinate.

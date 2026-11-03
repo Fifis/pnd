@@ -27,8 +27,8 @@ step.SW(
 \item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
 slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
 
-\item{shrink.factor}{A scalar less than 1 that is used to multiply the step size
-during the search. The authors recommend 0.25, but this may be result in earlier
+\item{shrink.factor}{A positive scalar less than 1 that is used to multiply the step size
+during the search. The authors recommend 0.25, but this may result in earlier
 termination at slightly sub-optimal steps. Change to 0.5 for a more thorough search.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
@@ -38,7 +38,7 @@ step sizes for declaring convergence.}
 
 \item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
 error of function evaluation. For highly accurate functions with all accurate bits
-is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
+it is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
 output of optimisation routines etc.), it is higher.}
 
 \item{maxit}{Maximum number of algorithm iterations to avoid infinite loops.
@@ -48,14 +48,13 @@ if this limit is reached.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }
@@ -64,7 +63,7 @@ A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
 \item \code{value} – the estimated numerical first derivative (using central differences).
-\item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+\item \code{counts} – the preliminary and main iteration counts.
 \item \code{abs.error} – an estimate of the truncation and rounding errors.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
@@ -106,7 +105,7 @@ f <- sin  # The derivative at pi/4 is sqrt(2)/2
 step.SW(x = pi/4, f)
 step.SW(x = pi/4, f, h0 = 1e-9) # Starting too low
 step.SW(x = pi/4, f, h0 = 0.1) # Starting slightly high
-# The following two example fail because the truncation error estimate is invalid
+# The following two examples fail because the truncation error estimate is invalid
 step.SW(x = pi/4, f, h0 = 10)   # Warning
 step.SW(x = pi/4, f, h0 = 1000) # Warning
 }

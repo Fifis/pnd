@@ -27,33 +27,33 @@ step.M(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
+\item{h0}{Numeric scalar: initial step size, defaulting to
+\code{2^round(log2(0.001 * max(abs(x), 1)))}.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
-\item{shrink.factor}{A scalar less than 1 that is used to create a sequence of
+\item{shrink.factor}{A positive scalar less than 1 that is used to create a sequence of
 step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
 number should be a negative power of 2 for the most accurate representation.}
 
 \item{min.valid.slopes}{Positive integer: how many points must form a sequence
-with the correct slope with relative difference from 2 less than \code{seq.tol}.
+with the correct slope with relative difference from \code{acc.order} less than \code{seq.tol}.
 If \code{shrink.factor} is small (< 0.33), consider reducing this to 4.}
 
-\item{seq.tol}{Numeric scalar: maximum relative difference between old and new
-step sizes for declaring convergence.}
+\item{seq.tol}{Numeric scalar: maximum relative deviation of truncation-error
+slopes from \code{acc.order}.}
 
-\item{correction}{Logical: if \code{TRUE}, returns the corrected step size (last
+\item{correction}{Logical: if \code{TRUE}, returns the corrected step size (first
 point in the sequence times a less-than-1 number to account for the possible
 continuation of the downwards slope of the total error); otherwise, returns
-the grid point that is is lowest in the increasing sequence of valid error
+the grid point that is lowest in the increasing sequence of valid error
 estimates.}
 
 \item{max.rel.error}{Error bound for the relative function-evaluation error
@@ -65,14 +65,13 @@ If the function has full precision to the last bit, set to \code{.Machine$double
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }
@@ -81,7 +80,7 @@ A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
 \item \code{value} – the estimated numerical first derivative (using central differences).
-\item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+\item \code{counts} – the number of grid points (each point includes two function evaluations).
 \item \code{abs.error} – an estimate of the truncation and rounding errors.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
@@ -103,11 +102,11 @@ Mathur's AutoDX-like automatic step selection
 This function computes the optimal step size for central differences using the
 \insertCite{mathur2012analytical}{pnd} algorithm. It consists of the following steps.
 \enumerate{
-\item Choose a reasonable large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
+\item Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
 \item Compute a series of truncation error estimates via third derivatives or Richardson extrapolation.
-\item Find the leftmost range of consecituve step sizes for which the slope of the trunctation error
-it approximately equal (within 10\% tolerance) to the accuracy order and which is long enough
+\item Find the leftmost range of consecutive step sizes for which the slope of the truncation error
+is approximately equal (within 10\% tolerance) to the accuracy order and which is long enough
 (e.g. at least length 5).
 \item Use the leftmost point of this range as the uncorrected optimal step size, or correct it by shrinking
 it by a small amount given in the article.

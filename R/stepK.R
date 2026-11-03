@@ -12,11 +12,11 @@
 #' This function computes the optimal step size for central differences using the statistical
 #' kink-search approach.
 #' The optimal step size is determined as the minimiser of the total error, which for central
-#' differences is V-shaped with the left-branch slope equal to the negative derivation order
+#' differences is V-shaped with the left-branch slope equal to the negative derivative order
 #' and the right-branch slope equal to the accuracy order. For standard simple central
 #' differences, the slopes are -1 and 2, respectively. The algorithm uses the
-#' least-median-of-squares (LMS) penalty and searches for the optimal position of the check
-#' that fits the data the best on a bounded 2D rectangle using derivative-free (Nelder--Mead)
+#' mean pseudo-Huber penalty and searches for the optimal position of the check
+#' that fits the data the best using unconstrained BFGS
 #' optimisation.
 #' Unlike other algorithms, if the estimated third derivative is too small, the function shape
 #' will be different, and two checks are made for the existence of two branches.
@@ -30,7 +30,7 @@
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
 #'     \item \code{value} – the estimated numerical first derivative (using central differences).
-#'     \item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+#'     \item \code{counts} – the number of grid points (each point includes two function evaluations).
 #'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
 #'     \item \code{exitcode} – an integer code indicating the termination status:
 #'       \itemize{
@@ -59,9 +59,9 @@
 #' step.K(sin, pi/2)
 #' step.K(sin, pi/2, shrink.factor = 0.8)
 #'
-#' # Edge case 1: the truncation error is always zero and f(x0) = 0
+#' # Edge case 2: the truncation error is always zero and f(x0) = 0
 #' suppressWarnings(step.K(function(x) x^2, 0))
-#' # Edge case 2: the truncation error is always zero
+#' # Other edge cases
 #' step.K(function(x) x^2, 1)
 #' step.K(function(x) x^4, 0)
 #' step.K(function(x) x^4, 0.1)

@@ -5,7 +5,7 @@
 - FEATURE: add options for default accuracy (maybe 4?)
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
 - FEATURE: suggest parallelisation if `f(x)` takes more than 0.002 s
-- FEATURE: CR, DW, SW, M, K algorithm for arbitrary derivative and accuracy orders
+- FEATURE: CR, DV, SW, M, K algorithm for arbitrary derivative and accuracy orders
 - FEATURE: if any algorithm returns a step size larger than `|x| / max(stencil)`, throw a warning
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
 - FEATURE: Arbitrary mixed orders
@@ -60,7 +60,7 @@
 
 # pnd 0.0.10 (2025-04-02)
 - Fix: GitHub issue #2 -- `checkDimensions` could not handle character `h` passed for auto-selection
-- Fix: GitHub issue #1 -- function arguments in `...` did non propagate properly to `step...` functions
+- Fix: GitHub issue #1 -- function arguments in `...` did not propagate properly to `step...` functions
 
 # pnd 0.0.9 (2025-03-10)
 - Fix: fixed a regression with the default step size

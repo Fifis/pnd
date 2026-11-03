@@ -1,6 +1,9 @@
 #' Determine function dimensionality and vectorisation
 #'
 #' @inheritParams GenD
+#' @param h Numeric scalar used for test stencil construction;
+#'   \code{NULL} or character uses the median of [stepx()].
+#' @param cores Core-count request, validated but not forwarded to detection evaluations.
 #'
 #' @details
 #' The following combinations of parameters are allowed, suggesting specific input and
@@ -14,7 +17,7 @@
 #' | `multivalued`, `!vectorised`  | *(undefined)*            | `[mc]lapply` Jacobian |
 #'
 #' Some combinations are impossible: multi-valued functions cannot be element-wise,
-#' and single-valued vectorised functions must element-wise.
+#' and single-valued vectorised functions must be element-wise.
 #'
 #' In brief, testing the input and output length and vectorisation capabilities may result in five
 #' cases, unlike 3 in \code{numDeriv::grad()} that does not provide checks for Jacobians.
@@ -185,6 +188,8 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
 #' Create a grid of points for a gradient / Jacobian
 #'
 #' @inheritParams GenD
+#' @param h Numeric scalar or vector of already-selected absolute step sizes.
+#' @param elementwise,vectorised Logical flags from [checkDimensions()], not \code{NA}.
 #' @param stencils A list of outputs from [fdCoef()] for each coordinate of \code{x}.
 #'
 #' @returns A list with points for evaluation, summation weights for derivative computation, and
@@ -241,16 +246,16 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' allowing arbitrary accuracies, sides, and derivative orders for different coordinates.
 #'
 #' @param FUN A function returning a numeric scalar or a vector whose derivatives are to be
-#'   computed. If the function returns a vector, the output will be a Jacobian.
+#'   computed.
 #' @param x Numeric vector or scalar: the point(s) at which the derivative is estimated.
-#'   \code{FUN(x)} must be finite.
+#'   Function values must be finite.
 #' @param elementwise Logical: is the domain effectively 1D, i.e. is this a mapping
 #'   \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
 #'   \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
-#'   compares the output length ot the input length.
+#'   compares the output length to the input length.
 #' @param vectorised Logical: if \code{TRUE}, the function
 #'   is assumed to be vectorised: it will accept a vector of parameters and return
-#'   a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+#'   a vector of values of the same length. Use \code{FALSE} for
 #'   functions that take vector arguments and return outputs of arbitrary length (for
 #'   \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
 #'   checks the output length and assumes vectorisation if it matches the input length;
@@ -262,7 +267,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.
 #' @param acc.order Integer or vector of integers specifying the desired accuracy order
 #'   for each element of \code{x}.
-#'   The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
+#'   The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.
 #' @param stencil Optional custom vector of points for function evaluation.
 #'   Must include at least \code{m+1} points for the \code{m}-th order derivative.
 #' @param side Integer scalar or vector indicating the type of finite difference:
@@ -276,8 +281,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   guessed step size is relative or near-relative (\code{x} multiplied by the step),
 #'   unless an auto-selection procedure is requested; otherwise, it is absolute.
 #' @param f0 Optional numeric: if provided, used to determine the vectorisation type
-#'   to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.
-#' @param h0 Numeric scalar of vector: initial step size for automatic search with
+#'   to save time.
+#' @param h0 Numeric scalar or vector: initial step size for automatic search with
 #'   \code{gradstep()}.
 #' @param control A named list of tuning parameters passed to \code{gradstep()}.
 #' @inheritParams runParallel
@@ -286,7 +291,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @param method For compatibility with \code{numDeriv::grad()} only. Supported values:
 #'   \code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.
 #' @param method.args For compatibility with \code{numDeriv::grad()} only. Check
-#'   \code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.
+#'   \code{?numDeriv::grad} for a list of values. Recognised arguments result in a warning.
 #' @param ... Additional arguments passed to \code{FUN}. Important! Since R does partial
 #'   matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
 #'   to [GenD()], [Grad()], or [Jacobian()] will result in the interpretation \code{acc.order = 1}
@@ -306,12 +311,12 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' function values with limited precision. For two-sided differences, it is proportional
 #' to Mach.eps^(1/3). However, selecting the best step size typically requires knowledge
 #' of higher-order derivatives, which may not be readily available. Luckily,
-#' using \code{step = "SW"} invokes a reliable automatic data-driven step-size selection.
+#' using \code{h = "SW"} invokes a reliable automatic data-driven step-size selection.
 #' Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
-#' The step size  defaults to \code{1.5e-8} (the square root of machine epsilon)
-#' for \code{x} less than \code{1.5e-8},
-#' \code{(2.2e-16)^(1/(deriv.order + acc.order)) * x} for \code{x > 1}, and interpolates
-#' exponentially between these values for \code{1.5e-8 < x < 1}.
+#' With default \code{zero.tol}, the step size is \code{.Machine$double.eps^(1/(deriv.order + acc.order - 0.5))}
+#' for \code{abs(x) < zero.tol},
+#' \code{(2.2e-16)^(1/(deriv.order + acc.order)) * abs(x)} for \code{abs(x) > 1}, and interpolates
+#' exponentially between these values for \code{zero.tol <= abs(x) <= 1}.
 #'
 #' The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 #' and \code{f.upper} in \code{uniroot()}.
@@ -321,8 +326,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' fully preserves the names of \code{x} and \code{FUN(x)}.
 #'
 #' @return A vector or matrix containing the computed derivatives, structured according
-#'   to the dimensionality of \code{x} and \code{FUN}. If \code{FUN} is scalar-valued,
-#'   returns a gradient vector. If \code{FUN} is vector-valued, returns a Jacobian matrix.
+#'   to the dimensionality of \code{x} and \code{FUN}. If the function is classified as single-valued,
+#'   returns a gradient vector; otherwise, returns a Jacobian matrix.
 #'
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
@@ -345,7 +350,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW")
 #' print(attr(g2.auto, "step.search")$exitcode)  # Success
 #'
-#' # Case 3: vector input, vector argument of different length
+#' # Case 3: vector input, vector output of different length
 #' f3 <- function(x) c(sum(sin(x)), prod(cos(x)))
 #' x3 <- 1:3
 #' j3 <- GenD(f3, x3, multivalued = TRUE)
@@ -361,8 +366,8 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' finner <- function(x) sin(x*log(abs(x)+1))
 #' fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$value
 #' # The outer function is non-vectorised
-#' fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
-#' f0 <- sapply(x, fouter)
+#' fslow <- function(x) {Sys.sleep(0.01); sum(sapply(x, fouter))}
+#' f0 <- sum(sapply(x, fouter))
 #' system.time(GenD(fslow, x, side = 1, acc.order = 2, f0 = f0))
 #' # Now, with extra checks, it will be slower
 #' system.time(GenD(fslow, x, side = 1, acc.order = 2))
@@ -554,7 +559,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' @inheritParams GenD
 #'
 #' @details
-#' This function aims to be 100% compatible with the syntax of \code{numDeriv::Grad()},
+#' This function aims to be 100% compatible with the syntax of \code{numDeriv::grad()},
 #' but there might be differences in the step size because some choices made in
 #' \code{numDeriv} are not consistent with theory.
 #'
@@ -568,7 +573,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #'   a fixed step
 #'   \eqn{h := |d\cdot x| + \varepsilon (|x| < \mathrm{zero.tol})}{h := |d*x| + eps*(|x| < zero.tol)},
 #'   where \code{d = 1e-4} is the relative step size and \code{eps} becomes an extra
-#'   addition to the step size for the argument that are closer to zero than \code{zero.tol}.
+#'   addition to the step size for the arguments that are closer to zero than \code{zero.tol}.
 #' }
 #' We believe that the latter may lead to mistakes when the user believes that they can set
 #' the step size for near-zero arguments, whereas in reality, a combination of \code{d} and \code{eps}
@@ -593,24 +598,25 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' Here are the differences in the new compatible implementation.
 #' \describe{
 #'   \item{eps}{If \code{numDeriv} \code{method = "simple"}, then,
-#'   \code{ifelse(x!=0, abs(x), 1) * sqrt(.Machine$double.eps) * 2} is used because
+#'   \code{1e-5 * .Machine$double.eps^(1/3 - 1/4)} is used because
 #'   one-sided differences require a smaller step size to reduce the truncation error.
 #'   If \code{method = "Richardson"}, then, \code{eps = 1e-5}.}
 #'   \item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
 #'   step size for arguments above the zero tolerance and the baseline step size for
 #'   small arguments that gets incremented by \code{eps}.}
-#'   \item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
-#'   For two-sided differences, each extrapolation increases the accuracy order by 2.}
-#'   \item{v}{The reduction factor in Richardson extrapolations.}
+#'   \item{r}{Half the accuracy order for central differences, i.e. the number of
+#'   Richardson extrapolations that successively reduce the initial step size.}
+#'   \item{v}{Ignored (in the old implementation, used to be the reduction factor
+#'   in Richardson extrapolations).}
 #' }
 #'
 #' @details
-#' \code{Grad} does an initial check (if \code{f0 = FUN(x)} is not provided)
+#' \code{Grad} does an initial check
 #' and calls [GenD()] with a set of appropriate parameters (\code{multivalued = FALSE}
-#' if the check succeds). In case of parameter mismatch, throws and error.
+#' if the check succeeds). In case of parameter mismatch, throws an error.
 #'
-#' @return Numeric vector of the gradient. If \code{FUN} returns a vector,
-#' a warning is issued suggesting the use of [Jacobian()].
+#' @return Numeric vector of the gradient. If \code{FUN} is classified as multi-valued,
+#' an error is issued suggesting the use of [Jacobian()].
 #'
 #' @seealso [GenD()], [Jacobian()]
 #' @export
@@ -674,14 +680,14 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' This function supports both two-sided (central, symmetric) and
 #' one-sided (forward or backward) derivatives. It can utilise parallel processing
 #' to accelerate computation of gradients for slow functions or
-#' to attain higher accuracy faster. Currently, only Mac and Linux are supported
-#' \code{parallel::mclapply()}. Windows support with \code{parallel::parLapply()}
-#' is under development.
+#' to attain higher accuracy faster. Fork-based parallelism uses
+#' \code{parallel::mclapply()} on macOS and Linux; supplied clusters use
+#' \code{parallel::parLapply()} or \code{parallel::parLapplyLB()} on all platforms.
 #'
 #' @inheritParams GenD
 #'
 #' @return Matrix where each row corresponds to a function output and each column
-#' to an input coordinate. For scalar-valued functions, a warning is issued and
+#' to an input coordinate. For scalar-valued functions,
 #' the output is returned as a row matrix.
 #'
 #' @seealso [GenD()], [Grad()]

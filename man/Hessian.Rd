@@ -35,7 +35,7 @@ Hessian(
 \item{x}{Numeric vector or scalar: point at which the derivative is estimated.
 \code{FUN(x)} must return a finite value.}
 
-\item{digits}{Positive integer: the number of digits after the decimal comma to round to
+\item{digits}{Positive integer: the number of digits after the decimal point in scientific notation
 (i.e. one less than the number of significant digits).}
 
 \item{shave.spaces}{Logical: if true, removes spaces to ensure compact output; if false, results
@@ -48,7 +48,7 @@ in nearly fixed-width output (almost).}
 
 \item{end}{A character to put at the end of each line, usually \code{""} or \code{")"}.}
 
-\item{...}{Additional arguments passed to \code{FUN}.}
+\item{...}{Additional arguments passed to \code{FUN}, except compatibility controls \code{method} and \code{method.args}.}
 
 \item{FUN}{A function returning a numeric scalar.
 Vector-valued functions are not supported; use \code{\link[=Jacobian]{Jacobian()}} instead.
@@ -79,14 +79,13 @@ Currently ignored.}
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{func}{Deprecated; for \code{numDeriv::hessian()} compatibility only.}
 }
@@ -100,6 +99,8 @@ of its input coordinates. Arbitrary accuracies and sides for different coordinat
 of the argument vector are supported.
 }
 \details{
+Additional arguments to the print method (\code{...}) are ignored.
+
 The optimal step size for 2nd-order-accurate central-differences-based Hessians
 is of the order Mach.eps^(1/4)
 to balance the Taylor series truncation error with the rounding error.
@@ -116,7 +117,7 @@ grid, and with a single parallelisable evaluation of the function on that grid, 
 symmetrisation is necessary because the result is mathematically and computationally identical.
 In \code{pnd}, only the upper triangular matrix is computed, saving time and ensuring
 unambiguous results owing to the interchangeability of summation terms (ignoring the numerical
-error in summation as there is nothing that can be done apart from compensation summation, e.g.
+error in summation as there is nothing that can be done apart from compensated summation, e.g.
 via Kahan's algorithm).
 }
 \examples{

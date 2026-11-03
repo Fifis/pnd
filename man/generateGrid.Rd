@@ -8,27 +8,13 @@ generateGrid(x, h, stencils, elementwise, vectorised)
 }
 \arguments{
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite.}
+Function values must be finite.}
 
-\item{h}{Numeric or character specifying the step size(s) for the numerical
-difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
-\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
-described in \code{?GenD}.}
+\item{h}{Numeric scalar or vector of already-selected absolute step sizes.}
 
 \item{stencils}{A list of outputs from \code{\link[=fdCoef]{fdCoef()}} for each coordinate of \code{x}.}
 
-\item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
-\eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
-\eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
-compares the output length ot the input length.}
-
-\item{vectorised}{Logical: if \code{TRUE}, the function
-is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
-functions that take vector arguments and return outputs of arbitrary length (for
-\eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
-checks the output length and assumes vectorisation if it matches the input length;
-this check is necessary and potentially slow.}
+\item{elementwise, vectorised}{Logical flags from \code{\link[=checkDimensions]{checkDimensions()}}, not \code{NA}.}
 }
 \value{
 A list with points for evaluation, summation weights for derivative computation, and

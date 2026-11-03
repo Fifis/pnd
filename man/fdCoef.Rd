@@ -21,11 +21,11 @@ for which a numerical approximation is needed.}
 \code{0} for central (AKA symmetrical or two-sided; the default),
 \code{1} for forward, and \code{-1} for backward.
 Using \code{2} (for 'two-sided') triggers a warning and is treated as \code{0}.
-with a warning. Unless the function is computationally prohibitively,
+Unless the function is prohibitively expensive,
 central differences are strongly recommended for their accuracy.}
 
 \item{acc.order}{Order of accuracy: defines how the approximation error scales
-with the step size \eqn{h}{h}, specifically \eqn{O(h^{a+1})}{O(h^(a+1))}, where
+with the step size \eqn{h}{h}, specifically \eqn{O(h^a)}{O(h^a)}, where
 \eqn{a}{a} is the accuracy order and depends on the higher-order derivatives
 of the function.}
 
@@ -33,16 +33,16 @@ of the function.}
 Must include at least \code{m+1} points for the \code{m}-th order derivative.}
 
 \item{zero.action}{Character string specifying how to handle near-zero weights:
-\code{"drop"} to omit small (less in absolute value than \code{zero.tol} times
-the median weight) weights and corresponding stencil points, \code{"round"}
+\code{"drop"} to omit small (less in absolute value than \code{zero.tol})
+weights and corresponding stencil points, \code{"round"}
 to round small weights to zero, and \code{"none"} to leave
 all weights as calculated.
 E.g. the stencil for \eqn{f'(x)}{f'(x)} is \code{(-1, 0, 1)} with weights
 \code{(-0.5, 0, 0.5)}; using \code{"drop"} eliminates the zero weight,
 and the redundant \code{f(x)} is not computed.}
 
-\item{zero.tol}{Non-negative scalar defining the threshold: weights below
-\code{zero.tol} times the median weight are considered near-zero.}
+\item{zero.tol}{Non-negative scalar defining the threshold: weights smaller in absolute value than
+\code{zero.tol} are considered near-zero.}
 }
 \value{
 A list containing the \code{stencil} used and the corresponding
@@ -56,11 +56,11 @@ It can also use any user-supplied stencil (uniform or non-uniform).
 For that stencil \eqn{\{b_i\}_{i=1}^n}{{b[i]}, i = 1, ..., n}, it computes
 the optimal weights \eqn{\{w_i\}}{{w[i]}} that yield
 the numerical approximation of the derivative:
-\deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ sum_i w[i] f(x + b[i]*h)}
+\deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ h^(-m) * sum_i w[i] f(x + b[i]*h)}
 }
 \details{
-This function relies on the approach of approximating numerical derivarives
-by weghted sums of function values described in \insertCite{fornberg1988generation}{pnd}.
+This function relies on the approach of approximating numerical derivatives
+by weighted sums of function values described in \insertCite{fornberg1988generation}{pnd}.
 It reproduces all tables from this paper exactly; see the example below to
 create Table 1.
 
@@ -81,7 +81,7 @@ fdCoef()  # Simple two-sided derivative
 fdCoef(2) # Simple two-sided second derivative
 fdCoef(acc.order = 4)$weights * 12  # Should be (1, -8, 8, -1)
 
-# Using an custom stencil for the first derivative: x-2h and x+h
+# Using a custom stencil for the first derivative: x-2h and x+h
 fdCoef(stencil = c(-2, 1), acc.order = 1)
 
 # Reproducing Table 1 from Fornberg (1988) (cited above)

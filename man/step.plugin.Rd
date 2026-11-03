@@ -28,7 +28,7 @@ The third derivative is estimated using larger spacing
 
 \item{max.rel.error}{Positive numeric scalar > 0 indicating the maximum relative
 error of function evaluation. For highly accurate functions with all accurate bits
-is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+it is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
 output of optimisation routines etc.), it is higher, typically
 \code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
 \code{.Machine$double.eps^(3/4) = 2e-12} for common functions.}
@@ -38,14 +38,13 @@ output of optimisation routines etc.), it is higher, typically
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }

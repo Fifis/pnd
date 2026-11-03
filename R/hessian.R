@@ -1,15 +1,18 @@
 #' Generate grid points for Hessians
 #'
-#' Creates a list of unique evaluation points for second derivatives: both
+#' Creates a list of evaluation points for second derivatives: both
 #' diagonal (\eqn{\partial^2 / \partial x_i^2}{d^2 / dx^2}) and cross
 #' (\eqn{\partial^2 / \partial x_i \partial x_j}{d^2 / dx_i dx_j}).
 #'
 #' @inheritParams GenD
+#' @param h Numeric vector of absolute step sizes, of length \code{length(x)}.
+#' @param side Integer vector of difference directions, of length \code{length(x)}.
+#' @param acc.order Integer vector of accuracy orders, of length \code{length(x)}.
 #'
 #' @return A list with elements:
 #' \itemize{
-#'   \item \code{xlist}: a list of unique coordinate shifts,
-#'   \item \code{w}: the finite-difference weights (one per point),
+#'   \item \code{xlist}: a list of evaluation points,
+#'   \item \code{weights}: the finite-difference weights (one per point),
 #'   \item \code{i1}, \code{i2}: integer vectors giving partial-derivative indices.
 #' }
 #' The length of each vector matches \code{xlist}.
@@ -126,7 +129,7 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #' @param control Reserved for automatic step-size selection controls. Currently ignored.
 #' @inheritParams runParallel
 #' @param func Deprecated; for \code{numDeriv::hessian()} compatibility only.
-#' @param ... Additional arguments passed to \code{FUN}.
+#' @param ... Additional arguments passed to \code{FUN}, except compatibility controls \code{method} and \code{method.args}.
 #'
 #' @details
 #'
@@ -147,7 +150,7 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #' symmetrisation is necessary because the result is mathematically and computationally identical.
 #' In \code{pnd}, only the upper triangular matrix is computed, saving time and ensuring
 #' unambiguous results owing to the interchangeability of summation terms (ignoring the numerical
-#' error in summation as there is nothing that can be done apart from compensation summation, e.g.
+#' error in summation as there is nothing that can be done apart from compensated summation, e.g.
 #' via Kahan's algorithm).
 #'
 #' @return A matrix with as many rows and columns as \code{length(x)}. Unlike the output of

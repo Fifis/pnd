@@ -28,13 +28,13 @@ checkDimensions(
 }
 \arguments{
 \item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be
-computed. If the function returns a vector, the output will be a Jacobian.}
+computed.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite.}
+Function values must be finite.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
-to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.}
+to save time.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -42,11 +42,11 @@ to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one e
 \item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
 \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
-compares the output length ot the input length.}
+compares the output length to the input length.}
 
 \item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+a vector of values of the same length. Use \code{FALSE} for
 functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
 checks the output length and assumes vectorisation if it matches the input length;
@@ -61,34 +61,34 @@ the function output.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{side}{Integer scalar or vector indicating the type of finite difference:
 \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
 Central differences are recommended unless computational cost is prohibitive.}
 
-\item{h}{Numeric or character specifying the step size(s) for the numerical
-difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},
-\code{"DV"}, or \code{"SW"} to be used in \code{\link[=gradstep]{gradstep()}}). The default value is
-described in \code{?GenD}.}
+\item{h}{Numeric scalar used for test stencil construction;
+\code{NULL} or character uses the median of \code{\link[=stepx]{stepx()}}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
 guessed step size is relative or near-relative (\code{x} multiplied by the step),
 unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
-\item{cores}{Integer specifying the number of CPU cores used for parallel computation.
-Recommended to be set to the number of physical cores on the machine minus one.}
+\item{cores}{Core-count request, validated but not forwarded to detection evaluations.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
-\item{...}{Ignored.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 }
 \value{
 A named logical vector indicating if a function is element-wise or not,
@@ -109,7 +109,7 @@ output handling by other functions:\tabular{lll}{
 
 
 Some combinations are impossible: multi-valued functions cannot be element-wise,
-and single-valued vectorised functions must element-wise.
+and single-valued vectorised functions must be element-wise.
 
 In brief, testing the input and output length and vectorisation capabilities may result in five
 cases, unlike 3 in \code{numDeriv::grad()} that does not provide checks for Jacobians.

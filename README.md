@@ -11,7 +11,7 @@ An R package for computing fast and accurate numerical derivatives.
 <img src="https://kostyrka.lu/user/pages/50.programming/05.pnd.package/parallel-numerical-derivatives-R-package.png" alt="Parallel numerical derivatives in R" width="640"/>
 
 In the past, I was using [numDeriv](https://CRAN.R-project.org/package=numDeriv) to compute numerical gradients.
-However, the results were not stable for some function, and I could not investigate the source of this instability.
+However, the results were not stable for some functions, and I could not investigate the source of this instability.
 Different step sizes yielded different results. Small step sizes were sometimes better, sometimes worse.
 
 The `pnd` package was designed to offer a comprehensive tool-kit containing popular algorithms for finite differences, numerical gradients, Jacobians, and Hessians.
@@ -24,7 +24,7 @@ Optimal step sizes and parallel evaluation of numerical derivatives translate di
 - **Gradient and Hessian calculations:** obtain the direction and curvature required by most quasi-Newton optimisation algorithms.
 - **Parallel capabilities:** evaluate multiple values under the best parallelisation scheme that reduces overhead. For example, on a 12-core machine, a 4th-order accurate Jacobian of a 3-dimensional function takes almost the same amount of time as one function evaluation.
 - **Optimal step size selection:** obtain adaptive step size to ensure the best trade-off between mathematical truncation error and computer floating-point rounding error for the best overall accuracy.
-- **Six optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2025) modification, Dumontet–Vignes (1977), Stepleman–Winarsky (1979), Mathur (2012), and Kostyrka (2025) algorithms. Future versions will feature parallelised algorithms.
+- **Six optimal step selection algorithms:** choose between Curtis–Reid (1974) and its modern (2025) modification, Dumontet–Vignes (1977), Stepleman–Winarsky (1979), Mathur (2012), and Kostyrka (2025) algorithms.
 
 ## Getting started
 
@@ -72,8 +72,8 @@ pnd::Grad(f, x, h = "SW")
 #> (SW step size: 5.0e-06, 1.0e-05, 7.5e-06, 1.0e-05).
 ```
 
-Extensive diagnostics requested at any time: the step-search tracing information is saved in the `attr(pnd::Grad(...), "step.search")` attribute that has an `$iterations` element.
-The numerical gradients and Jacobian are simple numeric vectors and matrices with attributes that facilitate printing -- feel free to handle them as any other numeric object.
+Extensive diagnostics can be requested at any time: the step-search tracing information is saved in the `attr(pnd::Grad(...), "step.search")` attribute with histories in `$original[[i]]$iterations`.
+The numerical gradients and Jacobians are simple numeric vectors and matrices with attributes that facilitate printing -- feel free to handle them as any other numeric object.
 
 ## Learning resources
 
@@ -86,7 +86,7 @@ The numerical gradients and Jacobian are simple numeric vectors and matrices wit
 This package is supported by 3 vignettes:
 
 * Kostyrka, A. V. Fast and accurate parallel numerical derivatives in R. *In progress.*
-* Kostyrka, A. V. Compatilibility of pnd with the syntax of numDeriv. *In progress.*
+* Kostyrka, A. V. Compatibility of pnd with the syntax of numDeriv. *In progress.*
 * Kostyrka, A. V. Step-size-selection algorithm benchmark. *In progress.*
 
 The following articles provide the theory behind the methods implemented in this package:

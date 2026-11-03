@@ -45,8 +45,8 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @inheritParams fdCoef
-#' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
-#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#' @param h0 Numeric scalar: initial step size, defaulting to
+#'   \code{stepx(x, deriv.order, acc.order)}.
 #' @param max.rel.error Error bound for the relative function-evaluation error
 #'   (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
 #'   If the function is relying on numerical optimisation routines, consider setting to
@@ -68,30 +68,24 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
 #' @details
 #' This function computes the optimal step size for central differences using the
 #' \insertCite{curtis1974choice}{pnd} algorithm.
-#' If the estimated third derivative is exactly zero, then, the initial step size
-#' is multiplied by 4 and returned.
+#' If the estimated truncation error is near zero, the search stops.
 #'
-#' If 4th-order accuracy is requested, then, two things happen. Firstly,
-#' since 4th-order-accurate differences requires a larger step size and the truncation error for
-#' the 2nd-order-accurate differences grows if the step size is larger than the optimal one,
-#' a higher ratio of truncation-to-rounding errors should be targeted. Secondly,
-#' a 4th-order-accurate numerical derivative is returned, but the truncation and rounding errors
-#' are still estimated for the 2nd-order-accurate differences. Therefore, the estimated truncation
-#' error is higher and the real truncation error of 4OA differences is lower.
+#' For the modified method, error estimates compare accuracy orders
+#' \code{acc.order} and \code{acc.order + 2}.
 #'
 #' TODO: mention that f must be one-dimensional
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
-#'     \item \code{value} – the estimated numerical first derivative (using central differences;
+#'     \item \code{value} – the estimated numerical derivative (using central differences;
 #'       especially useful for computationally expensive functions).
-#'     \item \code{counts} – the number of iterations (each iteration includes three function evaluations).
+#'     \item \code{counts} – the number of recorded iterations.
 #'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
 #'     \item \code{exitcode} – an integer code indicating the termination status:
 #'       \itemize{
 #'         \item \code{0} – Optimal termination within tolerance.
-#'         \item \code{1} – Third derivative is zero; large step size preferred.
+#'         \item \code{1} – Estimated truncation error is near zero; a larger step size is preferred.
 #'         \item \code{2} – No change in step size within tolerance.
 #'         \item \code{3} – Solution lies at the boundary of the allowed value range.
 #'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.

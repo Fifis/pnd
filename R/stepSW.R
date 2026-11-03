@@ -41,15 +41,15 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
 #'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
-#' @param shrink.factor A scalar less than 1 that is used to multiply the step size
-#'   during the search. The authors recommend 0.25, but this may be result in earlier
+#' @param shrink.factor A positive scalar less than 1 that is used to multiply the step size
+#'   during the search. The authors recommend 0.25, but this may result in earlier
 #'   termination at slightly sub-optimal steps. Change to 0.5 for a more thorough search.
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
 #' @param seq.tol Numeric scalar: maximum relative difference between old and new
 #'   step sizes for declaring convergence.
 #' @param max.rel.error Positive numeric scalar > 0 indicating the maximum relative
 #'   error of function evaluation. For highly accurate functions with all accurate bits
-#'   is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
+#'   it is equal to half of machine epsilon. For noisy functions (derivatives, integrals,
 #'   output of optimisation routines etc.), it is higher.
 #' @param maxit Maximum number of algorithm iterations to avoid infinite loops.
 #'   Consider trying some smaller or larger initial step size \code{h0}
@@ -72,7 +72,7 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
 #'     \item \code{value} – the estimated numerical first derivative (using central differences).
-#'     \item \code{counts} – the number of iterations (each iteration includes four function evaluations).
+#'     \item \code{counts} – the preliminary and main iteration counts.
 #'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
 #'     \item \code{exitcode} – an integer code indicating the termination status:
 #'       \itemize{
@@ -104,7 +104,7 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
 #' step.SW(x = pi/4, f)
 #' step.SW(x = pi/4, f, h0 = 1e-9) # Starting too low
 #' step.SW(x = pi/4, f, h0 = 0.1) # Starting slightly high
-#' # The following two example fail because the truncation error estimate is invalid
+#' # The following two examples fail because the truncation error estimate is invalid
 #' step.SW(x = pi/4, f, h0 = 10)   # Warning
 #' step.SW(x = pi/4, f, h0 = 1000) # Warning
 step.SW <- function(FUN, x, h0 = 1e-5 * (abs(x) + (x == 0)),

@@ -38,7 +38,7 @@ splitRuns <- function(x) {
 #' @param print If \code{TRUE}, outputs the lines of the matrix rows into the console.
 #' @param format If \code{FALSE}, skips the formatting part.
 #'
-#' @returns The same \code{x} that was passed as the first input.
+#' @returns An invisible character vector of formatted rows.
 #' @export
 #'
 #' @examples
@@ -59,15 +59,15 @@ printMat <- function(x, digits = 3, shave.spaces = TRUE,
   return(invisible(unname(unlist(x))))
 }
 
-#' Round a matrix to N signifcant digits in mixed FP/exp notation
+#' Round a matrix to N significant digits in mixed FP/exp notation
 #'
 #' @param x Numeric matrix.
-#' @param digits Positive integer: the number of digits after the decimal comma to round to
+#' @param digits Positive integer: the number of digits after the decimal point in scientific notation
 #'   (i.e. one less than the number of significant digits).
 #' @param shave.spaces Logical: if true, removes spaces to ensure compact output; if false, results
 #'   in nearly fixed-width output (almost).
 #'
-#' @returns A numeric matrix with all entries of equal width with the same number of characters
+#' @returns A character matrix of formatted entries.
 #' @export
 #'
 #' @examples
@@ -152,8 +152,8 @@ formatMat <- function(x, digits = 3, shave.spaces = TRUE) {
 #' Align printed output to the longest argument
 #'
 #' @param x A numeric vector or matrix to be aligned with a vector of column names.
-#' @param names Optional: if x does not have (column) names, a character vector of element
-#'   or column names to be output first. Ignored if \code{x} is named.
+#' @param names Optional: a character vector of element
+#'   or column names to be output first. Overrides existing names.
 #'   Numeric inputs are converted to character automatically.
 #' @param pad A single character: \code{"l"} for left padding (flush-right justification),
 #'   \code{"c"} for centre, and \code{"r"} for right padding (flush-left justification).
@@ -231,18 +231,17 @@ checkCores <- function(cores = NULL) {
 #' Run a function in parallel over a list (internal use only)
 #'
 #' @param FUN A function of only one argument. If there are more arguments, use
-#'   the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.
+#'   a wrapper such as \code{FUN2 <- function(x) FUN(x, a = 1)} and call it.
 #' @param x A list to parallelise the evaluation of \code{FUN} over: either numbers
 #'   or expressions.
-#' @param preschedule Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-#'   or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+#' @param preschedule Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+#'   or disables load balancing with \code{parLapply()}. Recommended for functions that
 #'   take less than 0.1 s per evaluation.
 #' @param cores Integer specifying the number of CPU cores used for parallel computation.
 #'   Recommended to be set to the number of physical cores on the machine minus one.
 #' @param cl An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 #'   or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-#'   is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-#'   (fork cluster) on everything else.
+#'   is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.
 #'
 #'
 #' @returns The value that `lapply(x, FUN)` would have returned.
@@ -297,13 +296,13 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
 #'
 #' This function is an inverse function to such operations as
 #' \code{m[c(1:3, 1, 1, 2), ]}: the matrix with potentially duplicated rows is
-#' taken as input, and repeated indices of the first occurrence of each row
+#' taken as input, and indices of each row in \code{unique(m)}
 #' are returned.
 #'
 #' This function is faster -- at least in the examples tested so far -- than
 #' `match(data.frame(t(m)), data.frame(t(unique(m))))`.
 #'
-#' @returns A vector of row indices corresponding to the first ocurrence of a given row.
+#' @returns A vector of row indices in \code{unique(m)}.
 #' @export
 #'
 #' @examples

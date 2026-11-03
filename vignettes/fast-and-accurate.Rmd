@@ -52,12 +52,12 @@ This vignette showcases the core functionality of the `pnd` package.
 
 Despite the proliferation of parallelism-supporting R packages (e.g. `psqn`, `DEoptim`, `hydroPSO`), few implementations address gradient-related numerical optimisation issues.
 The `optimParallel` package by @optimParallel offers an internally parallelised L-BFGS-B method for the `optim()` optimiser.^[The problem with the L-BFGS-B method in R is its reliance on finite function values; the BFGS method admits infinite function values during the linear improvement search, but its limited-memory counterpart with box constraints throws an error upon encountering \texttt{NaN}, \texttt{NA}, or $\pm$\texttt{Inf}. This limits the scope of the `optimParallel` solution to a narrow family of well-behaved functions or functions modified by the user to replace non-finite values with an arbitrary large number.]
-As of May 2023, it does not support algorithms other than L-BFGS-B, which is problematic given the abundance of quasi-Newton solvers (`nlm`, `nlmimb`, `nloptr::nloptr`, `Rsolnp::solnp`, `BB::spg`, `maxLik::maxBHHH`), all of which would benefit from parallelised gradients or Hessians.
+As of May 2023, it does not support algorithms other than L-BFGS-B, which is problematic given the abundance of quasi-Newton solvers (`nlm`, `nlminb`, `nloptr::nloptr`, `Rsolnp::solnp`, `BB::spg`, `maxLik::maxBHHH`), all of which would benefit from parallelised gradients or Hessians.
 
 To the best of our knowledge, no R packages currently address the problem of step size in finite-difference derivative approximation comprehensively.
 The `numDeriv` package offers facilities for controlling the accuracy order, step size, and other tuning parameters, but does not output diagnostic information.
 Users must manually request the diagnostic print-out themselves, which works for gradients but not Hessians.^[`numDeriv:::grad.default()` prints out the Richardson extrapolation steps for first derivatives, but not cross-derivatives, which rely on `numDeriv:::genD.default()` instead.]
-The `pnd` package tackles this problem by offering three explicit data-driven step-search routines with detailed diagnostic information.
+The `pnd` package tackles this problem by offering several explicit data-driven step-search routines with detailed diagnostic information.
 
 `numDeriv` and `pnd` differ fundamentally in attaining higher-order accuracy.
 `numDeriv` allows users to set the initial step size and request a certain number of Richardson improvement iterations to mitigate the truncation error, which run sequentially.
@@ -74,7 +74,7 @@ For the remainder of the paper, we shall use the following abbreviations and not
 * $x^{(n)}$ denotes the $n$^th^ coordinate of $x$, where $n$ is an Arabic numeral.
 * $\hat f(x)$ or $[f(x)]$ denotes the finite-precision machine version of $f$ evaluated at $x$. Brackets are better for denoting the compounded error in expressions with chained operations.
 * $\varepsilon_{f}$ denotes the machine-rounding error between the true value and its FP representation: $\varepsilon_{f} := f - \hat f$.
-* $\epsilon_{\mathrm{m}}$ denotes the machine epsilon, i.e.\ the smallest positive FP number $a$ such that $[1+a] \ne 1$. Equals on modern 64-bit machines to $2^{-52} \approx 2.22\cdot 10^{-16}$ if the IEEE double-precision FP standard is used.^[Other works (e.g. @goldberg1991what) give a different definition of the machine epsilon -- the relative error bound. In our notation, any real number is rounded to the closest FP number with relative error less that $\epsilon_{\mathrm{m}}/2$.]
+* $\epsilon_{\mathrm{m}}$ denotes the machine epsilon, i.e.\ the smallest positive FP number $a$ such that $[1+a] \ne 1$. Equals on modern 64-bit machines to $2^{-52} \approx 2.22\cdot 10^{-16}$ if the IEEE double-precision FP standard is used.^[Other works (e.g. @goldberg1991what) give a different definition of the machine epsilon -- the relative error bound. In our notation, any real number is rounded to the closest FP number with relative error less than $\epsilon_{\mathrm{m}}/2$.]
 
 This vignette demonstrates the capabilities of the `pnd` package, thus users should attach it before executing the code in subsequent sections:
 ```{r setup}
@@ -93,14 +93,14 @@ f'(x) := \lim_{h\to0} \frac{f(x + h) - f(x)}{h}.
 
 The usual caveat applies: $f(x)$ must be differentiable at $x$, i.e.\ the limit must exist.
 
-In many applications where analytical derivatives $f$ are cumbersome or impossible to compute but the value of $f'(x)$ is needed, one intuitive approach is to remove the limit in the definition of the derivative and considering the finite difference
+In many applications where analytical derivatives of $f$ are cumbersome or impossible to compute but the value of $f'(x)$ is needed, one intuitive approach is to remove the limit in the definition of the derivative and consider the finite difference
 \[
 f_{\mathrm{FD}_1}' (x, h) := \frac{f(x + h) - f(x)}{h}.
 \]
 This is the first-order-accurate forward-difference approximation of $f$.
 
 One could *hypothetically* choose a sequence of decreasing step sizes $h_i$ (e.g. $\{0.1, 0.01, 0.001, \ldots\}$), and observe that the sequence $f'_{\mathrm{FD}} (x, 0.1),  f'_{\mathrm{FD}} (x, 0.01),  f'_{\mathrm{FD}} (x, 0.001), \ldots$ approaches a certain number as $h\to 0$.
-In practice, however, computing this sequence on a computer can lead to erratic behavior for very small $h$.
+In practice, however, computing this sequence on a computer can lead to erratic behaviour for very small $h$.
 This instability arises from the discrepancy between the true $f'_{\mathrm{FD}}$ and its machine evaluation, $\hat f'_{\mathrm{FD}}$.
 The nature of this discrepancy is investigated in what follows.
 
@@ -128,7 +128,7 @@ The **truncation error** is the difference between the true function and the fir
 \[
 \varepsilon_{\mathrm{t}}(h) := f'(x) - f'_{\mathrm{FD}_1}(x, h)
 \]
-In forward differences, the dominant term in the truncation error is $\frac{f''(x)}{2} h^1$ -- the first power of~$h$ multiplied by a constant, hence the term **first-order accuracy**; since $h\to0$, we ignore the Lagrange remainder $O(h^2)$.^[Some confusion may stem from the fact that the derivative order in the error term is 2, $f''(x)$; the accuracy order relates to the step size power, not the derivative order in the Taylor expansion.]
+In forward differences, the dominant term in the truncation error is $-\frac{f''(x)}{2} h^1$ -- the first power of~$h$ multiplied by a constant, hence the term **first-order accuracy**; since $h\to0$, we ignore the Lagrange remainder $O(h^2)$.^[Some confusion may stem from the fact that the derivative order in the error term is 2, $f''(x)$; the accuracy order relates to the step size power, not the derivative order in the Taylor expansion.]
 We reserve the letter $a$ for the accuracy order -- requested by the user and achievable by carrying out multiple function evaluations -- and the letter $m$ for the derivative order.
 
 Central differences are second-order-accurate owing to the cancellation of even-power terms in the Taylor expansion:
@@ -137,7 +137,7 @@ f(x+h) - f(x-h) = (f(x) - f(x)) + (h - (-h)) f'(x)+ (h^2/2 - h^2/2) f''(x)  \\
 + \frac{h^3}{6} f'''(x+\alpha_1 h) + \frac{h^3}{6}  f'''(x - \alpha_2 h)
 \]
 where $\alpha_1, \alpha_2 \in [0, 1]$.
-To simplify this expression, we use the Generalsed Intermediate Value Theorem (GIVT).
+To simplify this expression, we use the Generalised Intermediate Value Theorem (GIVT).
 
 By the generalised intermediate value theorem,
 \[
@@ -204,10 +204,10 @@ provided that $B$ is invertible -- implying that the elements of the stencil mus
 Another condition follows from the definition of $\vec m$: for the element $m!$ to be placed in the position $m+1$, the stencil length must be at least $m+1$ (one more than the derivative order).
 
 The optimal weights $\vec w$ do not depend on $h$ because the weighted sum in Eq.~\eqref{eq:wsum} is already normalised by factor $h^{-m}$.
-The weights for stencils $(-2, -1, 1, 2)$ and $(-10, -5, 5, 10)$ are therefore identical.
+The weights for stencils $(-2, -1, 1, 2)$ and $(-10, -5, 5, 10)$ differ by a factor of $5^{-m}$.
 
 The idea is to find such coefficients $\{w_i\}_{i=1}^n$ that the derivatives of order less than $m$ cancel out and the coefficients on the $m$^th^ derivative add up to unity.
-Our implementation uses the @bjorck1970solution algorithm to avoid inverting the matrix the numerically ill-conditioned Vandermonde matrix $B$.
+Our implementation uses the @bjorck1970solution algorithm to avoid inverting the numerically ill-conditioned Vandermonde matrix $B$.
 Using numerical routines relying on matrix inversion (such as LAPACK) invokable through `base::solve()` is not recommended due to the rapid deterioration of the solution accuracy.
 See Appendix A in @kostyrka2025what for an investigation of this numerical instability.
 
@@ -216,12 +216,12 @@ By default, `fdCoef()` assumes central differences for second-order-accurate fir
 * `fdCoef()` without any arguments returns a list with stencil $(-1, 1)$ and weights $(-0.5, 0.5)$, translating to the approximation $f'_{\mathrm{CD_2}}(x, h) = (-0.5 f(x-h) + 0.5 f(x+h))/h$.
 * Requesting higher-order accuracy via `fdCoef(acc.order = 4)` yields a larger stencil for the default derivative order ($m=1$) via central differences because more evaluations are needed to make $a-1$ terms cancel out.
 * Requesting higher-order derivatives via `fdCoef(deriv.order = 3)` yields the minimally sufficient stencil for second-order accuracy ($a=2$) via central differences.
-* Requesting forward differences yields a stencil starting at zero: `fdCoef(deriv.order = 2, side = "forward")` yields the minimally sufficient non-negative stencil for $m=2$, $a=2$.
+* Requesting forward differences yields a stencil starting at zero: `fdCoef(deriv.order = 2, side = 1)` yields the minimally sufficient non-negative stencil for $m=2$, $a=2$.
 * The user may request a custom stencil: `fdCoef(deriv.order = 3, stencil = c(-3, -1, 1, 3))` calculates the weights for second-order-accurate $f'''_\Delta (x)$ obtained by evaluating $f$ at $x+(-3, -1, 1, 3)\cdot h$.
 
 
 Central differences (or, more generally, stencils with both positive and negative points) yield *higher accuracy* for the same number of evaluations or require *fewer evaluations* to attain the desired accuracy order.
-Computing fourth-order-accurate second derivatives (e.g. for a very accurate Hessian diagonal) can be done on stencils $\{0, \pm 1, \pm 2\}$ (5 evaluations) or $\{0, 1, \ldots, 6\}$ (7 evaluations).
+Computing fourth-order-accurate second derivatives (e.g. for a very accurate Hessian diagonal) can be done on stencils $\{0, \pm 1, \pm 2\}$ (5 evaluations) or $\{0, 1, \ldots, 5\}$ (6 evaluations).
 The practical reason to prefer forward differences can be the extreme computation time of $f$; if $f(x)$ has been pre-computed, evaluating $(f(x+h) - f(x))/h$ is faster than $0.5 (f(x+h) - f(x-h))/h$.
 If $f(x)$ has not yet been computed, both $f_{\mathrm{FD}_1}$ and $f_{\mathrm{CD}_2}$ require 2 evaluations, so  the latter is preferable for accuracy reasons.
 
@@ -237,7 +237,7 @@ Without a gradient function, a gradient-based optimisation method might attempt 
 
 After the optimiser converges (hopefully with zero exit code) to a certain optimal value of the argument (usually called the *estimate*), many implementations of statistical methods calculate a measure of uncertainty in the estimate due to the data randomness through the objective function curvature.
 This measurement often involves the Hessian matrix, which also needs to be computed or at least approximated.
-For example, if the parameter vector $\theta$ is estimated via maximum likelihood, assuming that the model specification is correct and the conditional density of the model error is fully known up $\theta$, the asymptotic variance-covariance of the estimator is often computed as the inverse of the observed Fisher information at the optimum -- the negative Hessian of the log-likelihood function.
+For example, if the parameter vector $\theta$ is estimated via maximum likelihood, assuming that the model specification is correct and the conditional density of the model error is fully known up to $\theta$, the asymptotic variance-covariance of the estimator is often computed as the inverse of the observed Fisher information at the optimum -- the negative Hessian of the log-likelihood function.
 The accuracy of Hessian calculation depends on the step size, and the step size that minimises the numerical gradient error is unlikely to minimise the numerical Hessian error.
 Arguably, accurate Hessians are more important for applied researchers than accurate gradients because it is the inverse of the Hessian matrix that is used for inferential calculations.
 Matrix inversion, being a numerically unstable operation, propagates and magnifies any inaccuracies in the computed Hessian, often by several orders of magnitude.
@@ -250,12 +250,12 @@ In our notation, $[3/10] \ne 3/10$.
 
 To accurately compute numerical derivatives, researchers should track every potentially lossy operation in computer memory.
 This allows bounding the error, comparing the losses, and focusing on the preventable ones.
-The expression $\hat f'_{\mathrm{FD}_2}$ implies a 3-step procedure, namely $\left[\frac{[\hat f([x+h]) - \hat f(x)]}{h}\right]$.
+The expression $\hat f'_{\mathrm{FD}_1}$ implies a 3-step procedure, namely $\left[\frac{[\hat f([x+h]) - \hat f(x)]}{h}\right]$.
 Assuming that $x$ is a value already loaded in the memory:
 
 1. $x+h$ is computed by the machine (to the best available precision, usually 64-bit FP);
 1. $f$ is evaluated at $x$ and $[x+h]$ (to the same precision);
-1. The outermost arithmetic operations are performed: addition and division by $h$ (to the same precision).
+1. The outermost arithmetic operations are performed: subtraction and division by $h$ (to the same precision).
 
 Thus, 3 types of errors appear:
 \[
@@ -277,7 +277,7 @@ It is also common to ignore the arithmetic-rounding errors in the numerator.
 Therefore, it suffices to bound the numerator error, calculate its amplification due to division by $h^m$, and minimise the result with respect to~$h$.
 
 The terms $f(x+h)$ and $f(x-h)$ usually have the same binary exponent; thus, by the Theorem 11 in @goldberg1991what, $[f(x+h) - f(x-h)]$ is exact.
-Even for higher-order derivatives, the same order of magnitude of $f(x+h), f(x+2h),\ldots$ implies that in most cases, no radix shifting is required for IEEE~794-compliant addition, and the round-off error is due only to the normalisation of the sum.
+Even for higher-order derivatives, the same order of magnitude of $f(x+h), f(x+2h),\ldots$ implies that in most cases, no radix shifting is required for IEEE~754-compliant addition, and the round-off error is due only to the normalisation of the sum.
 This normalisation error has a high probability of being zero, depending on the least significant bits.
 Similarly, multiplication by integer powers of 2 is achieved through incrementing or decrementing the (usually 11-bit) exponent without changing the significand, unless the number is too large or too small and some non-zero bits of the mantissa are lost due to shifting.
 
@@ -390,7 +390,7 @@ With this optimal step size, the total error function attains its minimum value 
 Other bounds for the numerator round-off error exist in the literature.
 @sauer2017numerical assumes $|f(x)| \approx 1$ and $|\varepsilon_{f,1}| \approx |\varepsilon_{f,2}| \approx \epsilon_{\mathrm{m}}$.
 The latter assumption is too conservative compared to his earlier statement from Chapter 0 that the relative rounding error is at most $\epsilon_{\mathrm{m}} / 2$.
-Even if the round-off error is accumulated through $[x+h] \ne x-h$ and $|f'(x)| > 1$, this conservatism is stronger than the conservatism in our derivation, and the worst case is much less likely than the typical case.
+Even if the round-off error is accumulated through $[x+h] \ne x+h$ and $|f'(x)| > 1$, this conservatism is stronger than the conservatism in our derivation, and the worst case is much less likely than the typical case.
 The absolute difference $|\varepsilon_{f_2} - \varepsilon_{f_1}|$, bounded above by $\epsilon_{\mathrm{m}} |f(x)|$, takes smaller values in most cases.
 If the relative rounding errors are independently uniformly distributed over $[-\epsilon_{\mathrm{m}}/2, \epsilon_{\mathrm{m}}/2]$, then $\varepsilon_{f_2} - \varepsilon_{f_1}$ has a *triangular* (not uniform) distribution on $[-\epsilon_{\mathrm{m}}, \epsilon_{\mathrm{m}}]$ with density $\frac{1-|t|}{\epsilon_{\mathrm{m}}} \mathbb{I}(t \le \epsilon_{\mathrm{m}})$.
 If the total rounding error were uniformly distributed on $[-\epsilon_{\mathrm{m}}, \epsilon_{\mathrm{m}}]$, its variance and mean absolute deviation would be 2 and 1.5 times higher, respectively.
@@ -417,10 +417,10 @@ We apply a similar argument to compute one-sided numerical derivatives of costly
 \textcolor{red}{!!! Compute the remainder term for non-symmetric stencils (should be larger for $f'$ on [0, 1, 2] than on [-1, 0, 1]) and advocate symmetric stencils}
 
 Mathematicians noticed the superior accuracy of approximations of functions on grids symmetric around the value of interest more than a century ago.
-Symmetric stencils for evaluations of derivatives were explicirtly proposed in @aitken1938application, following his 1932 paper on interpolation by iteration based on an earlier 1928 result by C. Jordan that recast the 1901 Everett interpolation formula into a format that was more parsimonious in terms of computations.
+Symmetric stencils for evaluations of derivatives were explicitly proposed in @aitken1938application, following his 1932 paper on interpolation by iteration based on an earlier 1928 result by C. Jordan that recast the 1901 Everett interpolation formula into a format that was more parsimonious in terms of computations.
 The computational advantages and higher accuracy of symmetric stencils on finite-precision computers were restated by @oliver1975selection, who advocate the use of symmetric stencils ‘wherever possible’.
 
-Although inferior in terms of accuracy, one-sided derivatives might be the only feasible solution where one evaluation of $f(x)$ takes dozens of seconds or where the gradient-based optimisation routines takes too many steps to converge.
+Although inferior in terms of accuracy, one-sided derivatives might be the only feasible solution where one evaluation of $f(x)$ takes dozens of seconds or where the gradient-based optimisation routines take too many steps to converge.
 Except for the situations where the curvature of a computationally expensive function must be inferred from what the researcher can glean from existing cached results, there are no other practical or theoretical reasons to use one-sided derivatives with more than two grid points instead of two-sided ones.
 
 <...>
@@ -428,7 +428,7 @@ Except for the situations where the curvature of a computationally expensive fun
 The fact that FD approximations have such a high total error was noted by early researchers (@gill1981practical, Section 8.2.2) and can be summarised as follows: **at least half of all digits of a FD numerical derivative are wrong**.
 The ‘at least’ part is due to the function scaling and step size; higher accuracy cannot simply be achieved.
 To the contrary, **at least 1/3 of all digits of a CD numerical derivative are wrong**, which leaves more room for error in such applications optimising with a gradient-based stopping rule.
-If the algorithm terminates when the Euclidean norm of the gradient is less than some tolerance (usually $\approx \sqrt{\epsilon_{\mathrm{m}}}$, then, the FD derivative with error magnitude comparable to the tolerance should be rejected in favour of the more accurate CD derivative.
+If the algorithm terminates when the Euclidean norm of the gradient is less than some tolerance (usually $\approx \sqrt{\epsilon_{\mathrm{m}}}$), then, the FD derivative with error magnitude comparable to the tolerance should be rejected in favour of the more accurate CD derivative.
 This does not apply if the maximisation is preliminary and a more accurate optimiser at a later stage refines the argument value for a more rigorous solution.
 
 ## Second derivatives
@@ -445,16 +445,16 @@ f''(x) = \frac{f(x-h) - 2f(x) + f(x+h)}{h^2} + O(h^2)
 \[
 f(x\pm h) = f(x) \pm \frac{h}{1!}\cdot f'(x) + \frac{h^2}{2!} f''(x) \pm \frac{h^3}{3!} f'''(x) + \frac{h^4}{4!} f''''(x+\alpha_4 h)
 \]
-where $\alpha_4^+, \alpha_4 \in [0, 1]$ and $\alpha_4 \in [-1, 1]$.
+where $\alpha_4^+, \alpha_4^- \in [0, 1]$ and $\alpha_4 \in [-1, 1]$.
 
-\textcolor{red}{!!! ERROR: check that $\alpha_4$ should belongs to [-1, 1] (earlier versions had [0, 1])}
+\textcolor{red}{!!! ERROR: check that $\alpha_4$ should belong to [-1, 1] (earlier versions had [0, 1])}
 
 The approximations differ from the true derivatives by the following terms:
 \[
 f''_{\mathrm{CD}}(x) = \frac{f(x-h) - 2 f(x) + f(x+h)}{h^2}  \\
 = \frac{h^2 f''(x) + \frac{h^4}{24} (f''''(x+\alpha_{4}^+ h) +  f''''(x - \alpha_{4}^- h)) }{h^2} = f''(x) + \frac{h^2}{12}f''''(x + \alpha_4 h),
 \]
-where $\alpha_4 \in [0, 1]$.
+where $\alpha_4 \in [-1, 1]$.
 
 Since $h\to 0$, we use the same approximate bound for steps of length $2h$:
 \[
@@ -462,7 +462,7 @@ Since $h\to 0$, we use the same approximate bound for steps of length $2h$:
 \]
 The rounding error in the numerator is bounded thusly:
 \[
-[f(x-h)] - 2[f(x)] + [f(x+h)] = f(x-h) + \varepsilon_1 - 2(f(x) + \varepsilon_2) + f(x-h) + \varepsilon_3 \\
+[f(x-h)] - 2[f(x)] + [f(x+h)] = f(x-h) + \varepsilon_1 - 2(f(x) + \varepsilon_2) + f(x+h) + \varepsilon_3 \\
 \le f(x-h) - 2f(x) + f(x+h) + 4\cdot 0.5|f(x)| \cdot \epsilon_{\mathrm{m}} \\
 = f(x-h) - 2f(x) + f(x+h) + 2 |f(x)| \epsilon_{\mathrm{m}}
 \]
@@ -473,7 +473,7 @@ The overall error is
 \[
 f''(x) - \hat f''_\mathrm{CD}(x) = f''(x) - \frac{[f(x-h)] - 2[f(x)] + [f(x+h)]}{h^2} \\
 \le f''(x) - \frac{f(x-h) - 2f(x) + f(x+h)}{h^2} + \frac{2 |f(x)| \epsilon_{\mathrm{m}} }{h^2} \\
-\approx \frac{h^2}{12}f''''(x + \alpha_4 h) + \frac{2 |f(x)| \epsilon_{\mathrm{m}} }{h^2}
+\approx -\frac{h^2}{12}f''''(x + \alpha_4 h) + \frac{2 |f(x)| \epsilon_{\mathrm{m}} }{h^2}
 \]
 
 Since $f''''(x + \alpha_4 h) \approx f''''(x)$, the absolute error of $f''_{\mathrm{CD}_2}(x)$ is bounded by
@@ -503,18 +503,18 @@ print(w4)
 ```
 
 \[
-f'''(x) = \frac{-0.5f(x-2h) + f(x-h) - f(x+h) + 0.5f(x+2h)}{h^3} + O(h^4)
+f'''(x) = \frac{-0.5f(x-2h) + f(x-h) - f(x+h) + 0.5f(x+2h)}{h^3} + O(h^2)
 \]
 \[
-f''''(x) = \frac{f(x-2h) - 4f(x-h) + 6f(x) - 4f(x+h) + f(x+2h)}{h^4} + O(h^5)
+f''''(x) = \frac{f(x-2h) - 4f(x-h) + 6f(x) - 4f(x+h) + f(x+2h)}{h^4} + O(h^2)
 \]
 
 The Taylor expansions for step-size multipliers $c \in \{1, 2\}$ are 
 \[
 f(x\pm c\cdot h) = f(x) \pm \frac{ch}{1!}\cdot f'(x) + \frac{(ch)^2}{2!} f''(x) \pm \frac{(ch)^3}{3!} f'''(x) + \frac{(ch)^4}{4!} f''''(x) \\
-\pm\begin{cases}
-\frac{(ch)^5}{5!} f^{(V)}(x + \alpha ch), & m=3\\
-\frac{(ch)^5}{5!} f^{(V)}(x) + \frac{(ch)^6}{6!} f^{(VI)}(x+\alpha ch), & m=4,
+\begin{cases}
+\pm\frac{(ch)^5}{5!} f^{(V)}(x \pm \alpha ch), & m=3\\
+\pm\frac{(ch)^5}{5!} f^{(V)}(x) + \frac{(ch)^6}{6!} f^{(VI)}(x\pm\alpha ch), & m=4,
 \end{cases}
 \]
 where $\alpha \in [0, 1]$.
@@ -523,19 +523,19 @@ The value of the multiplier $\alpha$ in the Lagrange remainder is different for 
 For $m=3$, the expression becomes
 \[
 f'''_{\mathrm{CD}}(x) = \frac{0.5(-f(x-2h) + 2f(x-h) - 2 f(x+h) + f(x+2h))}{h^3}  \\
-= \frac{h^3 f'''(x) + \frac{h^5}{240} (32 f^{(V)}(x+2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h)}{h^3},
+= \frac{h^3 f'''(x) + \frac{h^5}{240} (32 f^{(V)}(x-2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h))}{h^3},
 \]
 where $\alpha_{51}, \alpha_{52}, \alpha_{53}, \alpha_{54} \in [0, 1]$.
 Here, the GIVT cannot be applied because not all coefficients on $f^{(V)}$ are positive.
 They can still be grouped:
 \[
-32 f^{(V)}(x+2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h) \\
+32 f^{(V)}(x-2\alpha_{51} h) - 2f^{(V)}(x+\alpha_{52} h) - 2f^{(V)}(x-\alpha_{53} h) +  32 f^{(V)}(x+2\alpha_{54} h) \\
 = 64 f^{(V)} (x + 2\alpha_{5p}h) - 4 f^{(V)} (x + \alpha_{5m}h),
 \]
-where $\alpha_{5p}, \alpha_{5m} \in [0, 1]$.
+where $\alpha_{5p}, \alpha_{5m} \in [-1, 1]$.
 To place an upper bound on this term, we use the triangle inequality for the terms' absolute values:
 \[
-64 f^{(V)} (x + 2\alpha_{5p}) - 4 f^{(V)} (x + \alpha_{5m}) \le 64| f^{(V)} (x + 2\alpha_{5p}h)| + 4|f^{(V)} (x + \alpha_{5m}h)| \\
+64 f^{(V)} (x + 2\alpha_{5p}h) - 4 f^{(V)} (x + \alpha_{5m}h) \le 64| f^{(V)} (x + 2\alpha_{5p}h)| + 4|f^{(V)} (x + \alpha_{5m}h)| \\
 \le 68 \max\{| f^{(V)} (x + 2\alpha_{5p}h)|, |f^{(V)} (x + \alpha_{5m}h)|\}
 \]
 Again, we rely on $h\to0$ to obtain  $f^{(V)} (x + 2\alpha_{5p}h) \approx f^{(V)}(x)  \approx f^{(V)} (x + \alpha_{5m}h) \approx f^{(V)}(x)$.
@@ -567,7 +567,7 @@ As for the rounding errors in the numerator, they are bounded by the sum of abso
 For $m=3$,
 \[
 [-0.5f(x-2h)] + [f(x-h)] - [f(x+h)] + 0.5[f(x+2h)] = \\
--0.5f(x-h) - 0.5\varepsilon_1 + f(x-h) + \varepsilon_2 - f(x+h) - \varepsilon_3 + 0.5f(x+2h) + 0.5\varepsilon_4 \\
+-0.5f(x-2h) - 0.5\varepsilon_1 + f(x-h) + \varepsilon_2 - f(x+h) - \varepsilon_3 + 0.5f(x+2h) + 0.5\varepsilon_4 \\
 =  \ldots - 0.5\varepsilon_1 + \varepsilon_2 - \varepsilon_3 + 0.5\varepsilon_4  \\
 \le \ldots + 0.5 |f(x)| \epsilon_{\mathrm{m}} (0.5 + 1 + 1 + 0.5) = \ldots + 1.5 |f(x)| \epsilon_{\mathrm{m}}
 \]
@@ -580,10 +580,10 @@ sum(abs(w4$weights))
 
 The total errors are thus
 \[
-f'''(x) - [f'''_\mathrm{CD}(x)] \le \varepsilon_3(h) := \frac{17 f^{(V)}(x)}{60} h^2 + \frac{1.5 |f(x)| \epsilon_{\mathrm{m}} }{h^3}
+f'''(x) - [f'''_\mathrm{CD}(x)] \le \varepsilon_3(h) := \frac{17 |f^{(V)}(x)|}{60} h^2 + \frac{1.5 |f(x)| \epsilon_{\mathrm{m}} }{h^3}
 \]
 \[
-f''''(x) - [f''''_\mathrm{CD}(x)] \le \varepsilon_4(h) := \frac{17 f^{(VI)}(x)}{90} h^2 + \frac{8 |f(x)| \epsilon_{\mathrm{m}}}{h^4}
+f''''(x) - [f''''_\mathrm{CD}(x)] \le \varepsilon_4(h) := \frac{17 |f^{(VI)}(x)|}{90} h^2 + \frac{8 |f(x)| \epsilon_{\mathrm{m}}}{h^4}
 \]
 
 Finding the minimum of the total error functions:
@@ -618,7 +618,7 @@ This calculation confirms that there is no $f'''(x)$ in the expression for the d
 We apply the same technique due to the presence of different step sizes and the non-applicability of the GIVT:
 \[
 \frac{1}{12} f(x-2h) - \frac23 f(x-h) + \frac23 f(x+h) - \frac{1}{12} f(x+2h) = \\
-f'(x) + \frac{h^5}{120}\left(-\frac83f^{(V)}(x-2\alpha_1 h) + \frac23 f^{(V)}(x-\alpha_2 h) + \frac23 f^{(V)}(x+\alpha_3 h) - \frac83 f^{(V)}(x+2\alpha_4 h)  \right)
+h f'(x) + \frac{h^5}{120}\left(-\frac83f^{(V)}(x-2\alpha_1 h) + \frac23 f^{(V)}(x-\alpha_2 h) + \frac23 f^{(V)}(x+\alpha_3 h) - \frac83 f^{(V)}(x+2\alpha_4 h)  \right)
 \]
 Some terms in the brackets can still be grouped:
 \[
@@ -629,7 +629,7 @@ An upper bound through approximation is available:
 
 \textcolor{red}{!!! Move this expression into the previous section}
 \[
-|af^{(V)}(c_2) - bf^{(V)}(c_1)| \le a|f^{(V)}(c_1)| + b|f^{(V)}(c_2)|, \quad |f^{(V)}(c_1)| \approx |f^{(V)}(c_2)| \approx f^{(V)}(x),
+|af^{(V)}(c_2) - bf^{(V)}(c_1)| \le a|f^{(V)}(c_2)| + b|f^{(V)}(c_1)|, \quad |f^{(V)}(c_1)| \approx |f^{(V)}(c_2)| \approx |f^{(V)}(x)|,
 \]
 therefore, the difference in the numerator is less or equal to $\frac{\frac{20}3 |f^{(V)}(x)|}{120} h^5$, and the truncation error is bounded by the same divided by $h$:
 \[
@@ -650,7 +650,7 @@ The total error minimisation problem is similar to the ones solved before:
 \varepsilon(h) = \frac{|f^{(V)}(x)|}{18} h^4 + \frac{0.75 |f(x)| \epsilon_{\mathrm{m}}}{h}
 \]
 \[
-\varepsilon(h) = 0 \quad \Rightarrow \quad \frac{2|f^{(V)}(x)|}{9} h^3 = \frac{0.75 |f(x)| \epsilon_{\mathrm{m}}}{h^2} \quad \Rightarrow \quad h^{*}_{\mathrm{CD}_4} = \sqrt[5]{\frac{27 |f(x)| \epsilon_{\mathrm{m}}}{8 |f^{(V)}(x)|}} \propto \sqrt[5]{\epsilon_{\mathrm{m}}}
+\varepsilon'(h) = 0 \quad \Rightarrow \quad \frac{2|f^{(V)}(x)|}{9} h^3 = \frac{0.75 |f(x)| \epsilon_{\mathrm{m}}}{h^2} \quad \Rightarrow \quad h^{*}_{\mathrm{CD}_4} = \sqrt[5]{\frac{27 |f(x)| \epsilon_{\mathrm{m}}}{8 |f^{(V)}(x)|}} \propto \sqrt[5]{\epsilon_{\mathrm{m}}}
 \]
 
 The reduction of the truncation error from the Taylor series allows for a larger step size for better rounding-error control.
@@ -706,7 +706,7 @@ print(c2 <- 0.5*sum(abs(w$weights)))
 
 The expression below is minimised w.r.t.\ $h$ where solving the FOC is easy because both components are power functions:
 \[
-\varepsilon(h) = c_1 f^{(m+2)}(x) h^2 + c_2 |f(x)| \epsilon_{\mathrm{m}} \frac{1}{h^m}
+\varepsilon(h) = c_1 |f^{(m+2)}(x)| h^2 + c_2 |f(x)| \epsilon_{\mathrm{m}} \frac{1}{h^m}
 \]
 \[
 \varepsilon'(h) = 0 \quad \Rightarrow \quad 2c_1 |f^{(m+2)}(x)| h = m c_2 |f(x)| \epsilon_{\mathrm{m}} \frac{1}{h^{m+1}} \quad \Rightarrow \quad h = \sqrt[m+2]{\frac{mc_2 |f(x)| \epsilon_{\mathrm{m}}}{2c_1 |f^{(m+2)}(x)|}}
@@ -736,7 +736,7 @@ A viable solution is proposed in the same thesis and is described in Section \te
 
 * Gradients are repeated derivatives; choose the optimal size for each coordinate
 * The theory remains the same
-* Compute gradients faster by pre-defining a grid and doind parallel calls across all steps for all coordinates to maximise CPU use and reduce overhead and idle time
+* Compute gradients faster by pre-defining a grid and doing parallel calls across all steps for all coordinates to maximise CPU use and reduce overhead and idle time
 
 ## Numerical Jacobians
 
@@ -804,7 +804,7 @@ print(getMults(3))
 
 The terms with $f$ and $f'$ disappear, and the 4-term sum becomes
 \[
-\frac{f(x + h_{ij}) - f(x - h_i + h_j) - f(x + h_i - h_j) + f(x - {h_ij})}{4h^2} = \frac{\frac{1}{2}h^2 (4H_{ij} + 4H_{ji}) + O(h^4)}{4h^2},
+\frac{f(x + h_i + h_j) - f(x - h_i + h_j) - f(x + h_i - h_j) + f(x - h_i - h_j)}{4h^2} = \frac{\frac{1}{2}h^2 (4H_{ij} + 4H_{ji}) + O(h^4)}{4h^2},
 \]
 therefore,
 \[
@@ -823,23 +823,23 @@ print(mults4[mults4 != 0])
 This implies that the error term is determined solely by $\frac{\partial^4 f}{\partial x_i^3 \partial x_j}$ and $\frac{\partial^4 f}{\partial x_i \partial x_j^3}$ owing to the symmetry of cross-derivatives: $f''''_{jiii} = f''''_{ijii} = f''''_{iiji} = f''''_{iiij}$.
 The exact value of the higher-order coefficient is thus
 \[
-O(h^4) = \frac{h^4}{24} (4 f''''_{jiii}(x + c_1) + 4f''''_{ijjj}(x+c_2)) \approx \frac{h^4}{6} (f''''_{jiii}(x) + f''''_{ijjj}(x)), 
+O(h^4) = \frac{h^4}{24} (16 f''''_{jiii}(x + c_1) + 16f''''_{ijjj}(x+c_2)) \approx \frac{2h^4}{3} (f''''_{jiii}(x) + f''''_{ijjj}(x)),
 \]
 where $c_1, c_2 \in (-h, h)$ are some constants.
-After dividing by $4 h^2$, we get the truncation error equal to $\frac{h^2}{24} (f''''_{jiii}(x) + f''''_{ijjj}(x))$ that can be plugged into the expression for the total error.
+After dividing by $4 h^2$, we get the truncation error equal to $\frac{h^2}{6} (f''''_{jiii}(x) + f''''_{ijjj}(x))$ that can be plugged into the expression for the total error.
 
 The rounding error $[f([x \pm h_i \pm h_j])] - f(x \pm h_i \pm h_j)$ from 4 function evaluations is approximately bounded by $4 \times 0.5 |f(x)| \epsilon_{\mathrm{m}}$.
 
 \[
-\varepsilon(h) = \frac{|f''''_{ijjj}(x) + f''''_{iiij}(x)|}{24} h^2 + \frac{0.5 |f(x)| \epsilon_{\mathrm{m}}}{h^2}
+\varepsilon(h) = \frac{|f''''_{ijjj}(x) + f''''_{iiij}(x)|}{6} h^2 + \frac{0.5 |f(x)| \epsilon_{\mathrm{m}}}{h^2}
 \]
 \[
-\varepsilon(h) = 0 \quad \Rightarrow \quad \frac{|f''''_{ijjj}(x) + f''''_{iiij}(x)|}{12} h = \frac{|f(x)| \epsilon_{\mathrm{m}}}{h^3} \quad \Rightarrow \quad h = \sqrt[4]{\frac{12 |f(x)| \epsilon_{\mathrm{m}}}{ |f''''_{ijjj}(x) + f''''_{iiij}(x)|}} \propto \sqrt[4]{\epsilon_{\mathrm{m}}}
+\varepsilon'(h) = 0 \quad \Rightarrow \quad \frac{|f''''_{ijjj}(x) + f''''_{iiij}(x)|}{3} h = \frac{|f(x)| \epsilon_{\mathrm{m}}}{h^3} \quad \Rightarrow \quad h = \sqrt[4]{\frac{3 |f(x)| \epsilon_{\mathrm{m}}}{ |f''''_{ijjj}(x) + f''''_{iiij}(x)|}} \propto \sqrt[4]{\epsilon_{\mathrm{m}}}
 \]
 
 We recommend that the main diagonal of the Hessian be computed separately using $h^{**}_{\mathrm{CD}_2}$ (or, even better, $h^{**}_{\mathrm{CD}_4}$) estimated for each coordinate, and each off-diagonal element $H_{ij}$ using data-driven procedures described in the section below (e.g. ‘AutoDX’).
 
-\textcolor{red}{!!! TODO: write a paragraph about the general case with different step sizes  $h_i$ and $h_j$; mentione that is mostly of theoretical, not practical interest}
+\textcolor{red}{!!! TODO: write a paragraph about the general case with different step sizes  $h_i$ and $h_j$; mention that this is mostly of theoretical, not practical interest}
 
 ## Exploiting the Hessian symmetry
 
@@ -851,7 +851,7 @@ If the formula~\eqref{eq:nhess} is used, then, symmetry is guaranteed because th
 This can be exploited to reduce computation time: if $\dim x = k$, calculate only the main upper triangular matrix and reflect it, carrying out only $k(k+1)/2$ operations instead of $k^2$.
 This is the default behaviour of the `Hessian()` function from this package.
 If instead, the implementation carries out repeated Jacobian calculation for the numerical gradient, then, there is no guarantee that $\nabla_j [\nabla_i f(x)]$ be equal to $\nabla_i [\nabla_j f(x)]$.
-This is, e.\,g., the case with the `optimHess()` function from `base`: it calls the gradient in a loop over coordinates.
+This is, e.\,g., the case with the `optimHess()` function from `stats`: it calls the gradient in a loop over coordinates.
 To ensure the symmetry in this case, the numerical Hessian should be averaged with its transpose:
 
 \textcolor{red}{!!! TODO}
@@ -887,7 +887,7 @@ finite-difference derivatives. The grid points have to be fixed and equidistant 
 4. With $(x, y)$ and the derivatives $dy$ the objective function sets up the integrand of the integral to be minimised.
 5. Finally, the objective function applies the trapezoidal formula (or the Romberg integral) and computes a value for this configuration. Based on this information, the optimisation solver will change the $y$-values and go to the next iteration.
 
-The number $n$ of grid points is also the number of independent variables in the optimization process and should not be too big ($n=8000$ may take hours of computation time), but sufficiently large for providing a good estimate of the derivatives.
+The number $n$ of grid points is also the number of independent variables in the optimisation process and should not be too big ($n=8000$ may take hours of computation time), but sufficiently large for providing a good estimate of the derivatives.
 
 Since calculus of variations is outside the scope of this vignette, we show how to set up step (3) that calculates numerical derivatives.
 ```{r}
@@ -940,7 +940,7 @@ This distinction begs the question: since both approaches are 4\textsuperscript{
 
 \textcolor{red}{!!! Write better}
 
-Comparing the stencils $(-2, 1, 1, 2)$ and $(-3, -1, 1, 3)$ is not fair because the Taylor remainder is directly proportional to the larger step size.
+Comparing the stencils $(-2, -1, 1, 2)$ and $(-3, -1, 1, 3)$ is not fair because the Taylor remainder is directly proportional to the larger step size.
 Since the inner step size of 1 eliminates the first-order terms and leaves the second-order truncation error $O(h^2)$, the outer step size eliminates the second-order truncation error and leaves the fourth-order remainder $O(h^4)$, which is larger for larger $h$.
 It is tempting to impose a normalisation on the step size for comparing stencils of the form $(-1-s, -1+s, 1-s, 1+s)$ because in this case, the average step size is one.
 Setting $s=1/2$ yields $(\pm1/2$, $\pm3/2)$ with step tripling, and $s=1/3$ yields $(\pm2/3$, $\pm4/3)$ with step doubling.
@@ -961,7 +961,7 @@ Proper optimal stencil analysis requires considering the total error including t
 Usually, the step size is proportional to the value of the argument, i.e. $h \propto x \sqrt[c]{\varepsilon_{\text{mach}}}$, where $c$ depends on the derivative and accuracy order (see above).
 However, for $x\approx 0$, this may result in $[[x]+[h]] = [x]$.
 To avoid this, the default behaviour in many software implementations, including `numDeriv`, is to use fixed $h$ for $|x| < \delta$.
-E.g. `numDeriv` uses `h = eps = 1e-4` in place of `h = d*x` if `x < zero.tol`; the default method arguments are `eps = d = 1e-4`, `zero.tol = sqrt(.Machine$double.eps/7e-7) = 1.781e-5`.
+E.g. `numDeriv` uses `h = abs(d*x) + eps*(abs(x) < zero.tol)`; the default method arguments are `eps = d = 1e-4`, `zero.tol = sqrt(.Machine$double.eps/7e-7) = 1.781e-5`.
 
 For iterative step-size search procedures, @stepleman1979adaptive suggest a reasonable workaround to prevent this behaviour: use $h = 0.04\sqrt[c]{\varepsilon_{\text{mach}}}$ as the starting value in the step-search procedure.
 In practice, one may take any reasonable value that is suitable for the application and supply some *a priori* information about the function and the meaningful distinction between zero and non-zero values.
@@ -985,7 +985,7 @@ The machine epsilon is such a number that $[1 + \delta] = 1$ for $|\delta| \le \
 Hence, the core problem in numerical differentiation is working with discontinuous functions where $\lim_{h\to 0} \frac{\hat f([x+h]) - \hat f([x])}{h} = 0$, but the derivative of the noiseless function $f$ -- as if the machine had infinite precision -- has to be computed with the maximum achievable precision.
 
 So far, we have considered the ‘best’ case assuming that $\hat f([x+h]) - f(x) \le \epsilon_{\mathrm{m}}/2$.
-However is quite common to have objective functions that depend on the values of inaccurate internal numerical routines.
+However, it is quite common to have objective functions that depend on the values of inaccurate internal numerical routines.
 Usually, such routines involve optimisation, or integration, or root search, or computing derivatives.
 Depending on the convergence tolerance (and the ensuing routine error magnitude) of the inner routines, small changes in the input parameter of the outermost objective function might lead to abrupt changes in the return values of inner functions, which implies discontinuity and, therefore, non-differentiability.
 
@@ -1004,19 +1004,19 @@ print(res1 - res2)
 Two mathematically equivalent expressions, $(x-t)^4 \cdot (t^{-4} / 4)$ and $(x-t)^4 / (4t^4)$, differ in absolute terms by more than $1000 \epsilon_{\text{m}}$! Evaluating $(t^{-4} / 4) -1/ (4t^4)$ yields zero exactly; however, the extra multiplication by $(x-t)^4$ creates lost accuracy bits.
 The magnitude of the objective function in this specific application is approximately 1, which is why the termination of the optimisation algorithm occurs in a different number of steps with the two different implementations of the Taylor series.
 
-The consequence of this loss is the increase in the rounding-error variance and the need to take into account the absolute error magnitude of $\hat f([x+h]) - f(x+h)$ into account; the relative error is still bounded by $\epsilon_{\text{m}}/2$, but when some intermediate terms of the computation shoot off due to division by small quantities (in this example, $4t^4 \approx 3.3\cdot 10^{-7}$), it changes the magnitude of the numerator.
+The consequence of this loss is the increase in the rounding-error variance and the need to take into account the absolute error magnitude of $\hat f([x+h]) - f(x+h)$; the relative error is still bounded by $\epsilon_{\text{m}}/2$, but when some intermediate terms of the computation shoot off due to division by small quantities (in this example, $4t^4 \approx 3.3\cdot 10^{-7}$), it changes the magnitude of the numerator.
 Usually, it is not feasible to extract the information about the most ill-conditioned operation in the chain of thousands or millions of operations taking place under the hood of present-day objective functions, but a rough measure of the ‘combined noisiness due to inaccurate internal routines’ could be calculated based on certain input characteristics of the input.
 
 
 \textcolor{red}{!!! Comment: no straightforward correspondence between `rel.tol` and `xtol`}
 
-If computing $f$ involves optimisation with a relative-tolerance-based stopping criterion `ret.tol = 1e-8`, then, the difference might be as bad as $\epsilon_{\mathrm{m}} \cdot 10^8$! The same argument applies to numerical integration, root solving, stochastic algorithms and such: if $\hat f(x + h)$ is prone to deviating from $f(x+h)$ due to some extra losses occurring under the hood of $f$, the bound on the rounding error must reflect this fact.
+If computing $f$ involves optimisation with a relative-tolerance-based stopping criterion `rel.tol = 1e-8`, then, the difference might be as bad as $\epsilon_{\mathrm{m}} \cdot 10^8$! The same argument applies to numerical integration, root solving, stochastic algorithms and such: if $\hat f(x + h)$ is prone to deviating from $f(x+h)$ due to some extra losses occurring under the hood of $f$, the bound on the rounding error must reflect this fact.
 It would be dangerous to assume $|\varepsilon_{f_2} - \varepsilon_{f_1}| \le \epsilon_{\mathrm{m}}$ if changes of inputs cause the internal routines of $f$ to go differently due to the butterfly effect.
 If $f$ relies on stochastic optimisation with relative tolerance $2.22 \cdot 10^{-7}$ (not uncommon in popular algorithms) as the stopping criterion, $|\varepsilon_{f,2} - \varepsilon_{f,1}| \le 10^9 \cdot \epsilon_{\mathrm{m}}$, which is why the rule-of-thumb $h^*$ needs to be blown up by a factor of 1000 (becoming 0.006) to obtain any meaningful information about the slope of the function! Ironically, this is the reason why repeated differences for higher-order derivatives can be so unstable: central differences of well-behaved functions lose 5 accurate digits, and one-sided differences, 8 (out of 16!) digits.
 
 \textcolor{red}{!!! The part with the numerical gradient here}
 
-\textcolor{red}{!!! Paeallels: Numerical integration? Root solving? Nested optimisation?}
+\textcolor{red}{!!! Parallels: Numerical integration? Root solving? Nested optimisation?}
 
 The problem with function optimisation is, the relative tolerance as a stopping criterion is \textcolor{red}{TODO}
 
@@ -1039,7 +1039,7 @@ This might incur extra accuracy loss because the numerator in this approach cont
 
 The effect of this error compounding can be illustrated by the following example.
 Recall that two-sided differences are accurate only up to (approximately) 2/3 of their significant digits.
-Indeed, $|\hat f([x+h]) - f(x-h)| \le \epsilon_{\mathrm{m}} / 2$, but $|\hat f'_{\mathrm{FD}}([x+h]) - f'(x+h)| = O(h^2) = O(\epsilon_{\mathrm{m}}^{2/3})$ for the optimal $h \propto \sqrt[3]{\epsilon_{\mathrm{m}}}$.
+Indeed, $|\hat f([x+h]) - f(x+h)| \le \epsilon_{\mathrm{m}} / 2$, but $|\hat f'_{\mathrm{CD}}([x+h]) - f'(x+h)| = O(h^2) = O(\epsilon_{\mathrm{m}}^{2/3})$ for the optimal $h \propto \sqrt[3]{\epsilon_{\mathrm{m}}}$.
 The noisy $\hat f'_{\mathrm{CD}_2} (x+h) = f'(x+h) + O(\epsilon_{\mathrm{m}}^{2/3})$ enters the numerator of the second step and is multiplied by the $1/h$ factor again.
 Therefore, rounding errors accumulate in the two-step differencing procedure to a greater extent than in the one-step one, and dedicated analysis is required to gauge the order of magnitude of the accuracy loss.
 
@@ -1068,16 +1068,16 @@ However, a small complex step $h = 10^{-20}$ is a reasonable rule-of-thumb value
 
 Higher-order differences require fewer evaluations, too, but are not difference-free, which is why
 \[
-f''(x) = \frac{2[f(x) - \Re f(x+\mathrm{i}h)]}{h^2} - \frac{h^2}{12} f''''(x) + O(h^4)
+f''(x) = \frac{2[f(x) - \Re f(x+\mathrm{i}h)]}{h^2} + \frac{h^2}{12} f''''(x) + O(h^4)
 \]
 suffers from machine round-off to a certain degree.
 
 The method accuracy and convergence can be improved by carefully choosing the complex-step *angle*:
 \[
-f'(x) = \frac{\Im\{ f(x+\mathrm{i}^{2/3}h) - f(x+\mathrm{i}^{8/3}h)\} }{\sqrt{3} h} - \frac{h^4}{120} f^{(V)}(x) + \ldots
+f'(x) = \frac{\Im\{ f(x+\mathrm{i}^{2/3}h) - f(x+\mathrm{i}^{8/3}h)\} }{\sqrt{3} h} + \frac{h^4}{120} f^{(V)}(x) + \ldots
 \]
 \[
-f''(x) = \frac{\Im\{ f(x+\mathrm{i}^{1/2}h) + f(x+\mathrm{i}^{5/2}h)\} }{h^2} - \frac{h^4}{360} f^{(VI)}(x) + \ldots
+f''(x) = \frac{\Im\{ f(x+\mathrm{i}^{1/2}h) + f(x+\mathrm{i}^{5/2}h)\} }{h^2} + \frac{h^4}{360} f^{(VI)}(x) + \ldots
 \]
 Jacobians and Hessians can be evaluated similarly with fewer function calls.
 However, for small step sizes, they suffer from the round-off error just like the real-valued finite-difference counterparts.
@@ -1086,9 +1086,9 @@ The benefit is, the complex method yields a much wider range of accurate matrix 
 Richardson extrapolation can be used for attaining higher-order accuracy at the cost of more evaluations.
 Using 4 instead of 2 complex argument evaluations yields ludicrous accuracy:
 \[
-f''(x) = \frac{\Im \left\{ 64 [f(x+\frac{\sqrt{\mathrm{i}} h}{2}) + f(x-\frac{\sqrt{\mathrm{i}} h}{2})] - f(x+\sqrt{\mathrm{i}} h) - f(x-\sqrt{\mathrm{i}} h) \right\}}{15 h^2} + \frac{h^8 f^{(X)}(x)}{1\,814\,400},
+f''(x) = \frac{\Im \left\{ 64 [f(x+\frac{\sqrt{\mathrm{i}} h}{2}) + f(x-\frac{\sqrt{\mathrm{i}} h}{2})] - f(x+\sqrt{\mathrm{i}} h) - f(x-\sqrt{\mathrm{i}} h) \right\}}{15 h^2} + \frac{h^8 f^{(X)}(x)}{29\,030\,400} + \ldots,
 \]
-i.e. one millionth of the tenth derivative times the eighth power of the tiny step!
+i.e. one twenty-nine-millionth of the tenth derivative times the eighth power of the tiny step!
 
 See @lai2008extensions for more details.
 
@@ -1106,7 +1106,7 @@ Currently, the complex method is not supported in the `pnd` package; derivations
 
 \textcolor{red}{!!! Compare numDeriv with Richardson and pnd with a stencil}
 
-The results are comparable in terms of effective accuracy: e.g. the grid $x-2h, x-h, x+h, x+2h$ from `pnd` corresponds to 4 Richardson iterations from `numDeriv`, with minor differences due to the initial step size choice.
+The results are comparable in terms of effective accuracy: e.g. the grid $x-2h, x-h, x+h, x+2h$ from `pnd` corresponds to one Richardson extrapolation step from `numDeriv`, with minor differences due to the initial step size choice.
 
 \textcolor{red}{!!! Benchmark optimising SEL with 2-sided and one-sided gradients and switching at the end, compare speed and accuracy}
 
@@ -1117,7 +1117,7 @@ Simulation set-up from Curtis and Reid:
 f1 <- function(x) expm1(x)^2 + (1/sqrt(1+x^2) - 1)^2
 df1 <- function(x) 2 * exp(x) * expm1(x) - 2*x * (1/sqrt(1+x^2) - 1) / (1 + x^2) / sqrt(1 + x^2)
 ddf1 <- function(x) (6 * (1/sqrt(1 + x^2) - 1) * x^2)/(1 + x^2)^(5/2) + (2 * x^2)/(1 + x^2)^3 - (2 * (1/sqrt(1 + x^2) - 1))/(1 + x^2)^(3/2) + 2 * exp(2*x) + 2 * exp(x) * expm1(x)
-dddf1 <- function(x) (18 * (1/sqrt(1 + x^2) - 1) * x)/(1 + x^2)^(5/2) + (6 * x)/(1 + x^2)^3 - (30 * (1/sqrt(1 + x^2) - 1) * x^3)/(1 + x^2)^(7/2) - (18 * x^3)/(1 + x^2)^4 + 6 * exp(2*x) + 2 * exp(x) * expm1(1)
+dddf1 <- function(x) (18 * (1/sqrt(1 + x^2) - 1) * x)/(1 + x^2)^(5/2) + (6 * x)/(1 + x^2)^3 - (30 * (1/sqrt(1 + x^2) - 1) * x^3)/(1 + x^2)^(7/2) - (18 * x^3)/(1 + x^2)^4 + 6 * exp(2*x) + 2 * exp(x) * expm1(x)
 
 squish <- function(x, pow = 1/2, shift = 1) ((abs(x) + shift)^pow - shift^pow) * sign(x)
 unsquish <- function(y, pow = 1/2, shift = 1) ((abs(y) + shift^pow)^(1/pow) - shift) * sign(y)
@@ -1150,15 +1150,15 @@ for (i in 1:4) {
 }
 
 f2 <- sin
-try2.good  <- step.SW(x = pi/4, f2) # Starts at h0 = 1e-5
+try2.good  <- step.SW(x = pi/4, f2) # Starts at h0 = 1e-5*pi/4
 try2.small <- step.SW(x = pi/4, f2, h0 = 1e-9)
 try2.large <- step.SW(x = pi/4, f2, h0 = 10)
 try2.huge <- step.SW(x = pi/4, f2, h0 = 1000) # Observe the custom warning
 try2 <- list(try2.good, try2.small, try2.large, try2.huge)
 
-hvals2 <- sapply(try1, function(x) x$iterations$h[1])
+hvals2 <- sapply(try2, function(x) x$iterations$h[1])
 for (i in 1:4) {
-  cat("\n\nDiagnostics for the SW79 algorithm, f(x) = sin(x), x = pi/4, h0 =", hvals1[i], "\n")
+  cat("\n\nDiagnostics for the SW79 algorithm, f(x) = sin(x), x = pi/4, h0 =", hvals2[i], "\n")
   cairo_pdf(paste0("sine-", i, ".pdf"), 6.2, 4)
   tryCatch(par(family = "Fira Sans"), error = \(e) NULL, warning = \(w) NULL)
   printDiag(try2[[i]], true.val = sqrt(2)/2, main = paste0("f(x) = sin(x) with initial h = ", hvals2[i]))

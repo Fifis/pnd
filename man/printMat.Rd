@@ -18,7 +18,7 @@ printMat(
 \arguments{
 \item{x}{A numeric matrix to print line by line.}
 
-\item{digits}{Positive integer: the number of digits after the decimal comma to round to
+\item{digits}{Positive integer: the number of digits after the decimal point in scientific notation
 (i.e. one less than the number of significant digits).}
 
 \item{shave.spaces}{Logical: if true, removes spaces to ensure compact output; if false, results
@@ -36,7 +36,7 @@ in nearly fixed-width output (almost).}
 \item{format}{If \code{FALSE}, skips the formatting part.}
 }
 \value{
-The same \code{x} that was passed as the first input.
+An invisible character vector of formatted rows.
 }
 \description{
 Print a matrix with separators

@@ -8,7 +8,7 @@ runParallel(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE)
 }
 \arguments{
 \item{FUN}{A function of only one argument. If there are more arguments, use
-the \code{FUN2 <- do.call(FUN, c(list(x), ...))} annd call it.}
+a wrapper such as \code{FUN2 <- function(x) FUN(x, a = 1)} and call it.}
 
 \item{x}{A list to parallelise the evaluation of \code{FUN} over: either numbers
 or expressions.}
@@ -18,11 +18,10 @@ Recommended to be set to the number of physical cores on the machine minus one.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 }
 \value{

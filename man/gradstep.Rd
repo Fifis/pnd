@@ -23,55 +23,47 @@ gradstep(
 \method{print}{gradstep}(x, ...)
 }
 \arguments{
-\item{FUN}{Function for which the optimal numerical derivative step size is needed.}
+\item{FUN}{Scalar-valued function for which the optimal numerical derivative step size is needed.}
 
 \item{x}{Numeric vector or scalar: the point at which the derivative is computed
 and the optimal step size is estimated.}
 
-\item{h0}{Numeric vector or scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
+\item{h0}{Numeric vector or scalar: initial step size, defaulting to \code{\link[=stepx]{stepx()}}
+(rescaled for \code{"M"} and \code{"K"}).}
 
 \item{method}{Character indicating the method: \code{"CR"} for \insertCite{curtis1974choice}{pnd},
 \code{"CRm"} for modified Curtis--Reid, "DV" for \insertCite{dumontet1977determination}{pnd},
 \code{"SW"} \insertCite{stepleman1979adaptive}{pnd}, \code{"M"} for
-\insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, exerimental),
+\insertCite{mathur2012analytical}{pnd}, \code{"K"} for Kostyrka (2026, experimental),
 and \code{"plugin"} for the single-step plug-in estimator.}
 
 \item{control}{A named list of tuning parameters for the method. If \code{NULL},
 default values are used. See the documentation for the respective methods. Note that
-full iteration history including all function evaluations is returned, but
+iteration history including function evaluations is returned, but
 different methods have slightly different diagnostic outputs.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }
 \value{
 A list similar to the one returned by \code{optim()} and made of
-concatenated individual elements coordinate-wise lists: \code{par} -- the optimal
+concatenated elements of coordinate-wise lists: \code{par} -- the optimal
 step sizes found, \code{value} -- the estimated numerical gradient,
-\code{counts} -- the number of iterations for each coordinate,
-\code{abs.error} -- an estimate of the total approximation error
-(sum of truncation and rounding errors),
-\code{exitcode} -- an integer code indicating the termination status:
-\code{0} indicates optimal termination within tolerance,
-\code{1} means that the truncation error (CR method) or the third derivative
-(DV method) is zero and large step size is preferred,
-\code{2} is returned if there is no change in step size within tolerance,
-\code{3} indicates a solution at the boundary of the allowed value range,
-\code{4} signals that the maximum number of iterations was reached.
+\code{counts} -- method-specific counts for each coordinate,
+\code{abs.error} -- estimates of the truncation and rounding errors,
+\code{exitcode} -- method-specific termination codes; see the respective methods.
 \code{message} -- summary messages of the exit status.
-\code{iterations} is a list of lists
+\code{original} is a list of lists
 including the full step size search path, argument grids, function values on
 those grids, estimated error ratios, and estimated derivative values for
 each coordinate.
@@ -83,8 +75,7 @@ Automatic step selection for gradients
 We recommend using the Stepleman--Winarsky algorithm because it does not suffer
 from over-estimation of the truncation error in the Curtis--Reid approach
 and from sensitivity to near-zero third derivatives in the Dumontet--Vignes
-approach. It really tries multiple step sizes and handles missing
-values due to bad evaluations for inadequate step sizes really in a robust manner.
+approach. It really tries multiple step sizes.
 }
 \examples{
 gradstep(x = 1, FUN = sin, method = "CR")

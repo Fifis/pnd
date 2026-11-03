@@ -24,19 +24,19 @@ step.K(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
-\item{h0}{Numeric scalar: initial step size, defaulting to a relative step of
-slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).}
+\item{h0}{Numeric scalar: initial step size, defaulting to
+\code{2^round(log2(0.001 * max(abs(x), 1)))}.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
 
-\item{shrink.factor}{A scalar less than 1 that is used to create a sequence of
+\item{shrink.factor}{A positive scalar less than 1 that is used to create a sequence of
 step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
 number should be a negative power of 2 for the most accurate representation.}
 
@@ -49,14 +49,13 @@ If the function has full precision to the last bit, set to \code{.Machine$double
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{...}{Passed to FUN.}
 }
@@ -65,7 +64,7 @@ A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
 \item \code{value} – the estimated numerical first derivative (using central differences).
-\item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+\item \code{counts} – the number of grid points (each point includes two function evaluations).
 \item \code{abs.error} – an estimate of the truncation and rounding errors.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
@@ -91,11 +90,11 @@ rounding-to-truncation error is optimal.
 This function computes the optimal step size for central differences using the statistical
 kink-search approach.
 The optimal step size is determined as the minimiser of the total error, which for central
-differences is V-shaped with the left-branch slope equal to the negative derivation order
+differences is V-shaped with the left-branch slope equal to the negative derivative order
 and the right-branch slope equal to the accuracy order. For standard simple central
 differences, the slopes are -1 and 2, respectively. The algorithm uses the
-least-median-of-squares (LMS) penalty and searches for the optimal position of the check
-that fits the data the best on a bounded 2D rectangle using derivative-free (Nelder--Mead)
+mean pseudo-Huber penalty and searches for the optimal position of the check
+that fits the data the best using unconstrained BFGS
 optimisation.
 Unlike other algorithms, if the estimated third derivative is too small, the function shape
 will be different, and two checks are made for the existence of two branches.
@@ -114,9 +113,9 @@ step.K(atan, 1)
 step.K(sin, pi/2)
 step.K(sin, pi/2, shrink.factor = 0.8)
 
-# Edge case 1: the truncation error is always zero and f(x0) = 0
+# Edge case 2: the truncation error is always zero and f(x0) = 0
 suppressWarnings(step.K(function(x) x^2, 0))
-# Edge case 2: the truncation error is always zero
+# Other edge cases
 step.K(function(x) x^2, 1)
 step.K(function(x) x^4, 0)
 step.K(function(x) x^4, 0.1)

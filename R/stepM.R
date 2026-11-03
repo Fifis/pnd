@@ -26,26 +26,26 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
 #' @inheritParams GenD
-#' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
-#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}).
+#' @param h0 Numeric scalar: initial step size, defaulting to
+#'   \code{2^round(log2(0.001 * max(abs(x), 1)))}.
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
 #' @param max.rel.error Error bound for the relative function-evaluation error
 #'   (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
 #'   If the function is relying on numerical optimisation routines, consider setting to
 #'   \code{sqrt(.Machine$double.eps)}.
 #'   If the function has full precision to the last bit, set to \code{.Machine$double.eps/2}.
-#' @param shrink.factor A scalar less than 1 that is used to create a sequence of
+#' @param shrink.factor A positive scalar less than 1 that is used to create a sequence of
 #'   step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
 #'   number should be a negative power of 2 for the most accurate representation.
-#' @param seq.tol Numeric scalar: maximum relative difference between old and new
-#'   step sizes for declaring convergence.
+#' @param seq.tol Numeric scalar: maximum relative deviation of truncation-error
+#'   slopes from \code{acc.order}.
 #' @param min.valid.slopes Positive integer: how many points must form a sequence
-#'   with the correct slope with relative difference from 2 less than \code{seq.tol}.
+#'   with the correct slope with relative difference from \code{acc.order} less than \code{seq.tol}.
 #'   If \code{shrink.factor} is small (< 0.33), consider reducing this to 4.
-#' @param correction Logical: if \code{TRUE}, returns the corrected step size (last
+#' @param correction Logical: if \code{TRUE}, returns the corrected step size (first
 #'   point in the sequence times a less-than-1 number to account for the possible
 #'   continuation of the downwards slope of the total error); otherwise, returns
-#'   the grid point that is is lowest in the increasing sequence of valid error
+#'   the grid point that is lowest in the increasing sequence of valid error
 #'   estimates.
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
@@ -54,11 +54,11 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #' This function computes the optimal step size for central differences using the
 #' \insertCite{mathur2012analytical}{pnd} algorithm. It consists of the following steps.
 #'
-#' 1. Choose a reasonable large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
+#' 1. Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 #' factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
 #' 2. Compute a series of truncation error estimates via third derivatives or Richardson extrapolation.
-#' 3. Find the leftmost range of consecituve step sizes for which the slope of the trunctation error
-#'    it approximately equal (within 10% tolerance) to the accuracy order and which is long enough
+#' 3. Find the leftmost range of consecutive step sizes for which the slope of the truncation error
+#'    is approximately equal (within 10% tolerance) to the accuracy order and which is long enough
 #'    (e.g. at least length 5).
 #' 4. Use the leftmost point of this range as the uncorrected optimal step size, or correct it by shrinking
 #'    it by a small amount given in the article.
@@ -67,7 +67,7 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
 #'     \item \code{value} – the estimated numerical first derivative (using central differences).
-#'     \item \code{counts} – the number of iterations (each iteration includes two function evaluations).
+#'     \item \code{counts} – the number of grid points (each point includes two function evaluations).
 #'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
 #'     \item \code{exitcode} – an integer code indicating the termination status:
 #'       \itemize{

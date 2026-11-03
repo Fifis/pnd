@@ -29,14 +29,14 @@ getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
 #'
 #' @param x Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.
 #' @param FUN Function for which the optimal numerical derivative step size is needed.
-#' @param h0 Numeric scalar: initial step size, defaulting to a relative step of
-#'   slightly greater than .Machine$double.eps^(1/3) (or absolute step if \code{x == 0}). This step
-#'   size for first derivarives is internallt translated into the initial step size for third
+#' @param h0 Numeric scalar: initial step size, defaulting to
+#'   \code{1e-5 * max(abs(x), sqrt(.Machine$double.eps))}. This step
+#'   size for first derivatives is internally translated into the initial step size for third
 #'   derivatives by multiplying it by the machine epsilon raised to the power -2/15.
 #' @param range Numeric vector of length 2 defining the valid search range for the step size.
 #' @param max.rel.error Positive numeric scalar > 0 indicating the maximum relative
 #'   error of function evaluation. For highly accurate functions with all accurate bits
-#'   is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
+#'   it is equal to \code{.Machine$double.eps/2}. For noisy functions (derivatives, integrals,
 #'   output of optimisation routines etc.), it is higher, typically
 #'   \code{sqrt(.Machine$double.eps)}. Dumontet and Vignes recommend
 #'   \code{.Machine$double.eps^(3/4) = 2e-12} for common functions.

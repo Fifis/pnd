@@ -27,7 +27,7 @@ an accurate solution to non-confluent Vandermonde systems,
 which are known for their numerical instability. Unlike Gaussian elimination,
 which suffers from ill conditioning, this algorithm achieves numerical stability
 through exploiting the ordering of the stencil.
-An unsorted stencils will trigger a warning.
+An unsorted stencil will trigger a warning.
 Additionally, the stencil must contain unique points, as repeated values make
 the Vandermonde matrix confluent and therefore non-invertible.
 
@@ -39,7 +39,7 @@ See \insertCite{higham1987error}{pnd} for an in-depth error analysis of this alg
 }
 \examples{
 
-# Approximate the 4th derivatives on a non-negative stencil
+# Approximate the 4th derivative on a non-negative stencil
 solveVandermonde(s = 0:5, b = c(0, 0, 0, 0, 24, 0))
 
 # Small numerical inaccuracies: note the 6.66e-15 in the 4th position --

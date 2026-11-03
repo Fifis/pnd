@@ -8,14 +8,14 @@ stepx(x, deriv.order = 1, acc.order = 2, zero.tol = NULL)
 }
 \arguments{
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite.}
+Function values must be finite.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
 \eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{zero.tol}{Small positive integer: if \code{abs(x) >= zero.tol}, then, the automatically
 guessed step size is relative or near-relative (\code{x} multiplied by the step),
@@ -26,7 +26,7 @@ A numeric vector of the same length as \code{x} with positive step sizes.
 }
 \description{
 Compute an appropriate finite-difference step size based on the magnitude of x,
-derivation order, and accuracy order. If the function and its higher derivatives
+derivative order, and accuracy order. If the function and its higher derivatives
 belong to the same order of magnitude, this step is near-optimal. For small x,
 returns a hard bound to prevent large machine-rounding errors.
 }

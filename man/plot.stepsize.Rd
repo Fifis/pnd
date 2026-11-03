@@ -14,13 +14,13 @@
 
 \item{...}{Additional graphical parameters passed to \code{plot()}.}
 
-\item{index}{Integer index of character name of the coordinate of \code{x} to plot.}
+\item{index}{Integer index or character name of the coordinate of \code{x} to plot.}
 }
 \value{
-Nothing (invisible null).
+The plotted step-size result.
 }
 \description{
-Plots the estimated truncation error and total errors, highlighting various
+Plots step-size diagnostics, highlighting various
 ranges obtained during step-size selection for numerical differentiation.
 Works for all implemented methods.
 }

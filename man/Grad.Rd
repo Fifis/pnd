@@ -30,19 +30,19 @@ Grad(
 }
 \arguments{
 \item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be
-computed. If the function returns a vector, the output will be a Jacobian.}
+computed.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite.}
+Function values must be finite.}
 
 \item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
 \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
-compares the output length ot the input length.}
+compares the output length to the input length.}
 
 \item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+a vector of values of the same length. Use \code{FALSE} for
 functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
 checks the output length and assumes vectorisation if it matches the input length;
@@ -61,7 +61,7 @@ Central differences are recommended unless computational cost is prohibitive.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{stencil}{Optional custom vector of points for function evaluation.
 Must include at least \code{m+1} points for the \code{m}-th order derivative.}
@@ -75,25 +75,24 @@ described in \code{?GenD}.}
 guessed step size is relative or near-relative (\code{x} multiplied by the step),
 unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
-\item{h0}{Numeric scalar of vector: initial step size for automatic search with
+\item{h0}{Numeric scalar or vector: initial step size for automatic search with
 \code{gradstep()}.}
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
-to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.}
+to save time.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -102,13 +101,17 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.}
 
 \item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
-\code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
+\code{?numDeriv::grad} for a list of values. Recognised arguments result in a warning.}
 
-\item{...}{Ignored.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 }
 \value{
-Numeric vector of the gradient. If \code{FUN} returns a vector,
-a warning is issued suggesting the use of \code{\link[=Jacobian]{Jacobian()}}.
+Numeric vector of the gradient. If \code{FUN} is classified as multi-valued,
+an error is issued suggesting the use of \code{\link[=Jacobian]{Jacobian()}}.
 }
 \description{
 Computes numerical derivatives and gradients of scalar-valued functions using
@@ -118,7 +121,7 @@ to accelerate computation of gradients for slow functions or
 to attain higher accuracy faster.
 }
 \details{
-This function aims to be 100\% compatible with the syntax of \code{numDeriv::Grad()},
+This function aims to be 100\% compatible with the syntax of \code{numDeriv::grad()},
 but there might be differences in the step size because some choices made in
 \code{numDeriv} are not consistent with theory.
 
@@ -132,7 +135,7 @@ a fixed step size \code{eps}, which we denote by \eqn{\varepsilon}{eps}.
 a fixed step
 \eqn{h := |d\cdot x| + \varepsilon (|x| < \mathrm{zero.tol})}{h := |d*x| + eps*(|x| < zero.tol)},
 where \code{d = 1e-4} is the relative step size and \code{eps} becomes an extra
-addition to the step size for the argument that are closer to zero than \code{zero.tol}.
+addition to the step size for the arguments that are closer to zero than \code{zero.tol}.
 }
 We believe that the latter may lead to mistakes when the user believes that they can set
 the step size for near-zero arguments, whereas in reality, a combination of \code{d} and \code{eps}
@@ -157,20 +160,21 @@ For two-sided differences, each extrapolation increases the accuracy order by 2.
 Here are the differences in the new compatible implementation.
 \describe{
 \item{eps}{If \code{numDeriv} \code{method = "simple"}, then,
-\code{ifelse(x!=0, abs(x), 1) * sqrt(.Machine$double.eps) * 2} is used because
+\code{1e-5 * .Machine$double.eps^(1/3 - 1/4)} is used because
 one-sided differences require a smaller step size to reduce the truncation error.
 If \code{method = "Richardson"}, then, \code{eps = 1e-5}.}
 \item{d}{If \code{numDeriv} \code{method = "Richardson"}, then, \code{d*abs(x)} is the
 step size for arguments above the zero tolerance and the baseline step size for
 small arguments that gets incremented by \code{eps}.}
-\item{r}{The number of Richardson extrapolations that successively reduce the initial step size.
-For two-sided differences, each extrapolation increases the accuracy order by 2.}
-\item{v}{The reduction factor in Richardson extrapolations.}
+\item{r}{Half the accuracy order for central differences, i.e. the number of
+Richardson extrapolations that successively reduce the initial step size.}
+\item{v}{Ignored (in the old implementation, used to be the reduction factor
+in Richardson extrapolations).}
 }
 
-\code{Grad} does an initial check (if \code{f0 = FUN(x)} is not provided)
+\code{Grad} does an initial check
 and calls \code{\link[=GenD]{GenD()}} with a set of appropriate parameters (\code{multivalued = FALSE}
-if the check succeds). In case of parameter mismatch, throws and error.
+if the check succeeds). In case of parameter mismatch, throws an error.
 }
 \examples{
 f <- function(x) sum(sin(x))

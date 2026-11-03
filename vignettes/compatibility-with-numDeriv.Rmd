@@ -1,5 +1,5 @@
 ---
-title: "Compatilibility of pnd with the syntax of numDeriv"
+title: "Compatibility of pnd with the syntax of numDeriv"
 output:
   rmarkdown::html_vignette:
     toc: true
@@ -11,7 +11,7 @@ date: "Created: 2024-10-01, last modified: 2025-03-08, compiled: `r Sys.Date()`"
 abstract: "We describe the syntax of the widely popular `numDeriv` package and show how the functions from the `pnd` package recognise and handle the parameters related to numerical difference computation. We draw parallels between the two, examine the differences, and provide recommendations for new users."
 keywords: "numerical differentiation, finite differences, backwards compatibility"
 vignette: >
-  %\VignetteIndexEntry{Compatilibility of pnd with the syntax of numDeriv}
+  %\VignetteIndexEntry{Compatibility of pnd with the syntax of numDeriv}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -39,7 +39,7 @@ library(pnd)
 library(numDeriv)
 ```
 
-Numerical derivatives are ubiquitous in applies statistics and numerical methods, which is why many packages rely on streamlined implementations of numerical derivatives as dependencies.
+Numerical derivatives are ubiquitous in applied statistics and numerical methods, which is why many packages rely on streamlined implementations of numerical derivatives as dependencies.
 The popular `numDeriv` package by Paul Gilbert and Ravi Varadhan has 314 reverse dependencies as of October 2024.
 Its flexibility allowed other packages to achieve better results by providing reasonable defaults and the interface for fine-tuning that matters in numerical optimisation and statistical inference.
 However, it has no parallel capabilities, which is why it takes a lot of time to calculate numerical gradients with its `grad` function.
@@ -69,7 +69,7 @@ f_{\mathrm{CD},4}' (x, h) := \frac{f(x - 2h) -8 f(x-h) + 8 f(x+h) - f(x+2h)}{12h
 \]
 Instead of $(x\pm h, x \pm 2h)$, any other convenient grid may be chosen. For the sake of brevity, we do not compare the accuracy of these approximations and refer to another vignette of this package, ‘Step-size-selection algorithm benchmark’.
 
-Instead of choosing a large evaluation grid in advance, the researcher may instead compute the numerical derivative for several different step sizes, $h_1 > h_2 > \ldots$, and combine multiple approximation to achieve higher accuracy. This is known as **Richardson extrapolation**:
+Instead of choosing a large evaluation grid in advance, the researcher may instead compute the numerical derivative for several different step sizes, $h_1 > h_2 > \ldots$, and combine multiple approximations to achieve higher accuracy. This is known as **Richardson extrapolation**:
 \[
 f_{\mathrm{Rich},4}' (x, h_1, h_2) := \frac{(h_1 / h_2)^2 f_{\mathrm{CD}}' (x, h_2) - f_{\mathrm{CD}}' (x, h_1)}{(h_1 / h_2)^2 - 1}
 \]
@@ -83,7 +83,7 @@ Therefore, to estimate a derivative numerically, the user should be able to supp
 * The function $f$ and evaluation point $x$;
 * The side to determine whether forward, central, or backward differences should be calculated;
 * The step size $h$; 
-* The desired accuracy order $a$ for the truncation error to be $O(h^a)$ (requiring at least $2a$ evaluations). (Assuming, as described in the note above, that it means either the initial step size or the grid spacing based on the implementation.)
+* The desired accuracy order $a$ for the truncation error to be $O(h^a)$ (requiring at least $a$ evaluations). (Assuming, as described in the note above, that it means either the initial step size or the grid spacing based on the implementation.)
 
 Vector cases and, therefore, Jacobians can be approximated by applying these formulæ to each coordinate of $f$:
 \[
@@ -137,7 +137,7 @@ numd1 <- grad(func1, x)  # Old
 numd2 <- Grad(func1, x)  # New
 numd3 <- Grad(func1, x, h = gradstep(func1, x)$par)  # New auto-selection
 exact <- 10*cos(10*x) + exp(-x)
-c(Exact = exact, Old = numd1, New = numd2, NewAuto = numd2,
+c(Exact = exact, Old = numd1, New = numd2, NewAuto = numd3,
   OldErr = (numd1-exact)/exact, NewErr = (numd2-exact)/exact,
   NewAutoErr = (numd3-exact)/exact)
 ```
@@ -152,7 +152,7 @@ numd1 <- grad(func1, x)  # Old
 numd2 <- Grad(func1, x)  # New
 numd3 <- Grad(func1, x, h = sapply(x, function(y) gradstep(func1, y)$par))
 exact <- 10*cos(10*x) + exp(-x)
-cbind(Exact = exact, Old = numd1, New = numd2, NewAuto = numd2,
+cbind(Exact = exact, Old = numd1, New = numd2, NewAuto = numd3,
  OldErr = (numd1-exact)/exact, NewErr = (numd2-exact)/exact,
   NewAutoErr = (numd3-exact)/exact)
 ```
@@ -179,7 +179,7 @@ hessian(fun1e, x, method.args=list(d=0.01))
 ## Vectorisation pitfalls
 
 Vectorisation does not occur naturally in computer science; it is rather a feature of a specially designed system than a natural property of hardware or software.
-From the theoretical point of view, computers are imperfect, restricted versions of Turing machine, analogous to deterministic finite automata or linear bounded automata, capable of reading and writing on a ‘tape’ of practically limited size provided a sequence of instructions.
+From the theoretical point of view, computers are imperfect, restricted versions of a Turing machine, analogous to deterministic finite automata or linear bounded automata, capable of reading and writing on a ‘tape’ of practically limited size provided a sequence of instructions.
 At the hardware level, computers are capable of executing a set of processor instructions, and these instructions are typically supplied sequentially.
 In fact, vectorisation at the hardware level is a relatively rare phenomenon because without a proper set-up, it may lead to race conditions and non-deterministic behaviour.
 In certain architectures or extensions (MMX, SSE, AVX), the data for calculations can be set up in such a manner that one single instruction processes multiple inputs, which can be achieved by packing the values into one large register (e.g. four 32-bit numbers into one 128-bit SIMD register).
@@ -187,7 +187,7 @@ However, it is not easy to organise control flow in such a manner, which is why 
 
 The strong point of the **R** language is its vectorisation.
 One may argue that this feature leads to its inefficiency compared to, e.g., C++.
-Indeed, in C++, the overhead in loops is typically irreducible and boils down to such hard-to-control factors as jump instructions and data alignment to memory pages, whereas in R, the overhead appear at each loop iteration due to environment manipulation, extra assignment, name look-up, and occasional class-specific method execution.
+Indeed, in C++, the overhead in loops is typically irreducible and boils down to such hard-to-control factors as jump instructions and data alignment to memory pages, whereas in R, the overhead appears at each loop iteration due to environment manipulation, extra assignment, name look-up, and occasional class-specific method execution.
 On the other hand, not writing loops is useful when it would take more human time to allocate memory and run a loop than computer time to repeat redundant high-level operations under the hood: what matters is the total time saved, machine and human combined.
 Finally, if there is no explicit loop in a function because the latter relies internally on `apply()` or calls C/C++ loops on high-level or computationally heavy objects, then, the overhead due to the high-level nature of R does not create substantial time losses compared to the inner computations, and a vectorised function can be as slow as its loop-based sequential version.
 This can be seen in the definition of `do_vapply` in `apply.c`: the user-supplied function is called in a loop; the implementation of `SEXP lapply` also contains a C loop.
@@ -214,7 +214,7 @@ The same phenomenon is observed in the real world with storage media: copying 10
 
 The case of non-vectorised scalar output for scalar input, $f_1$, can be vectorised trivially by putting the function inside a loop or an `apply`-like operation.
 Then, the preparation task for approximating $f'_1$ is creating an array of values at which the function will be evaluated in a loop or in a sequence of parallel jobs (if $f_1$ is computationally costly and the parallelisation overhead is small compared to the evaluation time of $f_1$).
-This is the case if $f_1(x_0)$ has length 1 for scalar $x_0$ and throws and error for vector $x_0$.
+This is the case if $f_1(x_0)$ has length 1 for scalar $x_0$ and throws an error for vector $x_0$.
 
 If the function $f_2$ returns a vector of length $m$ for scalar input, then, its coordinate-wise derivatives make up a Jacobian with dimensions $m\times 1$. Such a function should return an error for vector input, but a list of scalar inputs should produce a list of vector outputs in a loop / apply-like call that can be combined to obtain the **Jacobian** approximation.
 The user should be aware of this function behaviour and specifically request a Jacobian.
@@ -248,7 +248,7 @@ This occurrence is more likely if $n$ and $m$ are small: for long inputs, a long
 
 **2.** If $n\ne m$ but the function is internally parallelised coordinate-wise, then, dimension checks based on the observed input and output lengths may be flawed and result in unexpected behaviour.
 Technically, computing $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^m$ can be seen as repeated application of $f_2\colon \mathbb{R} \mapsto \mathbb{R}^m$ to a list of $n$ points, and its parallelisation can be envisioned as such.
-However, if $f_4$ is implemented as stacked $f_3\colon \mathbb{R}^n \mapsto \mathbb{R}$, the output should be trated differently.
+However, if $f_4$ is implemented as stacked $f_3\colon \mathbb{R}^n \mapsto \mathbb{R}$, the output should be treated differently.
 
 The Jacobian matrix can be created by column, stacking evaluations of $\frac{\partial}{\partial x} f^{(i)}_4(x)$ at each point $x_1, \ldots, x_n$, or by row, binding the transposed gradients $\nabla^\intercal f^{(i)}_4(x)$ of each coordinate of $f$.
 In **R**, matrices can be created by column (default) or by row, which determines the order in which the vector of length $nm$ is wrapped, but the exact method has to be decided by the user or, in case of a package, inferred from the function behaviour. 
@@ -265,17 +265,17 @@ The Jacobian of $f$ is $(\cos x, -\sin x)$; therefore, the expected output for `
 However, the output is a matrix made of stacked diagonal matrices, and the result is wrong even when $n\ne m$!
 
 The root cause of this error is the manner in which the vector-valued function is defined: the length of the object `c(sin(x), cos(x))` depends on the length of `x`: if `length(x) == n`, then, `length(c(sin(x), cos(x))) == 2*n`, and **R** sees the output as a vector, not a matrix!
-Hence, `jacobian(f, x0)` computes `f(x0)` to check the function dimension, infers from the output `f(c(sin(1:2), cos(1:2)))` that $m = 4$, $n = 2$, which is wrong, and pre-allocates a $4\times 2$ matrix of zeros for the results. $\blacksquare$
+Hence, `jacobian(f, x0)` computes `f(x0)` to check the function dimension, infers from the output `f(1:2)` that $m = 4$, $n = 2$, which is wrong, and pre-allocates a $4\times 2$ matrix of zeros for the results. $\blacksquare$
 
 Therefore, without any *a priori* information about the function inputs and outputs, the function that computes matrices of derivatives should follow the following logic for determining dimensions and handling potential errors: 
 
 * If the input argument `x` is a scalar, prepare an evaluation grid in the form of a list, evaluate `f` on that grid, and combine the result by row. For safety, ignore the fact that `f` may be vectorised (like `sin(1:100)`) and may handle vector inputs in some cases.
     - If the resulting matrix has 1 column, then, the function is either $f_1\colon \mathbb{R} \mapsto \mathbb{R}$ or $f_3\colon \mathbb{R}^n \mapsto \mathbb{R}$ (since the output has length 1). Proceed with computing the derivative approximation via weighted sums and return the derivative estimate. If a Jacobian was initially requested, throw a warning that the output of `f` is a scalar and gradient facilities should be used.
-    - If the resulting matrix has more than 1 column, then, the function is either $f_2\colon \mathbb{R} \mapsto \mathbb{R}^m$ or $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^m$. Proceed with computing the Jacobian approximation via weighted sums and return the row matrix of the Jacobian estimate. If a gradient was initially requested, throw a warning that the output of `f` is not a scalar and Jacobian facilities should be used, or return an error that this case should be handled by the Jacobian routine directly.
+    - If the resulting matrix has more than 1 column, then, the function is either $f_2\colon \mathbb{R} \mapsto \mathbb{R}^m$ or $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^m$. Proceed with computing the Jacobian approximation via weighted sums and return the column matrix of the Jacobian estimate. If a gradient was initially requested, throw a warning that the output of `f` is not a scalar and Jacobian facilities should be used, or return an error that this case should be handled by the Jacobian routine directly.
 * If the input argument `x` is a vector, first, it must be determined if `f` is vectorised $\vec f_1\colon \mathbb{R} \mapsto \mathbb{R}$ or not. Call `f(x)` and examine the output.
     - If the output has the same length as the input, it is highly likely that `f` is vectorised -- for a counterexample where it is not, see Example 1 above showing that if the output is a vector, an input of identical length may create the impression of vectorisation by pure chance. This case can be checked by calling `f(x[1])` and checking if the output has length 1. If not, a warning that the user should request a Jacobian for a vector-valued function should be issued. If this check is passed, proceed by assuming vectorisation and prepare the evaluation grid as a long vector to reduce overhead.
     - If the output has length 1, then, the function is certainly $f_3\colon \mathbb{R}^n \mapsto \mathbb{R}$, and `f` should be applied to a list of input vectors for gradient approximation. If the user requested a Jacobian, a warning should be shown.
-    - If the output length is neither `length(x)` nor `1`, then `f` definitely belongs to the class $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^m$. In this case, similarly to the the case with scalar output, a list of vectors should be prepared as the evaluation grid for Jacobian approximation. If the user requested a gradient, throw a warning that the result is a Jacobian matrix with non-null dimensions.
+    - If the output length is neither `length(x)` nor `1`, then `f` definitely belongs to the class $f_4\colon \mathbb{R}^n \mapsto \mathbb{R}^m$. In this case, similarly to the case with scalar output, a list of vectors should be prepared as the evaluation grid for Jacobian approximation. If the user requested a gradient, throw a warning that the result is a Jacobian matrix with non-null dimensions.
 
 The user should know whether their function is scalar- or vector-valued and call the gradient or Jacobian routine accordingly.
 Nevertheless, a check should be carried out for dimensionality and vectorisation.
@@ -290,7 +290,7 @@ Nevertheless, a check should be carried out for dimensionality and vectorisation
 
 **Jacobians** should be checked similarly: compute `f(x)` and check the following.
 
-* If `length(f(x)) == 1`, return an error indicating that a gradient should be computed instead.
+* If `length(f(x)) == 1`, return the gradient as a row matrix.
 * If `length(x) > 1` and `length(f(x)) > 1`, create the evaluation grid as a list and call `f` on it directly. This is the $\vec f_4$ case. Even if the components of $f$ are vectorised, applying `f` to a list of points is the only safe option.
 
 # Breakdown of `numDeriv::grad`
@@ -298,8 +298,8 @@ Nevertheless, a check should be carried out for dimensionality and vectorisation
 ## Handling vectorised inputs
 
 The implementation of `numDeriv::grad()` is clever: it allows both vectorised and non-vectorised functions to be provided as the input argument.
-Since gradients are defined for scalar functions, it has to check whether the function of interest is scalar- or vector values.
-This can be non-trivial with vectorised functions: although $\sin x$ is as scalar function, `sin(1:100)` will return a vector in R.
+Since gradients are defined for scalar functions, it has to check whether the function of interest is scalar- or vector-valued.
+This can be non-trivial with vectorised functions: although $\sin x$ is a scalar function, `sin(1:100)` will return a vector in R.
 Therefore, `numDeriv::grad()` has to determine if the *implementation* of $f$ is $\mathbb{R}^n \mapsto \mathbb{R}^n$ (scalar / vectorised scalar), or $\mathbb{R}^n \mapsto \mathbb{R}$ (scalar multivariate function), or neither.
 Hence, functions like $\mathbb{R} \mapsto \mathbb{R}^n$ or $\mathbb{R}^n \mapsto \mathbb{R}^m$ are not considered valid inputs.
 
@@ -307,7 +307,7 @@ Internally, `numDeriv::grad(f, x0, ...)` computes `f0 = f(x0, ...)` and checks t
 For the input argument `x0` with `length(x0) = n`, the allowed lengths of `f0` are either `1` (scalar output) or `n` (vectorised output).
 Expressions such as `grad(function(x) c(sin(x), cos(x)), x = 1)` return an error, implying that for vector-valued function, the user might want to compute a Jacobian.
 Similarly, `numDeriv::hessian()` checks the dimensions of `f0 = f(x0, ...)` and only allows non-vectorised functions with `length(f0) == 1`.
-Finally, the function `numDeriv::genD` computes the first- and second-derivative information (without cross-derivatives).
+Finally, the function `numDeriv::genD` computes the first- and second-derivative information (including cross-derivatives).
 
 This check is not without its drawbacks: it may miscalculate function dimensions. The implementation in `pnd::Grad()` handles the edge cases that cause wrong outputs in `numDeriv::grad()`.
 
@@ -354,8 +354,8 @@ There are 3 methods implemented in `numDeriv` for gradient calculation: ‘simpl
 
 This syntax of `numDeriv::grad` makes consistent step size selection a chore because of the differences in method implementations. If `method = "simple"`, the step size is `method.args$eps` (defaults to $10^{-4}$), and it is absolute. If `method = "Richardson"`, the step size is the initial step size in the Richardson extrapolation, and is computed as follows:
 
-* If $x \ge \mathrm{zero.tol}$, then, the step size is relative, equal to $h = d|x|$ with default  $d = 10^{-4}$ and $\mathrm{zero.tol} = \sqrt{\epsilon_{\mathrm{mach}} / (7 \cdot 10^{-7})} \approx 1.8 \cdot 10^{-5}$;
-* If $x < \mathrm{zero.tol}$, then, an absolute step is added to the relative one, resulting in the effective step size $h = d|x| + \epsilon$ with default $\epsilon = 10^{-1}$.
+* If $|x| \ge \mathrm{zero.tol}$, then, the step size is relative, equal to $h = d|x|$ with default  $d = 10^{-4}$ and $\mathrm{zero.tol} = \sqrt{\epsilon_{\mathrm{mach}} / (7 \cdot 10^{-7})} \approx 1.8 \cdot 10^{-5}$;
+* If $|x| < \mathrm{zero.tol}$, then, an absolute step is added to the relative one, resulting in the effective step size $h = d|x| + \epsilon$ with default $\epsilon = 10^{-4}$.
 * A succession of finite differences is computed $r$ times (default $r = 4$) where at each step, $h$ is reduced by a factor of $v$ (default $v = 2$).
 
 Technical remarks.
@@ -368,7 +368,7 @@ Technical remarks.
 
 ## numDeriv zero handling has a discontinuity
 
-In `numDeriv`, the default step size -- arguably the most important tuning parameter of numerical differences -- is equal to `d*x + (abs(x)<zero.tol) * eps`, where ` = 1e-4`, `d = 1e-4`, `zero.tol = sqrt(.Machine$double.eps/7e-7)` (approximately `1.8e-5`).
+In `numDeriv`, the default step size -- arguably the most important tuning parameter of numerical differences -- is equal to `abs(d*x) + (abs(x)<zero.tol) * eps`, where `eps = 1e-4`, `d = 1e-4`, `zero.tol = sqrt(.Machine$double.eps/7e-7)` (approximately `1.8e-5`).
 
 * The manual states, ‘`eps` is used instead of `d` for elements of `x` which are zero’, but the implementation is different: if `x` is just below `zero.tol`, the actual step is not `eps` but `d*zero.tol + eps`.
 * If `x` transitions from being below just `zero.tol` to being just above it, the step size changes from `d*zero.tol + eps` to `d*zero.tol`, i.e. it decreases, which creates a discontinuity and a counter-intuitive result.
@@ -382,9 +382,9 @@ grad(f, 1.8e-5, method.args = list(r = 2))  # step 1.8e-9
 
 In `pnd`, the default step size is decided depending on the value of `x`:
 
-1. For `x < zero.tol`, it is constant and equal to `zero.tol`, where the revised value of `zero.tol` is `sqrt(.Machine$epsilon)`, or `1.5e-8`;
-2. For `x > 1`, the step size is equal to `x` times the machine epsilon to the appropriate power (inverse of the sum of derivative and accuracy orders);
-3. For `zero.tol <= x <= 1`, the step size is interpolated exponentially between `zero.tol` and `macheps^(1 / (deriv.order + acc.order))`.
+1. For `abs(x) < zero.tol`, it is constant and equal to `zero.tol`, where the revised value of `zero.tol` is `.Machine$double.eps^(1/2.5)`, or `5.5e-7`;
+2. For `abs(x) > 1`, the step size is equal to `abs(x)` times the machine epsilon to the appropriate power (inverse of the sum of derivative and accuracy orders);
+3. For `zero.tol <= abs(x) <= 1`, the step size is interpolated exponentially between `zero.tol` and `macheps^(1 / (deriv.order + acc.order))`.
 
 The chosen value of `zero.tol` is reasonable in many applications in biostatistics and econometrics where non-negativity of certain parameters in optimisation is often achieved via box constraints with a comparable distance from the boundary.
 
@@ -429,10 +429,10 @@ print(b)
 
 Here, the weights on the outermost points -- the first step of the iteration with $h_1$ -- are minuscule (`2.2e-5`). The relative importance of each iteration for this specific function at this specific point can be found from the equation
 \begin{multline*}
-f'_{\mathrm{Rich,8}} = \sum_{i=1}^4 w_{i}[f(x + h_i) - f(x + h_i)],
+f'_{\mathrm{Rich,8}} = \sum_{i=1}^4 w_{i}[f(x + h_i) - f(x - h_i)],
 \end{multline*}
-where $\{w_i\}_{i=1}^4 \approx \{+0.608, -0.0997, +0.0031, -0.00002\}$.
-These values are available as a length analytical expression with denominator 45360, but in this case, they were calculated numerically:
+where $\{w_i\}_{i=1}^4 = \{-1,168,-5376,32768\}/(45360h_4)$.
+These values are available as a lengthy analytical expression with denominator $45360h_4$, but in this case, they were calculated numerically:
 
 ```{r stencil}
 fd <- sin(x0 + b$stencil / 8 * 1e-4) * b$weights
@@ -472,7 +472,7 @@ Computer programmes in the 1980s were often optimised for memory use and size, n
 Therefore, a reader might get confused by the terms ‘extrapolation group’, ‘improvement iteration’, and ‘accuracy order’.
 The `pnd` package aims to provide more straightforward diagnostic information.
 
-Suppose that one wants to compute the derivative of $f(x) = x^7$ at $x_0 = 1$ -- therefore, the true derivative value is $f'(1) = 6$.
+Suppose that one wants to compute the derivative of $f(x) = x^9$ at $x_0 = 1$ -- therefore, the true derivative value is $f'(1) = 9$.
 The following code effectively debugs `numDeriv::grad()` and shows how many values are computed (we choose the initial step size $h=2^{-10} = 1/1024$ to avoid any representation error of $x_0+h$):
 ```{r}
 f <- function(x) {print(x, digits = 16); x^9} 
@@ -480,23 +480,23 @@ fp1 <- numDeriv::grad(f, x = 1, method.args = list(r = 4, d = 2^-10, show.detail
 print(fp1, digits = 16)
 ```
 
-In total, the function was called 9 times: 1 for the initial dimensionality check and 2 times per each of the 4 iterations (since `r r = 4`).
-In this implementation, the terminology differs from the textbook that it is referring to: `numDeriv`'s ‘first-order approximations’ correspond to Lindfield & Penny’s ‘Group 1’, ‘Richarsdon improvement group No. 1’ to LP’s ‘Group 2’, and the final output returned by `grad()` would be ‘Group 4’.
+In total, the function was called 9 times: 1 for the initial dimensionality check and 2 times per each of the 4 iterations (since `r=4`).
+In this implementation, the terminology differs from the textbook that it is referring to: `numDeriv`'s ‘first-order approximations’ correspond to Lindfield & Penny’s ‘Group 1’, ‘Richardson improvement group No. 1’ to LP’s ‘Group 2’, and the final output returned by `grad()` would be ‘Group 4’.
 
 In central differences, $f(x_0)$ is not used; with 8 symmetric evaluations, the truncation error of the result is $O(h^8)$.
-**Therefore, the standard textbook results about the optimal step size for central first differences being proportional to** $\epsilon_{\mathrm{mach}}^{1/3}$ **are not applicable to** `numDeriv::grad()` **because the default accuracy order is 8 and the step size of the order** $\epsilon_{\mathrm{mach}}^{1/3}$ **is appropriate in this case**.
+**Therefore, the standard textbook results about the optimal step size for central first differences being proportional to** $\epsilon_{\mathrm{mach}}^{1/3}$ **are not applicable to** `numDeriv::grad()` **because the default accuracy order is 8 and the step size of the order** $\epsilon_{\mathrm{mach}}^{1/9}$ **is appropriate in this case**.
 
 With `pnd`, there is no need to re-define the function to save its computed values because both the grid and the function values are returned as the attribute.
 ```{r}
 # f <- function(x) x^9
-# fp2 <- pnd::Grad(f, x = 1, h = "SW", acc.order = 8, vectorised1d = TRUE)
-# print(attributes(fp2)$step.search$iterations, digits = 16)
+# fp2 <- pnd::Grad(f, x = 1, h = "SW", acc.order = 8, vectorised = TRUE)
+# print(attributes(fp2)$step.search$original[[1]]$iterations, digits = 16)
 ```
 
 This highlights an important difference between the two packages:
 
-* `numDeriv::grad()` starts at a relatively large step size $h = 10^{-4} \cdot \max(|x_0|, 1)$ and repeatedly shrinks it, yielding an exponentially decreasing sequence $h, h / v, h / v^2, \ldots$ using the same reduction factor $v$ to attain the desired accuracy order $a = 2v$ -- **slow due to many evaluations, but rather accurate**;
-* `pnd::Grad()` starts at the rule-of-thumb step size of the correct order $\epsilon_{\text{mach}}^{1/(1+a)}$. By default, it computes central derivatives $f'_{\mathrm{CD}}(x, h)$ with accuracy order $a = 2$ -- **fast due to fewer evaluations, smaller default step size that agrees with numerical analysis literature, estimates of the approximation error are provided**. If accuracy order $a > 2$ is requested, then, the evaluation grid is linear: $x \pm h, x \pm 2h, x \pm 3h, \ldots$.
+* `numDeriv::grad()` starts at a relatively large step size $h = d|x_0| + \epsilon \mathbb{I}(|x_0| < \mathrm{zero.tol})$ and repeatedly shrinks it, yielding an exponentially decreasing sequence $h, h / v, h / v^2, \ldots$ using the same reduction factor $v$ to attain the desired accuracy order $a = 2r$ -- **slow due to many evaluations, but rather accurate**;
+* `pnd::Grad()` starts at the rule-of-thumb step size of the correct order $\epsilon_{\text{mach}}^{1/(1+a)}$. By default, it computes central derivatives $f'_{\mathrm{CD}}(x, h)$ with accuracy order $a = 2$ -- **fast due to fewer evaluations, smaller default step size that agrees with numerical analysis literature**. If accuracy order $a > 2$ is requested, then, the evaluation grid is linear: $x \pm h, x \pm 2h, x \pm 3h, \ldots$.
 
 Finally, the method argument `show.details = TRUE` is ignored for Hessians in `numDeriv`:
 ```{r}

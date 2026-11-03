@@ -41,19 +41,19 @@ GenD(
 }
 \arguments{
 \item{FUN}{A function returning a numeric scalar or a vector whose derivatives are to be
-computed. If the function returns a vector, the output will be a Jacobian.}
+computed.}
 
 \item{x}{Numeric vector or scalar: the point(s) at which the derivative is estimated.
-\code{FUN(x)} must be finite.}
+Function values must be finite.}
 
 \item{elementwise}{Logical: is the domain effectively 1D, i.e. is this a mapping
 \eqn{\mathbb{R} \mapsto \mathbb{R}}{R -> R} or
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^n}{R^n -> R^n}. If \code{NA},
-compares the output length ot the input length.}
+compares the output length to the input length.}
 
 \item{vectorised}{Logical: if \code{TRUE}, the function
 is assumed to be vectorised: it will accept a vector of parameters and return
-a vector of values of the same length. Use \code{FALSE} or \code{"no"}  for
+a vector of values of the same length. Use \code{FALSE} for
 functions that take vector arguments and return outputs of arbitrary length (for
 \eqn{\mathbb{R}^n \mapsto \mathbb{R}^k}{R^n -> R^k} functions). If \code{NA},
 checks the output length and assumes vectorisation if it matches the input length;
@@ -72,7 +72,7 @@ Central differences are recommended unless computational cost is prohibitive.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
-The final error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
+The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{stencil}{Optional custom vector of points for function evaluation.
 Must include at least \code{m+1} points for the \code{m}-th order derivative.}
@@ -86,25 +86,24 @@ described in \code{?GenD}.}
 guessed step size is relative or near-relative (\code{x} multiplied by the step),
 unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
-\item{h0}{Numeric scalar of vector: initial step size for automatic search with
+\item{h0}{Numeric scalar or vector: initial step size for automatic search with
 \code{gradstep()}.}
 
 \item{control}{A named list of tuning parameters passed to \code{gradstep()}.}
 
 \item{f0}{Optional numeric: if provided, used to determine the vectorisation type
-to save time. If FUN(x) must be evaluated (e.g. second derivatives), saves one evaluation.}
+to save time.}
 
 \item{cores}{Integer specifying the number of CPU cores used for parallel computation.
 Recommended to be set to the number of physical cores on the machine minus one.}
 
-\item{preschedule}{Logical: if \code{TRUE}, disables pre-scheduling for \code{mclapply()}
-or enables load balancing with \code{parLapplyLB()}. Recommended for functions that
+\item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
+or disables load balancing with \code{parLapply()}. Recommended for functions that
 take less than 0.1 s per evaluation.}
 
 \item{cl}{An optional user-supplied \code{cluster} object  (created by \code{makeCluster}
 or similar functions). If not \code{NULL}, the code uses \code{parLapply()} (if \code{preschedule}
-is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mclapply}
-(fork cluster) on everything else.}
+is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 
 \item{func}{For compatibility with \code{numDeriv::grad()} only. If instead of
 \code{FUN}, \code{func} is used, it will be reassigned to \code{FUN} with a warning.}
@@ -113,11 +112,15 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on Windows, and \code{mc
 \code{"simple"} and \code{"Richardson"}. Non-null values result in a warning.}
 
 \item{method.args}{For compatibility with \code{numDeriv::grad()} only. Check
-\code{?numDeriv::grad} for a list of values. Non-empty lists result in a warning.}
+\code{?numDeriv::grad} for a list of values. Recognised arguments result in a warning.}
 
-\item{...}{Ignored.}
+\item{...}{Additional arguments passed to \code{FUN}. Important! Since R does partial
+matching for argument names, using arguments like \code{f(x, a)} and passing \code{a = 1}
+to \code{\link[=GenD]{GenD()}}, \code{\link[=Grad]{Grad()}}, or \code{\link[=Jacobian]{Jacobian()}} will result in the interpretation \code{acc.order = 1}
+because the latter is a named argument of these functions. Either supply the full names of all
+similar-looking arguments or name arguments differently (e.g. \code{a0} instead of \code{a}).}
 
-\item{digits}{Positive integer: the number of digits after the decimal comma to round to
+\item{digits}{Positive integer: the number of digits after the decimal point in scientific notation
 (i.e. one less than the number of significant digits).}
 
 \item{shave.spaces}{Logical: if true, removes spaces to ensure compact output; if false, results
@@ -132,8 +135,8 @@ in nearly fixed-width output (almost).}
 }
 \value{
 A vector or matrix containing the computed derivatives, structured according
-to the dimensionality of \code{x} and \code{FUN}. If \code{FUN} is scalar-valued,
-returns a gradient vector. If \code{FUN} is vector-valued, returns a Jacobian matrix.
+to the dimensionality of \code{x} and \code{FUN}. If the function is classified as single-valued,
+returns a gradient vector; otherwise, returns a Jacobian matrix.
 }
 \description{
 Computes numerical derivatives of a scalar or vector function using finite-difference methods.
@@ -153,18 +156,20 @@ to balance the Taylor series truncation error with the rounding error due to sto
 function values with limited precision. For two-sided differences, it is proportional
 to Mach.eps^(1/3). However, selecting the best step size typically requires knowledge
 of higher-order derivatives, which may not be readily available. Luckily,
-using \code{step = "SW"} invokes a reliable automatic data-driven step-size selection.
+using \code{h = "SW"} invokes a reliable automatic data-driven step-size selection.
 Other options include \code{"DV"}, \code{"CR"}, and \code{"CRm"}.
-The step size  defaults to \code{1.5e-8} (the square root of machine epsilon)
-for \code{x} less than \code{1.5e-8},
-\code{(2.2e-16)^(1/(deriv.order + acc.order)) * x} for \code{x > 1}, and interpolates
-exponentially between these values for \code{1.5e-8 < x < 1}.
+With default \code{zero.tol}, the step size is \code{.Machine$double.eps^(1/(deriv.order + acc.order - 0.5))}
+for \code{abs(x) < zero.tol},
+\code{(2.2e-16)^(1/(deriv.order + acc.order)) * abs(x)} for \code{abs(x) > 1}, and interpolates
+exponentially between these values for \code{zero.tol <= abs(x) <= 1}.
 
 The use of \code{f0} can reduce computation time similar to the use of \code{f.lower}
 and \code{f.upper} in \code{uniroot()}.
 
 Unlike \code{numDeriv::grad()} and \code{numDeriv::jacobian()}, this function
 fully preserves the names of \code{x} and \code{FUN(x)}.
+
+Additional arguments to the print method (\code{...}) are ignored.
 }
 \examples{
 
@@ -182,7 +187,7 @@ g2 - g2.h2  # Tiny differences due to different step sizes
 g2.auto <- Grad(FUN = f2, x = 1:4, h = "SW")
 print(attr(g2.auto, "step.search")$exitcode)  # Success
 
-# Case 3: vector input, vector argument of different length
+# Case 3: vector input, vector output of different length
 f3 <- function(x) c(sum(sin(x)), prod(cos(x)))
 x3 <- 1:3
 j3 <- GenD(f3, x3, multivalued = TRUE)
@@ -198,8 +203,8 @@ x <- 1:4
 finner <- function(x) sin(x*log(abs(x)+1))
 fouter <- function(x) integrate(finner, 0, x, rel.tol = 1e-12, abs.tol = 0)$value
 # The outer function is non-vectorised
-fslow <- function(x) {Sys.sleep(0.01); fouter(x)}
-f0 <- sapply(x, fouter)
+fslow <- function(x) {Sys.sleep(0.01); sum(sapply(x, fouter))}
+f0 <- sum(sapply(x, fouter))
 system.time(GenD(fslow, x, side = 1, acc.order = 2, f0 = f0))
 # Now, with extra checks, it will be slower
 system.time(GenD(fslow, x, side = 1, acc.order = 2))
