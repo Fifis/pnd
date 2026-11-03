@@ -192,7 +192,6 @@ step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
     res.i <- getValsCR(FUN = FUN, x = x, h = hnew, deriv.order = deriv.order,
                        acc.order = acc.order, max.rel.error = max.rel.error,
                        cores = cores, cl = cl, preschedule = preschedule, ...)
-    iters[[i]] <- res.i
     if (any(bad <- !is.finite(res.i$f))) {
       bad.iters <- 0
       while (TRUE) {
@@ -209,6 +208,7 @@ step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
         if (!any(bad <- !is.finite(res.i$f))) break
       }
     }
+    iters[[i]] <- res.i
 
     if (res.i$ratio >= target[1] && res.i$ratio <= target[2]) {
       break # Successful termination by matching the range

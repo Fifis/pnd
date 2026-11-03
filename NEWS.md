@@ -30,6 +30,7 @@
 - Fix: use reduced spacing and accepted history in initial Stepleman--Winarsky recovery
 - Fix: return matching steps, derivatives and errors from Stepleman--Winarsky selection
 - Fix: follow the Stepleman--Winarsky zero-endpoint branch and explain undefined cancellation tests
+- Fix: record the accepted finite evaluation in Curtis--Reid recovery history
 
 
 # pnd 0.1.3 (2026-05-26)

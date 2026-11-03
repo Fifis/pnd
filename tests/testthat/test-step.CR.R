@@ -46,6 +46,24 @@ test_that("Curtis--Reid steps grow for linear functions", {
   expect_identical(step.CR(x = 1, function(x) x)$exitcode, 1L)
 })
 
+test_that("Curtis--Reid recovery records the accepted evaluation", {
+  seen <- numeric()
+  f <- function(z) {
+    seen <<- c(seen, z)
+    if (abs(z) <= 1/4) exp(z) else NA_real_
+  }
+  s <- step.CR(f, 0, h0 = 1, range = c(1e-8, 10), max.rel.error = 1e-3, aim = 1, tol = 2, cores = 1)
+  h <- s$par
+  expect_equal(seen, c(-1, 0, 1, -1/2, 0, 1/2, -1/4, 0, 1/4, -h, 0, h))
+  expect_equal(s$iterations$h, c(1/4, h))
+  expect_equal(s$iterations$x[1, ], c(-1/4, 0, 1/4))
+  expect_equal(s$iterations$f[1, ], exp(c(-1/4, 0, 1/4)))
+  expect_equal(unname(s$iterations$deriv[1, "cd"]), sinh(1/4)/(1/4))
+  expect_true(all(is.finite(s$iterations$ratio)))
+  expect_equal(s$value, sinh(h)/h, tolerance = 1e-8)
+  expect_identical(s$exitcode, 0L)
+})
+
 test_that("Large and small initial values in Curtis--Reid cause range problems", {
   f <- function(x) x^4
   expect_identical(step.CR(x = 2, f, h0 = 1000)$exitcode, 3L)
