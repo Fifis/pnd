@@ -32,7 +32,9 @@
 - Fix: follow the Stepleman--Winarsky zero-endpoint branch and explain undefined cancellation tests
 - Fix: record the accepted finite evaluation in Curtis--Reid recovery history
 - Fix: handle singleton Vandermonde systems and exact interpolation on integer zero stencils
-- Improvement: try a faster evaluation method (batching) for vectorised element-wise functions
+- Improvement: ~10% faster evaluation for long input point vectors owing to fewer temporary grid matrices
+- Improvement: 3--5x speed-up owing to batching for vectorised element-wise functions on long inputs
+- Improvement: 1.5--2.5x speed up with shared-stencil aggregation fast path on long inputs
 
 # pnd 0.1.3 (2026-05-26)
 - Fix: GitHub issue #5 -- simplified the dimension check for Jacobians

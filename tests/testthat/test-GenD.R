@@ -116,3 +116,28 @@ test_that("element-wise derivatives retain the parallel path", {
   expect_identical(do.call(GenD, c(args, list(cores = 1))),
                    suppressWarnings(do.call(GenD, c(args, list(cores = 2)))))
 })
+
+test_that("independent coordinate derivatives are equal to their counterparts with aggregation", {
+  x <- c(A = 1, B = 2, C = 3)
+  h <- setNames(c(1/32, 1/16, 1/8), names(x))
+  f <- function(z) c(fourth = sum(z^4), fifth = sum(z^5))
+  settings <- list(list(), list(deriv.order = c(1, 2, 3), stencil = -2:2),
+                   list(acc.order = c(2, 4, 6)))
+  for (setting in settings) {
+    args <- c(list(FUN = f, x = x, h = h, elementwise = FALSE,
+                   vectorised = FALSE, multivalued = TRUE), setting)
+    d <- do.call(GenD, args)
+    expect_identical(dimnames(d), list(c("fourth", "fifth"), names(x)))
+    expect_identical(attr(d, "step.size"), h)
+    expect_identical(attr(d, "step.size.method"), "user-supplied")
+    for (i in seq_along(x)) {
+      one <- args
+      one$FUN <- function(z) {y <- x; y[i] <- z; f(y)}
+      one$x <- x[i]
+      one$h <- h[i]
+      for (a in c("deriv.order", "acc.order"))
+        if (length(one[[a]]) > 1) one[[a]] <- one[[a]][i]
+      expect_identical(as.vector(d[, i]), as.vector(do.call(GenD, one)))
+    }
+  }
+})

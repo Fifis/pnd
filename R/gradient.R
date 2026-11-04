@@ -471,8 +471,9 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (length(h) != n) stop("The argument 'h' (step size) must have length 1 or length(x).")
 
   # Reuse weights for matching derivative orders on the same stencil.
-  if (length(unique(deriv.order)) == 1 &&
-      (!is.null(stencil) || (length(unique(acc.order)) == 1 && length(unique(side)) == 1))) {
+  same.stencil <- length(unique(deriv.order)) == 1 &&
+    (!is.null(stencil) || (length(unique(acc.order)) == 1 && length(unique(side)) == 1))
+  if (same.stencil) {
     # Default stencil or, if not null, the user-supplied one
     stencil1 <- fdCoef(deriv.order = deriv.order[1], acc.order = acc.order[1], side = side[1], stencil = stencil)
     stencils <- replicate(n, stencil1, simplify = FALSE)
@@ -530,9 +531,15 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     fvals <- do.call(rbind, fvals0)
   }
   wf <- fvals * grid$weights
-  wf <- lapply(split(wf, f = grid$index), matrix, ncol = ncol(wf)) # Matrices lose dimensions if split
-  wf <- lapply(wf, colSums)
-  jac <- unname(do.call(cbind, wf))
+  if (same.stencil && is.matrix(wf) && nrow(wf) == length(grid$index)) {
+    # Stencil points, coordinates, function outputs; sum in the original order.
+    dim(wf) <- c(length(stencil1$stencil), n, ncol(wf))
+    jac <- t(colSums(wf))
+  } else {
+    wf <- lapply(split(wf, f = grid$index), matrix, ncol = ncol(wf)) # Matrices lose dimensions if split
+    wf <- lapply(wf, colSums)
+    jac <- unname(do.call(cbind, wf))
+  }
   jac <- sweep(jac, 2, h^deriv.order, "/")
 
   if (!chk["multivalued"]) {
