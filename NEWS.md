@@ -15,7 +15,7 @@
 - MISC: Detailed vignette explaining the mathematics behind the functions with full transparency about the choice of parameters
 - DEV: ensure that `Grad` takes all the arguments of `GenD` and `Jacobian`, and vice versa
 - DEV: Ensure unit-test coverage >90%
-- DEV: Check the compatibility between the function and its documentation
+- DEV: Check correspondence between functions and their documentation (which might be lagging behind the developments)
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
 # pnd 0.1.4 (2026-11-XX)
@@ -32,7 +32,7 @@
 - Fix: follow the Stepleman--Winarsky zero-endpoint branch and explain undefined cancellation tests
 - Fix: record the accepted finite evaluation in Curtis--Reid recovery history
 - Fix: handle singleton Vandermonde systems and exact interpolation on integer zero stencils
-
+- Improvement: try a faster evaluation method (batching) for vectorised element-wise functions
 
 # pnd 0.1.3 (2026-05-26)
 - Fix: GitHub issue #5 -- simplified the dimension check for Jacobians

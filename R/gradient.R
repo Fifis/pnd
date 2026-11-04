@@ -497,27 +497,38 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   grid <- generateGrid(x = x, h = h, stencils = stencils, elementwise = chk["elementwise"],
                        vectorised = chk["vectorised"])
 
-  # Parallelising the task in the most efficient way possible, over all values of all grids
-  # TODO: deduplicate, save CPU
-  fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
-                        cores = cores, cl = cl, preschedule = preschedule)
-  nonfinite.f   <- !sapply(fvals0, is.finite)
-  horrible.f <- if (any(nonfinite.f))
-    nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite)) else FALSE
-  if (any(horrible.f)) {
-    warning("'FUN' must output numeric values only, but some non-numeric values were ",
-            "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
-            "returning character or other type. Check the function output.")
-    fvals0[horrible.f] <- NA_real_
-  } else if (any(nonfinite.f)) {
-    warning("'FUN' must output numeric values only, but some non-numeric values were ",
-            "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
-            "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution.")
-    fvals0[nonfinite.f] <- NA_real_
+  # Batch vectorised element-wise evaluations; retry scalars if the batch is unsuitable.
+  fvals <- NULL
+  if (chk["elementwise"] && chk["vectorised"] && !chk["multivalued"] &&
+      cores == 1 && is.null(cl)) {
+    fbatch <- tryCatch(safeF(FUN, unlist(grid$xlist, use.names = FALSE), ...),
+                       warning = function(w) NULL)
+    if (is.numeric(fbatch) && is.null(dim(fbatch)) &&
+        length(fbatch) == length(grid$xlist) && all(is.finite(fbatch)))
+      fvals <- matrix(fbatch, ncol = 1)
   }
+  if (is.null(fvals)) {
+    # TODO: deduplicate, save CPU
+    fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
+                          cores = cores, cl = cl, preschedule = preschedule)
+    nonfinite.f   <- !sapply(fvals0, is.finite)
+    horrible.f <- if (any(nonfinite.f))
+      nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite)) else FALSE
+    if (any(horrible.f)) {
+      warning("'FUN' must output numeric values only, but some non-numeric values were ",
+              "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
+              "returning character or other type. Check the function output.")
+      fvals0[horrible.f] <- NA_real_
+    } else if (any(nonfinite.f)) {
+      warning("'FUN' must output numeric values only, but some non-numeric values were ",
+              "returned (NA or NaN). Some gradient coordinates can be NA. Possible reason: point at ",
+              "the boundary of the support of FUN. Try side = 1 or -1 for a one-sided solution.")
+      fvals0[nonfinite.f] <- NA_real_
+    }
 
-  # The function can be vector-valued, which is why we ensure that dimensions are not dropped
-  fvals <- do.call(rbind, fvals0)
+    # The function can be vector-valued, which is why we ensure that dimensions are not dropped
+    fvals <- do.call(rbind, fvals0)
+  }
   wf <- fvals * grid$weights
   wf <- lapply(split(wf, f = grid$index), matrix, ncol = ncol(wf)) # Matrices lose dimensions if split
   wf <- lapply(wf, colSums)

@@ -60,3 +60,59 @@ test_that("custom stencils respect each coordinate's derivative order", {
   expect_error(GenD(function(x) sum(x^2), x, deriv.order = orders,
                      stencil = c(-1, 1), h = h), "unique stencil points")
 })
+
+test_that("element-wise batching preserves derivatives and attributes", {
+  named.input <- FALSE
+  calls <- 0L
+  f <- function(z, scale0) {
+    calls <<- calls + 1L
+    named.input <<- named.input || !is.null(names(z))
+    scale0*z^4
+  }
+  for (x in list(c(A = 1), c(A = 1, B = 2, C = 3))) {
+    n <- length(x)
+    args <- list(FUN = f, x = x, h = c(1/32, 1/16, 1/8)[seq_len(n)],
+                 deriv.order = seq_len(n), side = c(-1, 0, 1)[seq_len(n)],
+                 acc.order = c(2, 4, 2)[seq_len(n)], scale0 = 2,
+                 elementwise = TRUE, multivalued = FALSE, cores = 1)
+    for (stencil in list(NULL, -3:3)) {
+      calls <- 0L
+      batched <- do.call(GenD, c(args, list(stencil = stencil, vectorised = TRUE)))
+      expect_identical(calls, 1L)
+      scalar <- do.call(GenD, c(args, list(stencil = stencil, vectorised = FALSE)))
+      expect_identical(batched, scalar)
+    }
+  }
+  expect_false(named.input)
+})
+
+test_that("unsuitable batches fall back to scalar evaluations", {
+  run <- function(f, vectorised) GenD(f, c(-1, 1), h = 1/32, elementwise = TRUE,
+                                      vectorised = vectorised, multivalued = FALSE, cores = 1)
+  functions <- list(
+    function(z) {if (length(z) > 1) stop("batch failure"); z^2},
+    function(z) {if (length(z) > 1) warning("batch warning"); z^2},
+    function(z) if (length(z) > 1) 0 else z^2,
+    function(z) if (length(z) > 1) rep("bad", length(z)) else z^2,
+    function(z) if (length(z) > 1) matrix(z^2, nrow = 1) else z^2,
+    function(z) if (length(z) > 1) rep(Inf, length(z)) else z^2)
+  for (f in functions) expect_identical(run(f, TRUE), run(f, FALSE))
+
+  f <- function(z) {warning("scalar warning"); z^2}
+  expect_identical(capture_warnings(batched <- run(f, TRUE)),
+                   capture_warnings(scalar <- run(f, FALSE)))
+  expect_identical(batched, scalar)
+
+  f <- function(z) if (any(z < 0)) rep(NA_real_, length(z)) else z^2
+  expect_warning(batched <- run(f, TRUE), "NA or NaN")
+  expect_warning(scalar <- run(f, FALSE), "NA or NaN")
+  expect_identical(batched, scalar)
+  expect_equal(as.numeric(batched), c(NA, 2), tolerance = 1e-8)
+})
+
+test_that("element-wise derivatives retain the parallel path", {
+  args <- list(FUN = sin, x = c(A = 1, B = 2), h = 1/32,
+               elementwise = TRUE, vectorised = TRUE, multivalued = FALSE)
+  expect_identical(do.call(GenD, c(args, list(cores = 1))),
+                   suppressWarnings(do.call(GenD, c(args, list(cores = 2)))))
+})
