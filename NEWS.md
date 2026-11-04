@@ -4,7 +4,6 @@
 - FEATURE: use higher zero tolerances `stepx()` for higher-order derivatives, update all `step...` functions using it
 - FEATURE: add options for default accuracy (maybe 4?)
 - FEATURE: If `h` is a character in `Grad`, extract the gradient directly if the order is 2
-- FEATURE: suggest parallelisation if `f(x)` takes more than 0.002 s
 - FEATURE: CR, DV, SW, M, K algorithm for arbitrary derivative and accuracy orders
 - FEATURE: if any algorithm returns a step size larger than `|x| / max(stencil)`, throw a warning
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
@@ -36,6 +35,7 @@
 - Improvement: 3--5x speed-up owing to batching for vectorised element-wise functions on long inputs
 - Improvement: 1.5--2.5x speed up with shared-stencil aggregation fast path on long inputs
 - Improvement: ~2--30% speed-up through vectorised element-wise grid arithmetic
+- Improvement: added timing to measure overhead and function performance separately (global option)
 
 # pnd 0.1.3 (2026-05-26)
 - Fix: GitHub issue #5 -- simplified the dimension check for Jacobians

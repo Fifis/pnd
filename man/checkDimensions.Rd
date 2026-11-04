@@ -92,7 +92,8 @@ similar-looking arguments or name arguments differently (e.g. \code{a0} instead 
 }
 \value{
 A named logical vector indicating if a function is element-wise or not,
-vectorised or not, and multivalued or not.
+vectorised or not, and multivalued or not. Its \code{seconds} attribute is
+\code{NA} when \code{f0} is supplied or \code{options(pnd.timing = FALSE)}.
 }
 \description{
 Determine function dimensionality and vectorisation

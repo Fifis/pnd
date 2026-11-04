@@ -112,6 +112,7 @@ similar-looking arguments or name arguments differently (e.g. \code{a0} instead 
 \value{
 Numeric vector of the gradient. If \code{FUN} is classified as multi-valued,
 an error is issued suggesting the use of \code{\link[=Jacobian]{Jacobian()}}.
+Timing attributes are described in \code{\link[=GenD]{GenD()}}.
 }
 \description{
 Computes numerical derivatives and gradients of scalar-valued functions using

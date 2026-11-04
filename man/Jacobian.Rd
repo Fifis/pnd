@@ -113,6 +113,7 @@ similar-looking arguments or name arguments differently (e.g. \code{a0} instead 
 Matrix where each row corresponds to a function output and each column
 to an input coordinate. For scalar-valued functions,
 the output is returned as a row matrix.
+Timing attributes are described in \code{\link[=GenD]{GenD()}}.
 }
 \description{
 Computes the numerical Jacobian for vector-valued functions. Its columns are

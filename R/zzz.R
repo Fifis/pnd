@@ -34,4 +34,5 @@
   options(pnd.max.cores = getOption("pnd.max.cores", max.cores))
   options(pnd.preschedule = getOption("pnd.preschedule", TRUE))
   options(pnd.warn.vectorised = getOption("pnd.warn.vectorised", FALSE))
+  options(pnd.timing = getOption("pnd.timing", TRUE))
 }

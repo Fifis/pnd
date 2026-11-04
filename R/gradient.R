@@ -24,7 +24,8 @@
 #'
 #'
 #' @returns A named logical vector indicating if a function is element-wise or not,
-#' vectorised or not, and multivalued or not.
+#' vectorised or not, and multivalued or not. Its \code{seconds} attribute is
+#' \code{NA} when \code{f0} is supplied or \code{options(pnd.timing = FALSE)}.
 #' @order 1
 #' @export
 #'
@@ -81,19 +82,20 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   # Making one evaluation and measuring the time
   n <- length(x)
   user.f0 <- !is.null(f0)
-  tic0 <- Sys.time()
+  measure <- isTRUE(getOption("pnd.timing", TRUE)) && !user.f0
+  tic0 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
   if (!user.f0) {  # Try direct evaluation first
     f0 <- safeF(FUN, x, ...)  # If successful, this estimate is almost free from overhead (only CPU spin-up)
   } # Else, we do not know the run time because we are not experimenting with f0
-  tic1 <- Sys.time()
+  tic1 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
   if (checkBadSafeF(f0)) {
     vector.fail <- if (n > 1) TRUE else NA  # Does the function fail on vector input?
     if (is.na(vector.fail))
       stop("Could not evaluate FUN(x) for scalar x. Derivatives or gradients cannot be computed.")
-    tic0 <- Sys.time()
+    tic0 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
     f0 <- suppressWarnings(unlist(runParallel(FUN = function(y) safeF(FUN, y, ...),
                                               x = x, cl = cl, preschedule = preschedule)))
-    tic1 <- Sys.time()
+    tic1 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
   } else {
     vector.fail <- if (n > 1) FALSE else NA
   }
@@ -178,7 +180,7 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   } else {
     attr(ret, "f") <- c(f0, fhvals)
   }
-  attr(ret, "seconds") <- if (user.f0) NA else as.numeric(difftime(tic1, tic0, units = "secs"))
+  attr(ret, "seconds") <- tic1 - tic0
   attr(ret, "message") <- msg
 
   class(ret) <- "checkDimensions"
@@ -332,6 +334,15 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #' @return A vector or matrix containing the computed derivatives, structured according
 #'   to the dimensionality of \code{x} and \code{FUN}. If the function is classified as single-valued,
 #'   returns a gradient vector; otherwise, returns a Jacobian matrix.
+#'   With \code{options(pnd.timing = TRUE)} (the default), \code{timing} records
+#'   elapsed seconds for preparation, the evaluation phase, and the complete call.
+#'   Preparation includes checks, step selection, stencils and derivative assembly.
+#'   Evaluation includes batching, worker startup, scheduling and communication.
+#'   \code{function.calls} counts calls in the evaluation phase, including failed
+#'   batch attempts. Dividing evaluation time by this count gives elapsed time
+#'   per call, including overhead.
+#'   Timing uses \code{proc.time()}; resolution depends on the platform.
+#'   Set \code{options(pnd.timing = FALSE)} to omit timing and these attributes.
 #'
 #' @seealso [gradstep()] for automatic step-size selection.
 #'
@@ -380,6 +391,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  h = NULL, zero.tol = NULL,  h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
                  func = NULL, method = NULL, method.args = list(), ...) {
+  timing <- isTRUE(getOption("pnd.timing", TRUE))
+  tic0 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -474,7 +487,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (length(h) == 1) h <- rep(h, n)
   if (length(h) != n) stop("The argument 'h' (step size) must have length 1 or length(x).")
 
-  # Reuse weights for matching derivative orders on the same stencil.
+  # Reuse weights for matching derivative orders on the same stencil
   same.stencil <- length(unique(deriv.order)) == 1 &&
     (!is.null(stencil) || (length(unique(acc.order)) == 1 && length(unique(side)) == 1))
   if (same.stencil) {
@@ -502,10 +515,14 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   grid <- generateGrid(x = x, h = h, stencils = stencils, elementwise = chk["elementwise"],
                        vectorised = chk["vectorised"])
 
-  # Batch vectorised element-wise evaluations; retry scalars if the batch is unsuitable.
+  # Time stencil evaluations, including dispatch and collection of worker results
+  tic1 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
+  calls <- 0L
+  # Batch vectorised element-wise evaluations; retry scalars if the batch is unsuitable
   fvals <- NULL
   if (chk["elementwise"] && chk["vectorised"] && !chk["multivalued"] &&
       cores == 1 && is.null(cl)) {
+    calls <- calls + 1L
     fbatch <- tryCatch(safeF(FUN, unlist(grid$xlist, use.names = FALSE), ...),
                        warning = function(w) NULL)
     if (is.numeric(fbatch) && is.null(dim(fbatch)) &&
@@ -514,6 +531,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   }
   if (is.null(fvals)) {
     # TODO: deduplicate, save CPU
+    calls <- calls + length(grid$xlist)
     fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
                           cores = cores, cl = cl, preschedule = preschedule)
     nonfinite.f   <- !sapply(fvals0, is.finite)
@@ -534,9 +552,10 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     # The function can be vector-valued, which is why we ensure that dimensions are not dropped
     fvals <- do.call(rbind, fvals0)
   }
+  tic2 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   wf <- fvals * grid$weights
   if (same.stencil && is.matrix(wf) && nrow(wf) == length(grid$index)) {
-    # Stencil points, coordinates, function outputs; sum in the original order.
+    # Stencil points, coordinates, function outputs; sum in the original order
     dim(wf) <- c(length(stencil1$stencil), n, ncol(wf))
     jac <- t(colSums(wf))
   } else {
@@ -567,6 +586,12 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   }
 
   class(jac) <- "GenD"
+  if (timing) {
+    tic3 <- unname(proc.time()[["elapsed"]])
+    attr(jac, "timing") <- c(preparation = (tic1 - tic0) + (tic3 - tic2),
+                              evaluation = tic2 - tic1, elapsed = tic3 - tic0)
+    attr(jac, "function.calls") <- calls
+  }
   return(jac)
 }
 
@@ -640,6 +665,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #'
 #' @return Numeric vector of the gradient. If \code{FUN} is classified as multi-valued,
 #' an error is issued suggesting the use of [Jacobian()].
+#' Timing attributes are described in [GenD()].
 #'
 #' @seealso [GenD()], [Jacobian()]
 #' @export
@@ -661,6 +687,8 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
                  h = NULL, zero.tol = NULL, h0 = NULL, control = list(),
                  f0 = NULL, cores = 1, preschedule = TRUE, cl = NULL,
                  func = NULL, method = NULL, method.args = list(), ...) {
+  timing <- isTRUE(getOption("pnd.timing", TRUE))
+  tic0 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -692,6 +720,11 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
             cores = cores, preschedule = preschedule, cl = cl,
             func = func, method = method, method.args = method.args, ...)
 
+  if (timing) {
+    elapsed <- unname(proc.time()[["elapsed"]]) - tic0
+    attr(d, "timing")["preparation"] <- elapsed - attr(d, "timing")[["evaluation"]]
+    attr(d, "timing")["elapsed"] <- elapsed
+  }
   return(d)
 }
 
@@ -712,6 +745,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' @return Matrix where each row corresponds to a function output and each column
 #' to an input coordinate. For scalar-valued functions,
 #' the output is returned as a row matrix.
+#' Timing attributes are described in [GenD()].
 #'
 #' @seealso [GenD()], [Grad()]
 #'
@@ -747,6 +781,8 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
                      control = list(), f0 = NULL,
                      cores = 1, preschedule = TRUE, cl = NULL,
                      func = NULL, method = NULL, method.args = list(), ...) {
+  timing <- isTRUE(getOption("pnd.timing", TRUE))
+  tic0 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -808,5 +844,10 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
     colnames(d) <- nms
   }
 
+  if (timing) {
+    elapsed <- unname(proc.time()[["elapsed"]]) - tic0
+    attr(d, "timing")["preparation"] <- elapsed - attr(d, "timing")[["evaluation"]]
+    attr(d, "timing")["elapsed"] <- elapsed
+  }
   return(d)
 }

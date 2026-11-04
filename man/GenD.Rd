@@ -137,6 +137,15 @@ in nearly fixed-width output (almost).}
 A vector or matrix containing the computed derivatives, structured according
 to the dimensionality of \code{x} and \code{FUN}. If the function is classified as single-valued,
 returns a gradient vector; otherwise, returns a Jacobian matrix.
+With \code{options(pnd.timing = TRUE)} (the default), \code{timing} records
+elapsed seconds for preparation, the evaluation phase, and the complete call.
+Preparation includes checks, step selection, stencils and derivative assembly.
+Evaluation includes batching, worker startup, scheduling and communication.
+\code{function.calls} counts calls in the evaluation phase, including failed
+batch attempts. Dividing evaluation time by this count gives elapsed time
+per call, including overhead.
+Timing uses \code{proc.time()}; resolution depends on the platform.
+Set \code{options(pnd.timing = FALSE)} to omit timing and these attributes.
 }
 \description{
 Computes numerical derivatives of a scalar or vector function using finite-difference methods.
