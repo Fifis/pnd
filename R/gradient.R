@@ -222,9 +222,9 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
       if (n == 1) {
         xmat <- matrix(x[i] + bh)
       } else {
-        dx <- matrix(0, ncol = n, nrow = slengths[i])
-        dx[, i] <- bh
-        xmat <- matrix(rep(x, slengths[i]), ncol = n, byrow = TRUE) + dx
+        # Adding zero preserves the previous type and signed-zero behaviour
+        xmat <- matrix(x + 0, ncol = n, nrow = slengths[i], byrow = TRUE)
+        xmat[, i] <- x[i] + bh
       }
       xmat
     })
@@ -502,7 +502,8 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
                         cores = cores, cl = cl, preschedule = preschedule)
   nonfinite.f   <- !sapply(fvals0, is.finite)
-  horrible.f  <- nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite))
+  horrible.f <- if (any(nonfinite.f))
+    nonfinite.f & (!sapply(fvals0, is.na)) & (!sapply(fvals0, is.infinite)) else FALSE
   if (any(horrible.f)) {
     warning("'FUN' must output numeric values only, but some non-numeric values were ",
             "returned (not even NA or NaN). Some gradient coordinates can be NA. Possible reason: ",
