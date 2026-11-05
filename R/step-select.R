@@ -124,8 +124,6 @@ gradstep <- function(FUN, x, h0 = NULL,
   }
   h0 <- unname(h0)
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
-  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   ell <- list(...)
   if (any(names(ell) == "method.args"))
@@ -137,6 +135,8 @@ gradstep <- function(FUN, x, h0 = NULL,
   if (length(x) == 1 && length(h0) > 1) stop("The argument 'h0' must be a scalar for scalar 'x'.")
   if (length(x) > 1 && length(h0) == 1) h0 <- rep(h0, length(x))
   if (length(x) != length(h0)) stop("The argument 'h0' must have length 1 or length(x).")
+  cl <- getParallelCluster(cores, cl)
+  if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
   # The h0 and range arguments are updated later
   default.args <- list(plugin = list(h0 = h0[1], max.rel.error = .Machine$double.eps^(7/8),
                                      range = h0[1] / c(1e4, 1e-4),

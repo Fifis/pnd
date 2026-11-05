@@ -155,6 +155,8 @@ generateGrid2 <- function(x, side, acc.order, h) {
 #'
 #' @return A matrix with as many rows and columns as \code{length(x)}. Unlike the output of
 #'   \code{numDeriv::hessian()}, this output preserves the names of \code{x}.
+#'   With \code{options(pnd.timing = TRUE)}, \code{timing} records preparation,
+#'   evaluation and total elapsed seconds; \code{function.calls} counts unique stencil evaluations.
 #' @export
 #'
 #' @seealso [Grad()] for gradients, [GenD()] for generalised numerical differences.
@@ -170,6 +172,8 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
                     h0 = NULL, control = list(), f0 = NULL,
                     cores = 1, preschedule = TRUE, cl = NULL,
                     func = NULL, ...) {
+  timing <- isTRUE(getOption("pnd.timing", TRUE))
+  tic0 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   if (is.function(x) && !is.function(FUN)) {
     warning("The argument order must be FUN and then x, not vice versa.")
     x0 <- FUN
@@ -247,7 +251,7 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
 
   # Setting up parallel capabilities
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  cl <- getParallelCluster(cores, cl)
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
@@ -272,8 +276,10 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
 
   # Parallelising the task in the most efficient way possible, over all values of all grids
   FUN.eval <- if (length(ell)) bindFunctionArgs(FUN, ell) else FUN
+  tic1 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   fvals <- runParallel(FUN = FUN.eval, x = xvals,
                        cores = cores, cl = cl, preschedule = preschedule)
+  tic2 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
   fvals <- fvals[grid$uniq.i]  # Restoring duplicates
   nonfinite.f   <- !sapply(fvals, is.finite)
   horrible.f  <- nonfinite.f & (!sapply(fvals, is.na)) & (!sapply(fvals, is.infinite))
@@ -320,5 +326,11 @@ Hessian <- function(FUN, x, side = 0, acc.order = 2, h = NULL,
   }
 
   class(hes) <- "Hessian"
+  if (timing) {
+    tic3 <- unname(proc.time()[["elapsed"]])
+    attr(hes, "timing") <- c(preparation = (tic1 - tic0) + (tic3 - tic2),
+                              evaluation = tic2 - tic1, elapsed = tic3 - tic0)
+    attr(hes, "function.calls") <- length(xvals)
+  }
   return(hes)
 }

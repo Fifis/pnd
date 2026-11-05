@@ -116,7 +116,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   h0 <- unname(h0)
   inv.sf <- 1 / shrink.factor
 
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  cl <- getParallelCluster(cores, cl)
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   if (is.null(range)) {

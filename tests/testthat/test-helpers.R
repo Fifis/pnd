@@ -2,6 +2,8 @@ test_that("Cores are checked well", {
   checkCores()
   checkCores(2)
   expect_warning(checkCores(1000), "more cores than")
+  for (cores in list(NA_real_, 1.5, c(1, 2)))
+    expect_error(checkCores(cores), "positive integer")
 })
 
 
@@ -12,7 +14,7 @@ test_that("Parallel runs are executed correctly", {
   parallel::stopCluster(cl)
 
   expect_error(runParallel(sin, 1:3, cl = "rubbish"), "passed as a cluster")
-  expect_error(runParallel(sin, 1:3, cores = -1), "or a cluster object")
+  expect_error(runParallel(sin, 1:3, cores = -1), "positive integer")
 })
 
 

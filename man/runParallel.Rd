@@ -30,6 +30,23 @@ The value that \code{lapply(x, FUN)} would have returned.
 \description{
 Run a function in parallel over a list (internal use only)
 }
+\details{
+If no custom cluster is supplied or no default cluster is registered, \code{options(pnd.parallel = "auto")}
+uses \code{mclapply()} on Linux/macOS and automatically creates reusable PSOCK
+workers on Windows. Set \code{options(pnd.parallel = "PSOCK")} to use these
+workers on any platform, or \code{"mclapply"} to explicitly request forking on Linux/macOS.
+Repeated calls reuse the pool; larger requests replace it and smaller requests
+use a subset. Call \code{\link[=stopParallel]{stopParallel()}} to release it. Package unloading and session
+exit also attempt clean-up. Supplied/default clusters remain owned by the caller;
+their size overrides \code{cores} (the CRAN check limit of 2 is handled separately).
+Nested calls inside automatically created workers run serially unless given a separate cluster.
+
+PSOCK workers are separate R sessions. The data needed by \code{FUN} should be in
+its enclosing function environment or passed as arguments; objects used only
+from the global environment need explicit export to a custom user-supplied cluster.
+This also applies to unevaluated extra arguments referring to globals when
+dimension checks are skipped. Use a local objective closure to avoid this dependency.
+}
 \examples{
 fslow <- function(x) Sys.sleep(x)
 x <- rep(0.05, 6)
@@ -41,4 +58,8 @@ parallel::stopCluster(cl)
 cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "\%\n", sep = "")
 # Ignore on Windows
 cat("makeCluster() overhead at 2 cores: ", round(100*t2[3]/t3[3]-100), "\%\n", sep = "")
+# Store objective data locally so PSOCK workers can use it
+f <- local({scale <- 2; function(x) scale * x^2})
+runParallel(f, 1:3, cores = 2)
+stopParallel()
 }

@@ -3,7 +3,7 @@
 #' @inheritParams GenD
 #' @param h Numeric scalar used for test stencil construction;
 #'   \code{NULL} or character uses the median of [stepx()].
-#' @param cores Core-count request, validated but not forwarded to detection evaluations.
+#' @param cores Number of cores for coordinate-wise detection evaluations.
 #'
 #' @details
 #' The following combinations of parameters are allowed, suggesting specific input and
@@ -52,7 +52,6 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   # Vectorisation checks similar to case1or3 in numDeriv, but better optimised
   # to catch errors and waste fewer evaluations f(x)
@@ -92,9 +91,10 @@ checkDimensions <- function(FUN, x, f0 = NULL, func = NULL,
     vector.fail <- if (n > 1) TRUE else NA  # Does the function fail on vector input?
     if (is.na(vector.fail))
       stop("Could not evaluate FUN(x) for scalar x. Derivatives or gradients cannot be computed.")
+    cl <- getParallelCluster(cores, cl)
     tic0 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
-    f0 <- suppressWarnings(unlist(runParallel(FUN = function(y) safeF(FUN, y, ...),
-                                              x = x, cl = cl, preschedule = preschedule)))
+    f0 <- suppressWarnings(unlist(runParallel(FUN = bindSafeFunction(FUN, ...),
+                                              x = x, cores = cores, cl = cl, preschedule = preschedule)))
     tic1 <- if (measure) unname(proc.time()[["elapsed"]]) else NA_real_
   } else {
     vector.fail <- if (n > 1) FALSE else NA
@@ -344,7 +344,7 @@ generateGrid <- function(x, h, stencils, elementwise, vectorised) {
 #'   Timing uses \code{proc.time()}; resolution depends on the platform.
 #'   Set \code{options(pnd.timing = FALSE)} to omit timing and these attributes.
 #'
-#' @seealso [gradstep()] for automatic step-size selection.
+#' @seealso [gradstep()] for automatic step-size selection; [runParallel()] for parallel backends and cleanup.
 #'
 #' @order 1
 #' @export
@@ -466,7 +466,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   # Setting up parallel capabilities
   cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   if (!is.function(FUN)) stop("'FUN' must be a function.")
 
@@ -498,7 +497,6 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     stencils <- lapply(1:n, function(i) fdCoef(deriv.order = deriv.order[i],
                                                acc.order = acc.order[i], side = side[i], stencil = stencil))
   }
-
   # Vectorisation can be inferred if FUN(x) is supplied
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {
@@ -514,6 +512,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 
   grid <- generateGrid(x = x, h = h, stencils = stencils, elementwise = chk["elementwise"],
                        vectorised = chk["vectorised"])
+  cl <- getParallelCluster(cores, cl)
 
   # Time stencil evaluations, including dispatch and collection of worker results
   tic1 <- if (timing) unname(proc.time()[["elapsed"]]) else NA_real_
@@ -532,7 +531,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
   if (is.null(fvals)) {
     # TODO: deduplicate, save CPU
     calls <- calls + length(grid$xlist)
-    fvals0 <- runParallel(FUN = function(y) safeF(FUN, y, ...), x = grid$x,
+    fvals0 <- runParallel(FUN = bindSafeFunction(FUN, ...), x = grid$xlist,
                           cores = cores, cl = cl, preschedule = preschedule)
     nonfinite.f   <- !sapply(fvals0, is.finite)
     horrible.f <- if (any(nonfinite.f))
@@ -667,7 +666,7 @@ GenD <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' an error is issued suggesting the use of [Jacobian()].
 #' Timing attributes are described in [GenD()].
 #'
-#' @seealso [GenD()], [Jacobian()]
+#' @seealso [GenD()], [Jacobian()], [runParallel()]
 #' @export
 #'
 #' @examples
@@ -695,9 +694,6 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
     FUN <- x
     x <- x0
   }
-
-  cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   needs.detection <- is.na(elementwise) || is.na(vectorised) || is.na(multivalued)
   if (needs.detection) {
@@ -737,7 +733,8 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' one-sided (forward or backward) derivatives. It can utilise parallel processing
 #' to accelerate computation of gradients for slow functions or
 #' to attain higher accuracy faster. Fork-based parallelism uses
-#' \code{parallel::mclapply()} on macOS and Linux; supplied clusters use
+#' \code{parallel::mclapply()} on macOS and Linux; Windows automatically reuses
+#' PSOCK workers. See [runParallel()] for backend options and cleanup. Clusters use
 #' \code{parallel::parLapply()} or \code{parallel::parLapplyLB()} on all platforms.
 #'
 #' @inheritParams GenD
@@ -763,6 +760,7 @@ Grad <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA,
 #' system.time(g.fast <- Grad(slowFun, x = x0, cores = 2) - true.g)
 #' system.time(j.fast <- Jacobian(slowFunVec, x = x0, cores = 2) - true.j)
 #' system.time(j.fast4 <- Jacobian(slowFunVec, x = x0, acc.order = 4, cores = 2) - true.j)
+#' stopParallel()
 #'
 #' # Compare accuracy
 #' rownames(j.slow) <- paste0("numDeriv.jac.", c("sin", "exp"))
@@ -798,9 +796,6 @@ Jacobian <- function(FUN, x, elementwise = NA, vectorised = NA, multivalued = NA
       stop("Pass the function for differencing as the named argument 'FUN'.")
     }
   }
-
-  cores <- checkCores(cores)
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
 
   # Edge case: Rn -> Rn function, vector input, vector output, equal lengths
   if (is.null(f0)) f0 <- safeF(FUN, x, ...)

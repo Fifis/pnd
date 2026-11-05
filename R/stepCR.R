@@ -132,6 +132,7 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
 #' clusterExport(cl, c("f2", "f", "abc"))
 #' system.time(step.CR(f2, x, h = 1e-4, cl = cl))  # Also fast
 #' stopCluster(cl)
+#' stopParallel()
 step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
                     max.rel.error = .Machine$double.eps^(7/8),
                     aim = NULL, tol = NULL, range = NULL, maxit = 20L, seq.tol = 1e-4,
@@ -156,7 +157,7 @@ step.CR <- function(FUN, x, deriv.order = 1, acc.order = 1, h0 = NULL,
   if (is.null(aim)) aim <- if (vanilla) 100 else deriv.order / acc.order
   target <- sort(c(aim / tol, aim * tol))
 
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  cl <- getParallelCluster(cores, cl)
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   iters <- list()

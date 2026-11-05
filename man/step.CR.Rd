@@ -138,6 +138,7 @@ f2 <- function(x) f(x, abc)
 clusterExport(cl, c("f2", "f", "abc"))
 system.time(step.CR(f2, x, h = 1e-4, cl = cl))  # Also fast
 stopCluster(cl)
+stopParallel()
 }
 \references{
 \insertAllCited{}

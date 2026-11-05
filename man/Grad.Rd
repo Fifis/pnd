@@ -191,5 +191,5 @@ LReLU <- function(x) ifelse(x > 0, x, 0.01*x)
 Grad(LReLU, seq(-1, 1, 0.1))
 }
 \seealso{
-\code{\link[=GenD]{GenD()}}, \code{\link[=Jacobian]{Jacobian()}}
+\code{\link[=GenD]{GenD()}}, \code{\link[=Jacobian]{Jacobian()}}, \code{\link[=runParallel]{runParallel()}}
 }

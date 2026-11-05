@@ -2,6 +2,12 @@
 
 safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(structure(NA, error = e)))
 
+# Keep derivative grids out of callbacks sent to workers; leave dots lazy.
+bindSafeFunction <- function(FUN, ...) {
+  force(FUN)
+  function(y) safeF(FUN, y, ...)
+}
+
 # Bind arguments without retaining the caller's evaluation grid on cluster workers.
 bindFunctionArgs <- function(FUN, args) {
   force(FUN)
@@ -219,6 +225,8 @@ checkCores <- function(cores = NULL) {
   if (identical(cores, 1) || identical(cores, 1L)) return(1)
   max.cores <- getOption("pnd.max.cores", 2L)
   if (is.null(cores)) cores <- max.cores
+  if (!is.numeric(cores) || length(cores) != 1L || !is.finite(cores) ||
+      cores < 1 || cores != floor(cores)) stop("'cores' must be a positive integer.")
 
   if (cores > max.cores)
     warning("Requested more cores than you have logical cores. Consider setting 'cores = ", max.cores, "'.\n")
@@ -245,6 +253,23 @@ checkCores <- function(cores = NULL) {
 #'
 #'
 #' @returns The value that `lapply(x, FUN)` would have returned.
+#'
+#' @details
+#' If no custom cluster is supplied or no default cluster is registered, \code{options(pnd.parallel = "auto")}
+#' uses \code{mclapply()} on Linux/macOS and automatically creates reusable PSOCK
+#' workers on Windows. Set \code{options(pnd.parallel = "PSOCK")} to use these
+#' workers on any platform, or \code{"mclapply"} to explicitly request forking on Linux/macOS.
+#' Repeated calls reuse the pool; larger requests replace it and smaller requests
+#' use a subset. Call [stopParallel()] to release it. Package unloading and session
+#' exit also attempt clean-up. Supplied/default clusters remain owned by the caller;
+#' their size overrides \code{cores} (the CRAN check limit of 2 is handled separately).
+#' Nested calls inside automatically created workers run serially unless given a separate cluster.
+#'
+#' PSOCK workers are separate R sessions. The data needed by \code{FUN} should be in
+#' its enclosing function environment or passed as arguments; objects used only
+#' from the global environment need explicit export to a custom user-supplied cluster.
+#' This also applies to unevaluated extra arguments referring to globals when
+#' dimension checks are skipped. Use a local objective closure to avoid this dependency.
 #' @export
 #'
 #' @examples
@@ -258,8 +283,12 @@ checkCores <- function(cores = NULL) {
 #' cat("Parallel overhead at 2 cores: ", round(t2[3]*200/t1[3]-100), "%\n", sep = "")
 #' # Ignore on Windows
 #' cat("makeCluster() overhead at 2 cores: ", round(100*t2[3]/t3[3]-100), "%\n", sep = "")
+#' # Store objective data locally so PSOCK workers can use it
+#' f <- local({scale <- 2; function(x) scale * x^2})
+#' runParallel(f, 1:3, cores = 2)
+#' stopParallel()
 runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
-
+  if (is.null(cl)) cl <- parallel::getDefaultCluster()
   if (!is.null(cl)) {
     if (inherits(cl, "cluster"))
       cores <- length(cl)
@@ -271,17 +300,17 @@ runParallel <- function(FUN, x, cores = 1L, cl = NULL, preschedule = FALSE) {
   cores <- checkCores(cores)
 
   # If no specific parameters are requested, evaluate; if cl is not NULL, then, cores has the necessary length
-  if (cores == 1) return(lapply(x, FUN))
+  if (cores == 1 || !length(x) ||
+      (is.null(cl) && (length(x) == 1L || isTRUE(getOption("pnd.parallel.worker", FALSE)))))
+    return(lapply(x, FUN))
 
-  if (is.null(cl) && cores > 1) {
-    if (.Platform$OS.type == "windows") {
-      warning("'mclapply' is not available on Windows; reverting to single-core 'lapply'.")
-      return(lapply(x, FUN))
-    }
+  if (is.null(cl)) cl <- getParallelCluster(cores)
+  if (is.null(cl)) {
     return(parallel::mclapply(x, FUN, mc.cores = cores, mc.preschedule = preschedule))
   }
 
   if (inherits(cl, "cluster")) {
+    cl <- cl[seq_len(min(cores, length(x)))]
     if (preschedule)
       return(parallel::parLapply(cl, x, FUN))
     else

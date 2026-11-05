@@ -74,7 +74,7 @@ Central differences are recommended unless computational cost is prohibitive.}
 guessed step size is relative or near-relative (\code{x} multiplied by the step),
 unless an auto-selection procedure is requested; otherwise, it is absolute.}
 
-\item{cores}{Core-count request, validated but not forwarded to detection evaluations.}
+\item{cores}{Number of cores for coordinate-wise detection evaluations.}
 
 \item{preschedule}{Logical: if \code{TRUE}, enables pre-scheduling for \code{mclapply()}
 or disables load balancing with \code{parLapply()}. Recommended for functions that

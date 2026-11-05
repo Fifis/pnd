@@ -79,7 +79,7 @@ step.plugin <- function(FUN, x, h0 = max(1e-5*abs(x), stepx(x, deriv.order = 3))
   if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
   range <- sort(range)
 
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  cl <- getParallelCluster(cores, cl)
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   iters <- vector("list", 2)

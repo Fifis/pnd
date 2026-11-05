@@ -106,7 +106,7 @@ step.DV <- function(FUN, x, h0 = 1e-5*max(abs(x), sqrt(.Machine$double.eps)),
   range <- sort(range)
   range3 <- range * .Machine$double.eps^(-2/15)
 
-  if (is.null(cl)) cl <- parallel::getDefaultCluster()
+  cl <- getParallelCluster(cores, cl)
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   iters <- list()

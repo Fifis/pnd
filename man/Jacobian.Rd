@@ -122,7 +122,8 @@ This function supports both two-sided (central, symmetric) and
 one-sided (forward or backward) derivatives. It can utilise parallel processing
 to accelerate computation of gradients for slow functions or
 to attain higher accuracy faster. Fork-based parallelism uses
-\code{parallel::mclapply()} on macOS and Linux; supplied clusters use
+\code{parallel::mclapply()} on macOS and Linux; Windows automatically reuses
+PSOCK workers. See \code{\link[=runParallel]{runParallel()}} for backend options and cleanup. Clusters use
 \code{parallel::parLapply()} or \code{parallel::parLapplyLB()} on all platforms.
 }
 \examples{
@@ -139,6 +140,7 @@ system.time(j.slow <- numDeriv::jacobian(slowFunVec, x = x0) - true.j)
 system.time(g.fast <- Grad(slowFun, x = x0, cores = 2) - true.g)
 system.time(j.fast <- Jacobian(slowFunVec, x = x0, cores = 2) - true.j)
 system.time(j.fast4 <- Jacobian(slowFunVec, x = x0, acc.order = 4, cores = 2) - true.j)
+stopParallel()
 
 # Compare accuracy
 rownames(j.slow) <- paste0("numDeriv.jac.", c("sin", "exp"))

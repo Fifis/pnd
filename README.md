@@ -117,6 +117,12 @@ library(pnd)
 This package is almost dependency-free; the `parallel` library belongs to the `base`
 group and is included in most R distributions.
 
+If the user requests `cores > 1` in functions such as `Grad()`, `Hessian()` etc. on Windows,
+R will create and reuses PSOCK workers. On Linux/macOS, the default remains `mclapply()` forking,
+but setting `options(pnd.parallel = "PSOCK")` selects the same reusable pool;
+in this case, call `stopParallel()` when finished.
+An explicit custom or registered default cluster remains under the user's control, which is the preferred way.
+
 ## Licence
 
 This software is released under the free/open-source [EUPL 1.2 licence](https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12).

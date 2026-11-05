@@ -92,6 +92,8 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 \value{
 A matrix with as many rows and columns as \code{length(x)}. Unlike the output of
 \code{numDeriv::hessian()}, this output preserves the names of \code{x}.
+With \code{options(pnd.timing = TRUE)}, \code{timing} records preparation,
+evaluation and total elapsed seconds; \code{function.calls} counts unique stencil evaluations.
 }
 \description{
 Computes the second derivatives of a function with respect to all combinations

@@ -224,5 +224,5 @@ print(Grad(function(x) prod(sin(x)), x, h = "CR"))
 print(Jacobian(function(x) c(prod(sin(x)), sum(exp(x))), x))
 }
 \seealso{
-\code{\link[=gradstep]{gradstep()}} for automatic step-size selection.
+\code{\link[=gradstep]{gradstep()}} for automatic step-size selection; \code{\link[=runParallel]{runParallel()}} for parallel backends and cleanup.
 }
