@@ -11,7 +11,7 @@
 .onUnload <- function(libpath) try(stopParallel(), silent = TRUE)
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Parallel numerical derivatives v.0.1.4 (2025-05-09).")
+  packageStartupMessage("Parallel numerical derivatives v.0.1.4 (2026-11-10).")
 
   # The number of cores is auto-detected based on the OS
   os <- Sys.info()[["sysname"]]

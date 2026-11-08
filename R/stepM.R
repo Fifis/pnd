@@ -164,6 +164,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   stc0  <- fdCoef(deriv.order = deriv.order, acc.order = acc.order,   stencil = s0)
   stc1  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order,   stencil = s1)
   stc2  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order+2, stencil = s2)
+  K <- abs(attr(stc0, "remainder.coef"))  # Target coefficient |sum(w*b^(d+a))|/(d+a)!
 
   stc.list <- list(stc0, stc1, stc2)
   cds <- vector("list", 3)
@@ -177,12 +178,11 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
     # Estimated required and higher-order derivative times h^acc.order
     cds[[i]] <- (colSums(t(fpos) * wpos) + colSums(t(fneg) * wneg)) / hgrid
   }
-  etrunc1 <- cds[[2]] * abs(attr(stc1, "remainder.coef"))  #  f''' * <w, b> / (a+d)!
-  etrunc2 <- cds[[3]] * abs(attr(stc2, "remainder.coef"))
-  etrunc <- etrunc2
-  bad.etrunc <- (!is.finite(etrunc)) | (etrunc == 0)
-  etrunc[bad.etrunc] <- etrunc1[bad.etrunc]
-  etrunc <- abs(etrunc)
+  # Both auxiliary formulae estimate the same target truncation term K*h^a*f^(d+a).
+  fhigher <- cds[[3]]
+  bad.etrunc <- (!is.finite(fhigher)) | (fhigher == 0)
+  fhigher[bad.etrunc] <- cds[[2]][bad.etrunc]
+  etrunc <- K * abs(fhigher)
   # plot(abs(cds[[2]]), log = "y"); points(abs(cds[[3]]), col = 2)
 
   log2etrunc <- suppressWarnings(log2(etrunc))
@@ -340,20 +340,17 @@ plotM <- function(x, ...) {
   cols <- c("#7e1fde", "#328d2d", "#d58726", "#ca203a")
   it <- x$iterations
   et <- it$est.error[, "trunc"]
-  er <- it$est.error[, "round"]
-  et[et == 0] <- .Machine$double.eps
-  er[er == 0] <- .Machine$double.eps
-  if (!any(is.finite(et) & (et != 0))) {
+  i.missing <- which(!is.finite(et) | et <= 0)
+  et[i.missing] <- NA_real_
+  if (!any(is.finite(et))) {
     warning("The truncation error is either exactly 0 or NA. Nothing to plot.")
     return(invisible(x))
   }
   h <- it$h
-  xl <- range(h)
-  xl <- sqrt(range(h) * xl)
   yl <- range(et[is.finite(et)]) * c(0.5, 2)
-  plot(h[et > 0], et[et > 0],
-       log = "xy", bty = "n", ylim = yl,
-       ylab = "Estimated abs. error in df/dx", xlab = "Step size",
+  plot(h[is.finite(et)], et[is.finite(et)],
+       log = "xy", bty = "n", xlim = range(h), ylim = yl,
+       ylab = "Estimated truncation error", xlab = "Step size",
        main = "Mathur step-size selection", ...)
   # graphics::mtext(paste0("max. rel. err. = ", printE(x$args$max.rel.error, 1)), cex = 0.8, line = 0.5)
   if (length(x$args$i.round) > 0)
@@ -367,6 +364,8 @@ plotM <- function(x, ...) {
   i.bad <- setdiff(seq_along(h), c(x$args$i.good, x$args$i.okay, x$args$i.increasing, x$args$i.round))
   if (length(i.bad) > 0)
     graphics::points(h[i.bad], et[i.bad], pch = 4, col = "#00000088", cex = 0.9)
+  graphics::points(h[i.missing], rep(min(et, na.rm = TRUE), length(i.missing)),
+                   pch = 4, col = "#00000088", cex = 0.9)
 
   graphics::abline(v = x$par, lty = 3, col = "#00000088")
   graphics::legend("topleft", c("Rounding", "Trunc. good", "Trunc. fair", "Trunc. increas.", "Invalid"),

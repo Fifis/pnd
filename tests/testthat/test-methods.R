@@ -49,8 +49,15 @@ test_that("Plots work well", {
   expect_identical(step.DV(sin, 1), plot(step.DV(sin, 1)))
   expect_identical(step.plugin(sin, 1), plot(step.plugin(sin, 1)))
   expect_identical(step.SW(sin, 1), plot(step.SW(sin, 1)))
-  expect_identical(step.M(sin, 1), plot(step.M(sin, 1)))
-  expect_identical(step.K(sin, 1), plot(step.K(sin, 1)))
+})
+
+test_that("Kostyrka and Mathur plots retain unavailable step sizes", {
+  k <- step.K(sin, 1)
+  m <- step.M(sin, 1)
+  k$iterations$est.error[1:3, "trunc"] <- c(0, NA, Inf)
+  m$iterations$est.error[1:3, "trunc"] <- c(0, NA, Inf)
+  expect_identical(plot(k), k)
+  expect_identical(plot(m), m)
 })
 
 

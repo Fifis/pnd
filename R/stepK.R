@@ -43,7 +43,12 @@
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
 #'       function values on those grids, estimated derivative values, estimated error values,
-#'       and predicted model-based errors.
+#'       and predicted model-based errors. The \code{fhigher} column contains the higher-order
+#'       auxiliary derivative that uses the longer stencil where available.
+#'       \code{fit} contains the initial and fitted log-kink coordinates (\code{gamma}, \code{beta}),
+#'       unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
+#'       mean pseudo-Huber \code{loss} and optimiser \code{convergence}; a \code{NULL}
+#'       is returned if fitting failed.
 #'   }
 #' @export
 #'
@@ -116,6 +121,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   xgrid <- g$x
   n <- length(hgrid)
   hat.check <- rep(NA, length(hgrid))
+  fit <- NULL
 
   fgrid <- getValsM(FUN = FUN, x = xgrid, cores = cores, cl = cl, preschedule = preschedule, ...)
   fplus <- fgrid[, 2]
@@ -134,6 +140,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   stc0  <- fdCoef(deriv.order = deriv.order, acc.order = acc.order,   stencil = s0)
   stc1  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order,   stencil = s1)
   stc2  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order+2, stencil = s2)
+  K <- abs(attr(stc0, "remainder.coef"))  # Target coefficient |sum(w*b^(d+a))|/(d+a)!
 
   stc.list <- list(stc0, stc1, stc2)
   cds <- vector("list", 3)
@@ -147,12 +154,11 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
     # Estimated required and higher-order derivative times h^acc.order
     cds[[i]] <- (colSums(t(fpos) * wpos) + colSums(t(fneg) * wneg)) / hgrid
   }
-  etrunc1 <- cds[[2]] * abs(attr(stc1, "remainder.coef"))  #  f''' * <w, b> / (a+d)!
-  etrunc2 <- cds[[3]] * abs(attr(stc2, "remainder.coef"))
-  etrunc <- etrunc2
-  bad.etrunc <- (!is.finite(etrunc)) | (etrunc == 0)
-  etrunc[bad.etrunc] <- etrunc1[bad.etrunc]
-  etrunc <- abs(etrunc)
+  # Both auxiliary formulae estimate the same target truncation term K*h^a*f^(d+a)
+  fhigher <- cds[[3]]
+  bad.etrunc <- (!is.finite(fhigher)) | (fhigher == 0)
+  fhigher[bad.etrunc] <- cds[[2]][bad.etrunc]
+  etrunc <- K * abs(fhigher)
   # plot(abs(cds[[2]]), log = "y"); points(abs(cds[[3]]), col = 2)
 
   # A value to compare to the threshold for Zero Truncation Error
@@ -179,7 +185,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # plot(log2h, log2e)
 
   # Check-like function of two parameters: horizontal and vertical location
-  checkFit <- function (theta, x, a, m) (theta[2]-m*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
+  checkFit <- function (theta, x, a, d) (theta[2]-d*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
 
   # If the function is symmetric / low-degree polynomial, the truncation error is always zero -- return
   # the safe option; otherwise, carry out a search
@@ -244,40 +250,37 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
     if ((!only.right.branch) && (!zero.trunc) && length(i.trunc.valid) >= 3) {
       # It makes sense to equate the two errors when there are both branches with enough points
-      # Pseudo-Huber loss with knee radius
-      phuber <- function(x, r) r^2 * (sqrt(1 + (x/r)^2) - 1)
-      penalty <- function(theta, a, m, subset) {
-        ehat <- checkFit(theta = theta, x = log2h, a, m)
-        resid <- log2e - ehat
-        rmad <- stats::median(abs(resid), na.rm = TRUE)
-        if (rmad < max.rel.error) rmad <- mean(abs(resid), na.rm = TRUE)
-        mean(phuber(resid, r = rmad)[subset], na.rm = TRUE)
-      }
-      # Objective function of the two parameters only
       sbst <- sort(unique(c(i.trunc.valid, i.round)))
-      fobj <- function (theta) penalty(theta, a = acc.order, m = deriv.order, subset = sbst)
+      sbst <- sbst[is.finite(log2e[sbst])]
 
-      # Constrained optimisation on a reasonable range
-      # Initial value: median of 5 lowest points, but not farther than the the rightmost point of the valid truncation range
-      theta0 <- c(stats::median(log2h[rank(log2e, ties.method = "first") <= 5]), min(log2e[sbst], na.rm = TRUE))
+      # The median log-step among the 5 lowest errors prevents fragmented local optima
+      # as initial values; this is a purely empirical improvement
+      i.low <- utils::head(sbst[order(log2e[sbst])], 5)
+      theta0 <- c(stats::median(log2h[i.low]), min(log2e[sbst]))
       if (theta0[1] > log2h[max(i.trunc.valid)]) theta0 <- c(log2h[min(i.trunc.valid)], log2e[min(i.trunc.valid)])
       # If the rounding error was not available, use a rough fall-back
       if (is.na(theta0[2])) theta0[2] <- stats::quantile(log2e, 0.25, na.rm = TRUE)
 
-      # ui <- rbind(diag(2), -diag(2))
-      # ci <- c( c(min(log2h), min(log2e, na.rm = TRUE) - 1),
-      #          -c(max(log2h), unname(quantile(log2e, 0.75, na.rm = TRUE))))
-      # opt <- constrOptim(theta = theta0, f = fobj, grad = NULL, ui = ui, ci = ci, control = list(reltol = 1e-6))
+      resid0 <- log2e[sbst] - checkFit(theta0, log2h[sbst], acc.order, deriv.order)
+      rmad <- stats::mad(resid0, constant = 1)
+      # Keep the knee fixed; use unity (one power of two) instead for for near-zero MADs
+      rho <- if (is.finite(rmad)) max(1, rmad) else 1
+      fobj <- function(theta) {
+        resid <- log2e[sbst] - checkFit(theta, log2h[sbst], acc.order, deriv.order)
+        # Equivalent pseudo-Huber loss, avoiding cancellation and division by a tiny rho
+        mean(rho * resid^2 / (sqrt(rho^2 + resid^2) + rho))
+      }
       opt <- stats::optim(par = theta0, fn = fobj, method = "BFGS", control = list(reltol = .Machine$double.eps^(1/3)))
-      # Unconstrained optimisation works fine; this is 10x faster than constrOptim
+      fit <- list(initial = stats::setNames(theta0, c("gamma", "beta")),
+                  par = stats::setNames(opt$par, c("gamma", "beta")),
+                  mad = rmad, rho = rho, subset = sbst, loss = opt$value, convergence = opt$convergence)
 
-      # Left branch: t2 - m*(x-t1), right branch: t2 + a*(x-t1)
-      # Working in logarithms: the difference between the two at hopt must be log(d/a)
-      # (a+m) * (x-hopt0) = log(d/a) --> hopt = hopt0 / (d/a)^(1/(d+a))
-      # This ensures that etrunc/eround = 1/a
+      # The two-branch model has T/R = d/a at its minimum, giving h* = hcross*(d/a)^(1/(d+a))
+      # TODO: calibrate this heuristic for the auxiliary/target rounding-bound ratio lambda
+      # (11/16 for the 6-point stencil, 1/2 for 4 points at d=1, a=2)
       hopt0   <- if (!zero.trunc) 2^opt$par[1] else 0.001 * max(1, abs(x))
       hopt <- hopt0 * (deriv.order/acc.order)^(1/(deriv.order + acc.order))
-      hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, m = deriv.order)
+      hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, d = deriv.order)
     } else {  # Zero truncation --> choosing the smallest error that yields a non-zero total-error estimate
       hopt <- hgrid[min(i.etrunc.finite)]
     }
@@ -352,7 +355,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   cd <- stats::approx(x = h.closest, y = cd.closest, xout = hopt)$y
   if (is.na(cd)) cd <- mean(cd.closest)
   if (!zero.trunc && exists("opt")) {  # If optimisation was carried out
-    et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, m = deriv.order)
+    et <- 2^checkFit(opt$par, x = log2hopt, a = acc.order, d = deriv.order)
   } else {
     et <- med.te
   }
@@ -368,8 +371,9 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
   )
 
-  diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cbind(f = cds[[1]], fhigher = cds[[2]]),
-                    est.error = cbind(trunc = etrunc, round = eround, check = hat.check))
+  diag.list <- list(h = hgrid, x = xgrid, f = fgrid,
+                   deriv = cbind(f = cds[[1]], fhigher = fhigher / hgrid^acc.order),
+                   est.error = cbind(trunc = etrunc, round = eround, check = hat.check), fit = fit)
 
   ret <- list(par = hopt, value = cd, counts = n, exitcode = exitcode, message = msg,
               abs.error = c(trunc = et, round = er), method = "Kostyrka", iterations = diag.list,
@@ -385,20 +389,17 @@ plotK <- function(x, ...) {
   cols <- c("#7e1fde", "#328d2d") # , "#d58726", "#ca203a")
   it <- x$iterations
   et <- it$est.error[, "trunc"]
-  er <- it$est.error[, "round"]
-  et[et == 0] <- .Machine$double.eps
-  er[er == 0] <- .Machine$double.eps
-  if (!any(is.finite(et) & (et != 0))) {
+  i.missing <- which(!is.finite(et) | et <= 0)
+  et[i.missing] <- NA_real_
+  if (!any(is.finite(et))) {
     warning("The truncation error is either exactly 0 or NA. Nothing to plot.")
     return(invisible(x))
   }
   h <- it$h
-  xl <- range(h)
-  xl <- sqrt(range(h) * xl)
   yl <- range(et[is.finite(et)]) * c(0.5, 2)
-  plot(h[et > 0], et[et > 0],
-       log = "xy", bty = "n", ylim = yl,
-       ylab = "Estimated abs. error in df/dx", xlab = "Step size",
+  plot(h[is.finite(et)], et[is.finite(et)],
+       log = "xy", bty = "n", xlim = range(h), ylim = yl,
+       ylab = "Estimated truncation error", xlab = "Step size",
        main = "Kostyrka step-size selection", ...)
   # graphics::mtext(paste0("dotted line: rounding error assuming max. rel. err. < ", printE(epsilon, 1)), cex = 0.8, line = 0.5)
   if (length(x$args$i.round) > 0)
@@ -412,6 +413,8 @@ plotK <- function(x, ...) {
   i.bad <- setdiff(seq_along(h), c(x$args$i.good, x$args$i.ok, x$args$i.increasing, x$args$i.round))
   if (length(i.bad) > 0)
     graphics::points(h[i.bad], et[i.bad], pch = 4, col = "#00000088", cex = 0.9)
+  graphics::points(h[i.missing], rep(min(et, na.rm = TRUE), length(i.missing)),
+                   pch = 4, col = "#00000088", cex = 0.9)
 
   # graphics::lines(h, er, col = "#000000", lty = 3)
 
