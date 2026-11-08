@@ -14,7 +14,7 @@ fdCoef(
 )
 }
 \arguments{
-\item{deriv.order}{Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
+\item{deriv.order}{Order of the derivative (\eqn{d}{d} in \eqn{\frac{d^d f}{dx^d}}{d^d/dx^d f(x)})
 for which a numerical approximation is needed.}
 
 \item{side}{Integer that determines the type of finite-difference scheme:
@@ -30,7 +30,7 @@ with the step size \eqn{h}{h}, specifically \eqn{O(h^a)}{O(h^a)}, where
 of the function.}
 
 \item{stencil}{Optional custom vector of points for function evaluation.
-Must include at least \code{m+1} points for the \code{m}-th order derivative.}
+Must include at least \code{d+1} points for the \code{d}-th order derivative.}
 
 \item{zero.action}{Character string specifying how to handle near-zero weights:
 \code{"drop"} to omit small (less in absolute value than \code{zero.tol})
@@ -56,7 +56,7 @@ It can also use any user-supplied stencil (uniform or non-uniform).
 For that stencil \eqn{\{b_i\}_{i=1}^n}{{b[i]}, i = 1, ..., n}, it computes
 the optimal weights \eqn{\{w_i\}}{{w[i]}} that yield
 the numerical approximation of the derivative:
-\deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ h^(-m) * sum_i w[i] f(x + b[i]*h)}
+\deqn{\frac{d^d f}{dx^d} \approx h^{-d} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^d/dx^d f(x) ~ h^(-d) * sum_i w[i] f(x + b[i]*h)}
 }
 \details{
 This function relies on the approach of approximating numerical derivatives

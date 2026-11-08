@@ -28,7 +28,7 @@ step.K(
 \code{2^round(log2(0.001 * max(abs(x), 1)))}.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+\eqn{\mathrm{d}^d / \mathrm{d}x^d}{d^d/dx^d}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
@@ -77,7 +77,12 @@ A list similar to the one returned by \code{optim()}:
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,
 function values on those grids, estimated derivative values, estimated error values,
-and predicted model-based errors.
+and predicted model-based errors. The \code{fhigher} column contains the higher-order
+auxiliary derivative that uses the longer stencil where available.
+\code{fit} contains the initial and fitted log-kink coordinates (\code{gamma}, \code{beta}),
+unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
+mean pseudo-Huber \code{loss} and optimiser \code{convergence}; a \code{NULL}
+is returned if fitting failed.
 }
 }
 \description{

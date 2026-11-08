@@ -57,7 +57,7 @@ than 1. Use \code{FALSE} for element-wise functions. If \code{NA}, attempts infe
 the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+\eqn{\mathrm{d}^d / \mathrm{d}x^d}{d^d/dx^d}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.

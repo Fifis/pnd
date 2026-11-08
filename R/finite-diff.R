@@ -65,9 +65,9 @@ solveVandermonde <- function(s, b) {
 #' For that stencil \eqn{\{b_i\}_{i=1}^n}{{b[i]}, i = 1, ..., n}, it computes
 #' the optimal weights \eqn{\{w_i\}}{{w[i]}} that yield
 #' the numerical approximation of the derivative:
-#' \deqn{\frac{d^m f}{dx^m} \approx h^{-m} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^m/dx^m f(x) ~ h^(-m) * sum_i w[i] f(x + b[i]*h)}
+#' \deqn{\frac{d^d f}{dx^d} \approx h^{-d} \sum_{i=1}^n w_i f(x + b_i\cdot h)}{d^d/dx^d f(x) ~ h^(-d) * sum_i w[i] f(x + b[i]*h)}
 #'
-#' @param deriv.order Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
+#' @param deriv.order Order of the derivative (\eqn{d}{d} in \eqn{\frac{d^d f}{dx^d}}{d^d/dx^d f(x)})
 #'   for which a numerical approximation is needed.
 #' @param acc.order Order of accuracy: defines how the approximation error scales
 #'   with the step size \eqn{h}{h}, specifically \eqn{O(h^a)}{O(h^a)}, where
@@ -80,7 +80,7 @@ solveVandermonde <- function(s, b) {
 #'   Unless the function is prohibitively expensive,
 #'   central differences are strongly recommended for their accuracy.
 #' @param stencil Optional custom vector of points for function evaluation.
-#'   Must include at least \code{m+1} points for the \code{m}-th order derivative.
+#'   Must include at least \code{d+1} points for the \code{d}-th order derivative.
 #' @param zero.action Character string specifying how to handle near-zero weights:
 #'   \code{"drop"} to omit small (less in absolute value than \code{zero.tol})
 #'   weights and corresponding stencil points, \code{"round"}
@@ -194,7 +194,7 @@ fdCoef <- function(deriv.order = 1L, side = c(0L, 1L, -1L),
   is.symm <- all(stencil + rev(stencil) == 0)
   a <- l - deriv.order + is.symm # Effective accuracy (preliminary guess because 0 may be redundant)
   if (l < deriv.order + 1)
-    stop("To compute the m-th derivative, at least m+1 unique stencil points are required.")
+    stop("To compute the d-th derivative, at least d+1 unique stencil points are required.")
   if (l < deriv.order + acc.order - is.symm) {
     prefix <- switch(a, "st", "nd", "rd")
     if (is.null(prefix)) prefix <- "th"

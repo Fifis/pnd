@@ -64,7 +64,7 @@ than 1. Use \code{FALSE} for element-wise functions. If \code{NA}, attempts infe
 the function output.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+\eqn{\mathrm{d}^d / \mathrm{d}x^d}{d^d/dx^d}, for each element of \code{x}.}
 
 \item{side}{Integer scalar or vector indicating the type of finite difference:
 \code{0} for central, \code{1} for forward, and \code{-1} for backward differences.
@@ -75,7 +75,7 @@ for each element of \code{x}.
 The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
 \item{stencil}{Optional custom vector of points for function evaluation.
-Must include at least \code{m+1} points for the \code{m}-th order derivative.}
+Must include at least \code{d+1} points for the \code{d}-th order derivative.}
 
 \item{h}{Numeric or character specifying the step size(s) for the numerical
 difference or a method of automatic step determination (\code{"CR"}, \code{"CRm"},

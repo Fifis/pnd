@@ -27,7 +27,7 @@ step.CR(
 
 \item{x}{Numeric scalar: the point at which the derivative is computed and the optimal step size is estimated.}
 
-\item{deriv.order}{Order of the derivative (\eqn{m}{m} in \eqn{\frac{d^m f}{dx^m}}{d^m/dx^m f(x)})
+\item{deriv.order}{Order of the derivative (\eqn{d}{d} in \eqn{\frac{d^d f}{dx^d}}{d^d/dx^d f(x)})
 for which a numerical approximation is needed.}
 
 \item{acc.order}{Order of accuracy: defines how the approximation error scales

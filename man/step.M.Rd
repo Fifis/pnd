@@ -31,7 +31,7 @@ step.M(
 \code{2^round(log2(0.001 * max(abs(x), 1)))}.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+\eqn{\mathrm{d}^d / \mathrm{d}x^d}{d^d/dx^d}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.

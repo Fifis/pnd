@@ -11,7 +11,7 @@ stepx(x, deriv.order = 1, acc.order = 2, zero.tol = NULL)
 Function values must be finite.}
 
 \item{deriv.order}{Integer or vector of integers indicating the desired derivative order,
-\eqn{\mathrm{d}^m / \mathrm{d}x^m}{d^m/dx^m}, for each element of \code{x}.}
+\eqn{\mathrm{d}^d / \mathrm{d}x^d}{d^d/dx^d}, for each element of \code{x}.}
 
 \item{acc.order}{Integer or vector of integers specifying the desired accuracy order
 for each element of \code{x}.
