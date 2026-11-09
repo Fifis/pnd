@@ -73,7 +73,8 @@ test_that("Kostyrka's method returns reasonable values with unfortunate inputs",
   expect_identical(s$exitcode, 0L)
 
   f <- function(x) ifelse(x %in% 0:2, x^2, NA)
-  expect_identical(step.K(f, 1, cores = 1)$exitcode, 2L)
+  # Its only available stencil exceeds the local-step cap
+  expect_error(step.K(f, 1, cores = 1), "finite derivative")
 })
 
 test_that("Kostyrka's method returns reasonable values with tricky functions", {
@@ -93,28 +94,18 @@ test_that("Kostyrka's algorithm returns expected non-zero exit codes", {
   expect_null(s$iterations$fit)
 })
 
-test_that("Kostyrka's fallback uses a finite upper neighbour", {
-  f <- function(z) ifelse(abs(z-1) < 1e-10 | abs(z-1) >= 0.1, z^3, NA_real_)
-  s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
-  # Only h = 1/8 has a finite derivative among the two neighbours
-  expect_equal(s$value, 3 + (1/8)^2, tolerance = 1e-10)
-})
-
-test_that("Kostyrka's fallback uses a finite lower neighbour", {
-  f <- function(z) {
-    r <- abs(z-1)
-    ifelse(r < 1e-10 | r >= 0.15 | (r >= 1/16 & r < 1/8), z^3, NA_real_)
-  }
-  s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
-  # Only h = 1/16 has a finite derivative among the two neighbours.
-  expect_equal(s$value, 3 + (1/16)^2, tolerance = 1e-10)
-})
-
-test_that("Kostyrka's fallback uses a derivative from the full grid", {
+test_that("Kostyrka returns an evaluated step when interpolation is unavailable", {
   f <- function(z) ifelse(abs(z-1) < 1e-10 | abs(z-1) >= 0.15, z^3, NA_real_)
   s <- suppressWarnings(step.K(f, 1, range = c(2^-46, 2^14), cores = 1))
-  # Both neighbours are missing; h = 1/4 is the finite point nearest the grid's centre.
-  expect_equal(s$value, 3 + (1/4)^2, tolerance = 1e-10)
+  expect_true(s$par %in% s$iterations$h)
+  expect_equal(s$value, (f(1+s$par) - f(1-s$par))/(2*s$par), tolerance = 1e-12)
+})
+
+test_that("Kostyrka's fallback is unchanged by different function units", {
+  base <- suppressWarnings(step.K(function(z) z^2, 1e-8, range = c(2^-60, 2^14)))
+  scaled <- suppressWarnings(step.K(function(z) -2^40*z^2, 1e-8, range = c(2^-60, 2^14)))
+  expect_equal(c(scaled$par/base$par, scaled$value/(-2^40*base$value)), c(1, 1))
+  expect_null(scaled$iterations$fit)
 })
 
 test_that("Kostyrka's fallback fails explicitly without a finite derivative", {
@@ -122,6 +113,35 @@ test_that("Kostyrka's fallback fails explicitly without a finite derivative", {
   # Function values are finite on part of the grid, but every available derivative overflows
   expect_error(suppressWarnings(step.K(f, 0, range = c(1e-170, 1), cores = 1)), "finite derivative")
 })
+
+test_that("Kostyrka's grid starts at the requested lower step", {
+  s <- step.K(sin, 1, h0 = 0.003, shrink.factor = 1/sqrt(2), cores = 1)
+  h <- s$iterations$h
+  expect_equal(h[1], 0.003 * 2^-36)
+  expect_true(max(h) <= s$args$range[2])
+})
+
+test_that("Missing estimates cannot join separate truncation ranges", {
+  f <- function(z) ifelse(log2(abs(z)) %in% c(-12, -11, -10, -8, -7, -6, -4, -3, -2), z^3, NA_real_)
+  s <- suppressWarnings(step.K(f, 0, cores = 1))
+  error <- s$iterations$est.error[, "trunc"]
+  expect_equal(c(sum(is.finite(error) & error > 0), length(s$args$i.good)), c(6, 0))
+})
+
+test_that("An unsuccessful kink fit uses the fallback", {
+  skip_if_not_installed("testthat", "3.1.7")
+  local_mocked_bindings(optim = function(par, fn, ...) list(par = par, value = fn(par), convergence = 1L), .package = "stats")
+  s <- step.K(sin, 1, cores = 1)
+  expect_true(!is.null(s$iterations$fallback) && !s$iterations$fit$accepted)
+})
+
+test_that("A kink outside the observations uses the fallback", {
+  skip_if_not_installed("testthat", "3.1.7")
+  local_mocked_bindings(optim = function(par, fn, ...) list(par = c(100, 0), value = 0, convergence = 0L), .package = "stats")
+  s <- step.K(sin, 1, cores = 1)
+  expect_identical(s$exitcode, 3L)
+})
+
 
 test_that("Parallelisation in Kostyrka's algorithm works", {
   expect_identical(step.K(sin, 1, cores = 1), step.K(sin, 1, cores = 2))

@@ -37,7 +37,9 @@ step.M(
 for each element of \code{x}.
 The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
-\item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
+\item{range}{Positive finite vector of length 2 defining the initial search interval.
+A narrow interval is extended, with a warning, to cover steps on both sides
+of the usual machine-precision estimate. The interval used is saved in \code{args$range}.}
 
 \item{shrink.factor}{A positive scalar less than 1 that is used to create a sequence of
 step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This

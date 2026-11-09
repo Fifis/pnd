@@ -17,6 +17,10 @@
 #' \code{acc.order}, to estimate the minimum of the combined error.
 #' If too few estimates follow the expected truncation slope, a rounding-error
 #' fallback is used instead.
+#' A valid truncation branch requires 3 consecutive centred slopes within 10%
+#' of \code{acc.order}, without bridging missing estimates. The fit uses all finite
+#' estimates up to the end of the longest such run.
+#' A failed fit or a kink with observations on only one side invokes the fallback.
 #'
 #' The accuracy of the estimated higher-order derivatives starts at 2;
 #' only zero or non-finite estimates are retried at accuracy 4.
@@ -26,10 +30,11 @@
 #' on \code{h^acc.order}, avoiding further function evaluations. For continuous
 #' functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
 #'
-#' If only one neighbouring grid point has a finite derivative estimate, it is reused.
-#' If neither neighbour has a finite estimate, the finite derivative estimate closest
-#' to the middle of the step-size grid is used. The function stops with an error if
-#' no finite derivative estimate is available.
+#' The estimated step must lie in the search interval. Interpolation requires two
+#' finite neighbouring derivative estimates; otherwise the nearest usable grid step
+#' is returned with its derivative estimate. Steps with infinite or coincident
+#' stencil arguments are excluded. The function stops if no usable grid step remains.
+#' These checks reuse the evaluated grid and make no further function calls.
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
@@ -43,8 +48,9 @@
 #'         \item \code{0} – A V-shaped curve was fitted without errors or sanity-check failures.
 #'         \item \code{1} – The truncation branch is ill-behaved; a fail-safe value is returned.
 #'         \item \code{2} – Too few positive finite estimates; a fail-safe value is returned.
-#'         \item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
+#'         \item \code{3} – The fitted kink has observations on only one side; a fallback is returned.
 #'         \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+#'         \item \code{5} – The fit or selected step failed a safeguard; a fallback is returned.
 #'       }
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
@@ -53,7 +59,7 @@
 #'       auxiliary derivative; \code{aprime} records its selected accuracy order.
 #'       \code{fit} contains the initial and fitted log-kink coordinates (\code{gamma}, \code{beta}),
 #'       unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
-#'       mean pseudo-Huber \code{loss} and optimiser \code{convergence}; a \code{NULL}
+#'       mean pseudo-Huber \code{loss}, optimiser \code{convergence} and whether the fit was \code{accepted}; a \code{NULL}
 #'       is returned if no fit was attempted.
 #'       \code{fallback} records the quantities used when the truncation branch cannot be found.
 #'       Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
@@ -107,12 +113,10 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   if (is.null(range)) {
-    ends <- log(c(2^36, 2^(-24)), base = inv.sf)
-    ends <- c(floor(ends[1]), ceiling(ends[2]))
-    ends <- inv.sf^ends
-    range <- h0 / ends
+    range <- h0 * c(2^-36, 2^24)
   }
-  if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
+  if (length(range) != 2 || any(!is.finite(range)) || any(range <= 0))
+    stop("The range must be a positive vector of length 2 with finite endpoints.")
   range <- sort(range)
   # Safety checks for the range size
   hnaive <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1/(deriv.order + acc.order))
@@ -146,91 +150,46 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   eround <- estimates$round
   fallback <- NULL
 
-  # A value to compare to the threshold for Zero Truncation Error
-  good.te <- etrunc != 0 & is.finite(etrunc)
-  med.te <- if (any(good.te)) stats::median(etrunc[good.te]) else .Machine$double.eps
-
-  # Initial value:
   log2h <- log2(hgrid)
   log2e <- suppressWarnings(log2(etrunc))
-  log2e[is.infinite(log2e)] <- NA  # Preserving NaNs just in case
-  # plot(log2h, log2e)
+  log2e[!is.finite(log2e)] <- NA_real_
 
-  # Check-like function of two parameters: horizontal and vertical location
-  checkFit <- function (theta, x, a, d) (theta[2]-d*(x-theta[1]))*(x<theta[1]) + (theta[2]+a*(x-theta[1]))*(x>=theta[1])
+  # The two straight branches meet at theta[1], with height theta[2]
+  checkFit <- function(theta, x, a, d)
+    theta[2] + ifelse(x < theta[1], -d * (x-theta[1]), a * (x-theta[1]))
 
-  # If the function is symmetric / low-degree polynomial, the truncation error is always zero -- return
-  # the safe option; otherwise, carry out a search
-  is.finite.etrunc <- is.finite(log2e)
-  n.good <- sum(is.finite.etrunc)
-  is.good.round <- n.good >= 3
-  i.trunc.valid <- i.round <- NULL
-  if (is.good.round) {
-    # Identifying regions of rounding, valid truncation, and invalid truncation
-    # whilst also safeguarding against noisiness; define the slope at a point as
-    # the average right and left slope
-    i.etrunc.finite <- which(is.finite.etrunc)
-    local.slopes0 <- c(NA, sapply(2:n.good, function(i) {  # Backwards-looking slopes
-      ii  <- i.etrunc.finite[i-1:0]
-      diff(log2e[ii]) / diff(log2h[ii])
-    }))
-    local.slopes1 <- (local.slopes0 + c(local.slopes0[-1], NA)) * 0.5
-    local.slopes1[c(1, n.good)] <- local.slopes0[c(2, n.good)]
-    # Aligning the slopes with the original points
-    local.slopes <- rep(NA, n)
-    local.slopes[i.etrunc.finite] <- local.slopes1
-    # text(log2h[i.etrunc.finite], log2e[i.etrunc.finite], labels = round(local.slopes[i.etrunc.finite], 2), cex = 0.75, col = "#BB0000")
-
-    # Estimated minimum: where the slope changes from negative to positive
-    i.trunc.valid <- which(abs((local.slopes - acc.order) / acc.order) < 0.1)
-    only.right.branch <- FALSE
-    if (length(i.trunc.valid) > 0) {
-      zero.trunc <- FALSE
-      # Extending it because the local regression used +-1 points at the ends
-      i.trunc.valid <- sort(unique(c(i.trunc.valid-1, i.trunc.valid, i.trunc.valid+1)))
-
-      # Checking monotonicity after this addition to tackle edge cases like
-      # slopes = c(-1, 2, -1, -1, 2, -1) due to merging
-      # there are at least 3 points for sure, so the middle ones need to be taken out
-      nonmonot.i <- which(local.slopes[i.trunc.valid[2:(length(i.trunc.valid)-1)]] < 0) + 1
-      if (length(nonmonot.i) > 0) i.trunc.valid <- i.trunc.valid[-nonmonot.i]
-
-      # Another edge case: if the slope of etrunc is always acc.order, then, there is no check
-      if (0 %in% i.trunc.valid) {
-        only.right.branch <- FALSE
-        i.trunc.valid <- i.trunc.valid[i.trunc.valid > 0]
-        exitcode <- 3L
-      }
-
-      # If there are more than 1 run, pick the longest one
-      # However, if it is shorter than 5 (2 points were added artificially; we want a length-3 run), discard it
-      itv.runs <- splitRuns(i.trunc.valid)
-      itv.len <- sapply(itv.runs, length)
-      if (length(itv.runs) > 1)
-        i.trunc.valid <- itv.runs[[which.max(itv.len)]]
-      if (length(i.trunc.valid) >= 5) {
-        i.round <- seq_len(min(i.trunc.valid) - 1L)
-      } else {  # If the truncation error is too erratic, treat everything as a rounding error
-        zero.trunc <- med.te < max.rel.error
-        i.round <- which(etrunc != 0 & is.finite(etrunc))
-      }
-    } else {  # Maybe the higher-order derivatives are close to zero compared to the function noise?
-      zero.trunc <- med.te < max.rel.error
-      # If the truncation error is zero, treat everything as a rounding error
-      i.round <- which(etrunc != 0 & is.finite(etrunc))
+  i.finite <- which(is.finite(log2e))
+  i.trunc.valid <- i.round <- integer(0)
+  if (length(i.finite) < 3L) {
+    exitcode <- 2L
+  } else {
+    # A centred slope needs three consecutive observations; do not bridge missing estimates
+    middle <- seq.int(2L, n-1L)
+    complete <- is.finite(log2e[middle-1L]) & is.finite(log2e[middle]) & is.finite(log2e[middle+1L])
+    local.slopes <- rep(NA_real_, n)
+    local.slopes[middle[complete]] <-
+      (log2e[middle[complete]+1L] - log2e[middle[complete]-1L]) /
+      (log2h[middle[complete]+1L] - log2h[middle[complete]-1L])
+    good <- which(abs(local.slopes/acc.order - 1) < 0.1)
+    if (length(good)) {
+      runs <- splitRuns(good)
+      i.trunc.valid <- runs[[which.max(lengths(runs))]]
     }
 
-    if ((!only.right.branch) && (!zero.trunc) && length(i.trunc.valid) >= 3) {
-      # It makes sense to equate the two errors when there are both branches with enough points
-      sbst <- intersect(sort(unique(c(i.trunc.valid, i.round))), which(is.finite(log2e)))
+    if (length(i.trunc.valid) < 3L) {
+      warning("Fewer than 3 consecutive observations in the truncation branch! Resorting to a safe option.")
+      exitcode <- 1L
+    } else {
+      # Include the smaller steps to identify the rounding branch as well as the truncation branch
+      sbst <- i.finite[i.finite <= max(i.trunc.valid)]
+      i.round <- i.finite[i.finite < min(i.trunc.valid)]
 
       # The median log-step among the 5 lowest errors prevents fragmented local optima
       # as initial values; this is a purely empirical improvement
       i.low <- utils::head(sbst[order(log2e[sbst])], 5)
       theta0 <- c(stats::median(log2h[i.low]), min(log2e[sbst]))
-      if (theta0[1] > log2h[max(i.trunc.valid)]) theta0 <- c(log2h[min(i.trunc.valid)], log2e[min(i.trunc.valid)])
-      # If the rounding error was not available, use a rough fall-back
-      if (is.na(theta0[2])) theta0[2] <- stats::quantile(log2e, 0.25, na.rm = TRUE)
+      if (theta0[1] > log2h[max(i.trunc.valid)])
+        theta0 <- c(log2h[min(i.trunc.valid)], log2e[min(i.trunc.valid)])
 
       resid0 <- log2e[sbst] - checkFit(theta0, log2h[sbst], acc.order, deriv.order)
       rmad <- stats::mad(resid0, constant = 1)
@@ -241,60 +200,81 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
         # Equivalent pseudo-Huber loss, avoiding cancellation and division by a tiny rho
         mean(rho * resid^2 / (sqrt(rho^2 + resid^2) + rho))
       }
-      opt <- stats::optim(par = theta0, fn = fobj, method = "BFGS", control = list(reltol = .Machine$double.eps^(1/3)))
+      opt <- tryCatch(stats::optim(par = theta0, fn = fobj, method = "BFGS",
+                                  control = list(reltol = .Machine$double.eps^(1/3))),
+                      error = function(e) NULL)
       fit <- list(initial = stats::setNames(theta0, c("gamma", "beta")),
-                  par = stats::setNames(opt$par, c("gamma", "beta")),
-                  mad = rmad, rho = rho, subset = sbst, loss = opt$value, convergence = opt$convergence)
+                  par = if (is.null(opt)) c(gamma = NA_real_, beta = NA_real_)
+                        else stats::setNames(opt$par, c("gamma", "beta")),
+                  mad = rmad, rho = rho, subset = sbst,
+                  loss = if (is.null(opt)) NA_real_ else opt$value,
+                  convergence = if (is.null(opt)) NA_integer_ else opt$convergence,
+                  accepted = FALSE)
 
-      # The two-branch model has T/R = d/a at its minimum, giving h* = hcross*(d/a)^(1/(d+a))
-      # TODO: calibrate this heuristic for the auxiliary/target rounding-bound ratio lambda
-      # (11/16 for the 6-point stencil, 1/2 for 4 points at d=1, a=2)
-      hopt0   <- if (!zero.trunc) 2^opt$par[1] else 0.001 * max(1, abs(x))
-      hopt <- hopt0 * (deriv.order/acc.order)^(1/(deriv.order + acc.order))
-      hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, d = deriv.order)
-    } else {  # Zero truncation --> choosing the smallest error that yields a non-zero total-error estimate
-      hopt <- hgrid[min(i.etrunc.finite)]
+      if (is.null(opt) || opt$convergence != 0L ||
+          any(!is.finite(opt$par)) || !is.finite(opt$value)) {
+        exitcode <- 5L
+      } else if (!any(log2h[sbst] < opt$par[1]) || !any(log2h[sbst] > opt$par[1])) {
+        # A one-sided fit cannot identify the balance between the two error branches
+        exitcode <- 3L
+      } else {
+        # The two-branch model has T/R = d/a at its minimum, giving h* = hcross*(d/a)^(1/(d+a))
+        # TODO: calibrate this heuristic for the auxiliary/target rounding-bound ratio lambda
+        # (11/16 for the 6-point stencil, 1/2 for 4 points at d=1, a=2)
+        hopt <- 2^opt$par[1] * (deriv.order/acc.order)^(1/(deriv.order + acc.order))
+        if (!is.finite(hopt) || hopt < range[1] || hopt > range[2]) {
+          exitcode <- 5L
+        } else {
+          fit$accepted <- TRUE
+          hat.check <- 2^checkFit(opt$par, x = log2h, a = acc.order, d = deriv.order)
+        }
+      }
     }
-    log2hopt <- log2(hopt)
-    # points(log2h[sbst], log2e[sbst], pch = 16)
-    # lines(log2h, log2(hat.check), lty = 2)
-
-    if (length(i.trunc.valid) < 5) {
-      warning("Fewer than 5 observations in the truncation branch! Resorting to a safe option.")
-      # An unresolved branch uses the general model target or an explicit rough fallback
-      exitcode <- 1L
-    }
-  } else {
-    zero.trunc <- TRUE
-    exitcode <- 2L
   }
 
-  if (exitcode %in% c(1L, 2L)) {
+  if (exitcode %in% c(1L, 2L, 3L, 5L)) {
     fallback <- fallbackM(hgrid, fhigher, K, estimates$round.coef, eround,
                           x, deriv.order, acc.order)
     hopt <- fallback$par
-    log2hopt <- log2(hopt)
-  } else if (exitcode == 3L) {  # If the right branch is growing, choose a smaller step size
-    hopt <- hgrid[round(stats::quantile(i.trunc.valid, 0.25))]
-    log2hopt <- log2(hopt)
   }
 
-  # Locate neighbouring steps before applying the existing size safeguard
-  i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
-  h.closest <- hgrid[i.closest]
-
-  # Final step size check: not too large
-  if (max(h.closest) > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
-    exitcode <- 4L
-    hopt <- 0.1*abs(x)
-    log2hopt <- log2(hopt)
-    i.closest <- which(rank(abs(log2(hgrid) - log2hopt), ties.method = "first") <= 2)
-    h.closest <- hgrid[i.closest]
+  # Keep the existing local-step cap only when it belongs to the permitted interval
+  upper <- range[2]
+  cap <- 0.1 * abs(x)
+  if (abs(x) > 4.71216091538e-7 && cap >= range[1] && cap <= upper) {
+    upper <- cap
+    if (is.finite(hopt) && hopt > cap) {
+      exitcode <- 4L
+      hopt <- cap
+    }
   }
+
+  # A finite cached stencil above hopt encloses its target nodes on an interval domain
+  # Reject coincident or infinite arguments even if FUN happens to return a finite number there
+  target.x <- x + outer(hgrid, estimates$stencil)
+  valid.target <- which(is.finite(cds) &
+                          apply(target.x, 1L, function(z) all(is.finite(z)) && !anyDuplicated(z)))
+  available <- valid.target[hgrid[valid.target] >= range[1] & hgrid[valid.target] <= upper]
+  if (!length(available)) stop("Could not compute a finite derivative on the permitted grid.")
+  neighbours <- if (is.finite(hopt) && hopt > 0)
+    utils::head(order(abs(log2h - log2(hopt))), 2L) else integer(0)
+  exact <- which(hgrid == hopt)
+  supported <- is.finite(hopt) && hopt >= range[1] && hopt <= upper &&
+    if (length(exact)) exact[1L] %in% available else
+      all(neighbours %in% valid.target) && any(hgrid[valid.target] >= hopt) &&
+      all(is.finite(x + estimates$stencil*hopt)) &&
+      !anyDuplicated(x + estimates$stencil*hopt)
+  if (!supported) {
+    # Return an evaluated step when interpolation cannot be supported, keeping par and value consistent
+    distance <- if (is.finite(hopt) && hopt > 0) abs(log2h[available] - log2(hopt)) else rep(0, length(available))
+    hopt <- hgrid[available[which.min(distance)]]
+    exitcode <- 5L
+  }
+  log2hopt <- log2(hopt)
 
   cd <- interpolateM(hgrid, cds, hopt, acc.order)
   if (!is.finite(cd)) stop("Could not compute a finite derivative on the grid.")
-  if (!is.null(fit) && !(exitcode %in% c(1L, 2L))) {
+  if (!is.null(fit) && isTRUE(fit$accepted)) {
     # These are the separate empirical branches, without the deferred lambda calibration
     et <- 2^(opt$par[2] + acc.order * (log2hopt - opt$par[1]))
     er <- 2^(opt$par[2] - deriv.order * (log2hopt - opt$par[1]))
@@ -307,8 +287,9 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                 "target error ratio reached within tolerance",  # 0
                 "truncation branch unresolved, using a rounding-error fallback",  # 1
                 "too few positive finite truncation estimates, using a rounding-error fallback",  # 2
-                "there is no left branch of the combined error, fitting impossible",  # 3
-                "step size too large relative to x, using |x|/10 instead"  # 4
+                "the fitted kink has observations on only one side, using a rounding-error fallback",  # 3
+                "step size too large relative to x, using |x|/10 instead",  # 4
+                "fit or selected step failed a safeguard, using a fallback"  # 5
 
   )
 

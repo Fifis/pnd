@@ -20,7 +20,9 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' @inheritParams GenD
 #' @param h0 Numeric scalar: initial step size, defaulting to
 #'   \code{2^round(log2(0.001 * max(abs(x), 1)))}.
-#' @param range Numeric vector of length 2 defining the valid search range for the step size.
+#' @param range Positive finite vector of length 2 defining the initial search interval.
+#'   A narrow interval is extended, with a warning, to cover steps on both sides
+#'   of the usual machine-precision estimate. The interval used is saved in \code{args$range}.
 #' @param max.rel.error Error bound for the relative function-evaluation error
 #'   (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
 #'   If the function is relying on numerical optimisation routines, consider setting to
@@ -124,12 +126,10 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   if (inherits(cl, "cluster")) cores <- min(length(cl), cores)
 
   if (is.null(range)) {
-    ends <- log(c(2^36, 2^(-24)), base = inv.sf)
-    ends <- c(floor(ends[1]), ceiling(ends[2]))
-    ends <- inv.sf^ends
-    range <- h0 / ends
+    range <- h0 * c(2^-36, 2^24)
   }
-  if (length(range) != 2 || any(range <= 0)) stop("The range must be a positive vector of length 2.")
+  if (length(range) != 2 || any(!is.finite(range)) || any(range <= 0))
+    stop("The range must be a positive vector of length 2 with finite endpoints.")
   range <- sort(range)
   # Safety checks for the range size
   hnaive <- (abs(x) * (x!=0) + (x==0)) * .Machine$double.eps^(1/(deriv.order + acc.order))

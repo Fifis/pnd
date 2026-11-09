@@ -388,11 +388,17 @@ stencilM <- function(d, a, ratio) {
 # Construct the arguments at which FUN will be evaluated, once per grid point.
 # The same geometric ratio must be used for candidate steps and stencil nodes
 # This makes x +/- ratio^k*h_i available from the pair evaluated at h_(i+k)
-# Columns of x hold the left and right arguments, with h increasing down the rows.
-# Endpoints are rounded outward to powers of ratio; thus $h may extend beyond
-# the requested range
+# Columns of x hold the left and right arguments, with h increasing down the rows
+# Start at the lower endpoint so a supplied range is not widened by rounding
 gridM <- function(x, range, ratio = 2) {
-  h <- ratio^(floor(log(range[1], base = ratio)):ceiling(log(range[2], base = ratio)))
+  # Generate the next endpoint too, then discard it if it exceeds the upper bound
+  # This avoids losing an admissible endpoint to rounding in the logarithms
+  n <- 1L + ceiling((log(range[2]) - log(range[1])) / log(ratio))
+  h <- range[1] * ratio^(seq_len(n) - 1L)
+  # A wide interval can overflow ratio^i even when the resulting step is finite
+  overflow <- !is.finite(h)
+  h[overflow] <- exp(log(range[1]) + (which(overflow)-1L) * log(ratio))
+  h <- h[is.finite(h) & h <= range[2]]
   list(h = h, x = matrix(x + c(-h, h), ncol = 2L))
 }
 
@@ -481,7 +487,7 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   round.coef <- (max.rel.error * sum(abs(target$weights)) + 0.5 * .Machine$double.eps) * fmax
   list(f = fgrid, f0 = f0, deriv = derivative, higher = higher / grid$h^a,
        trunc = K * abs(higher), round = round.coef / grid$h^d,
-       K = K, aprime = aprime, round.coef = round.coef)
+       K = K, aprime = aprime, round.coef = round.coef, stencil = target$stencil)
 }
 
 # For error A*h^a + B*h^(-d), the derivative of this expression gives an optimal rounding level

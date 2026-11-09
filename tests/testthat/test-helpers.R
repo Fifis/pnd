@@ -75,3 +75,8 @@ test_that("non-finite values remain visible when formatting and printing", {
   expect_identical(printMat(matrix(nonfinite, nrow = 1), sep = " | ", print = FALSE),
                    "NA | NaN | Inf | -Inf")
 })
+
+test_that("A wide finite interval does not truncate the step grid", {
+  h <- gridM(0, c(2^-600, 2^600))$h
+  expect_true(all(is.finite(h)) && min(h) == 2^-600 && max(h) > 2^500 && max(h) <= 2^600)
+})

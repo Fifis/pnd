@@ -34,7 +34,9 @@ step.K(
 for each element of \code{x}.
 The truncation error will be of the order \eqn{O(h^{\mathrm{acc.order}})}{O(h^acc.order)}.}
 
-\item{range}{Numeric vector of length 2 defining the valid search range for the step size.}
+\item{range}{Positive finite vector of length 2 defining the initial search interval.
+A narrow interval is extended, with a warning, to cover steps on both sides
+of the usual machine-precision estimate. The interval used is saved in \code{args$range}.}
 
 \item{shrink.factor}{A positive scalar less than 1 that is used to create a sequence of
 step sizes. The recommended value is 0.5. Change to 0.25 for a faster search. This
@@ -72,8 +74,9 @@ the estimated rounding component describes noise in the truncation-error estimat
 \item \code{0} – A V-shaped curve was fitted without errors or sanity-check failures.
 \item \code{1} – The truncation branch is ill-behaved; a fail-safe value is returned.
 \item \code{2} – Too few positive finite estimates; a fail-safe value is returned.
-\item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
+\item \code{3} – The fitted kink has observations on only one side; a fallback is returned.
 \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
+\item \code{5} – The fit or selected step failed a safeguard; a fallback is returned.
 }
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,
@@ -82,7 +85,7 @@ and predicted model-based errors. The \code{fhigher} column contains the higher-
 auxiliary derivative; \code{aprime} records its selected accuracy order.
 \code{fit} contains the initial and fitted log-kink coordinates (\code{gamma}, \code{beta}),
 unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
-mean pseudo-Huber \code{loss} and optimiser \code{convergence}; a \code{NULL}
+mean pseudo-Huber \code{loss}, optimiser \code{convergence} and whether the fit was \code{accepted}; a \code{NULL}
 is returned if no fit was attempted.
 \code{fallback} records the quantities used when the truncation branch cannot be found.
 Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
@@ -107,6 +110,10 @@ these are -1 and 2, respectively. The step at the fitted kink is multiplied by
 \code{acc.order}, to estimate the minimum of the combined error.
 If too few estimates follow the expected truncation slope, a rounding-error
 fallback is used instead.
+A valid truncation branch requires 3 consecutive centred slopes within 10\%
+of \code{acc.order}, without bridging missing estimates. The fit uses all finite
+estimates up to the end of the longest such run.
+A failed fit or a kink with observations on only one side invokes the fallback.
 
 The accuracy of the estimated higher-order derivatives starts at 2;
 only zero or non-finite estimates are retried at accuracy 4.
@@ -116,10 +123,11 @@ Interpolation uses the existing derivative estimates and their leading dependenc
 on \code{h^acc.order}, avoiding further function evaluations. For continuous
 functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
 
-If only one neighbouring grid point has a finite derivative estimate, it is reused.
-If neither neighbour has a finite estimate, the finite derivative estimate closest
-to the middle of the step-size grid is used. The function stops with an error if
-no finite derivative estimate is available.
+The estimated step must lie in the search interval. Interpolation requires two
+finite neighbouring derivative estimates; otherwise the nearest usable grid step
+is returned with its derivative estimate. Steps with infinite or coincident
+stencil arguments are excluded. The function stops if no usable grid step remains.
+These checks reuse the evaluated grid and make no further function calls.
 }
 \examples{
 plot(step.K(sin, 1))
