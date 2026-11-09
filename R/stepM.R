@@ -1,4 +1,5 @@
-# Generator for Mathur and Kostyrka
+# Generator for Mathur's and Kostyrka's methods that evaluates the shared function grid
+# once so all difference formulae reuse the same values
 getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
   FUNsafe <- function(z) safeF(FUN, z, ...)
   fp <- runParallel(FUN = FUNsafe, x = x, cores = cores, cl = cl, preschedule = preschedule)
@@ -8,16 +9,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
     warning("First error: ", as.character(attr(fp[[first.err.ind]], "error")))
   }
   fgrid <- unlist(fp)
-  return(matrix(fgrid, ncol = 2))
-}
-
-
-# Grid value generator for Mathur and Kostyrka
-gridM <- function(x, range, shrink.factor = 0.5) {
-  inv.sf <- 1/shrink.factor
-  hgrid <- inv.sf^(floor(log(range[1], base = inv.sf)):ceiling(log(range[2], base = inv.sf)))
-  xgrid   <- x + c(-hgrid, hgrid)
-  list(h = hgrid, x = matrix(xgrid, ncol = 2L))
+  return(fgrid)
 }
 
 
@@ -42,11 +34,8 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #' @param min.valid.slopes Positive integer: how many points must form a sequence
 #'   with the correct slope with relative difference from \code{acc.order} less than \code{seq.tol}.
 #'   If \code{shrink.factor} is small (< 0.33), consider reducing this to 4.
-#' @param correction Logical: if \code{TRUE}, returns the corrected step size (first
-#'   point in the sequence times a less-than-1 number to account for the possible
-#'   continuation of the downwards slope of the total error); otherwise, returns
-#'   the grid point that is lowest in the increasing sequence of valid error
-#'   estimates.
+#' @param correction Logical: if \code{TRUE}, adjust the selected grid step to achieve the
+#'   optimal truncation-to-rounding-error ratio (see Details); otherwise return the selected grid step.
 #' @inheritParams runParallel
 #' @param ... Passed to FUN.
 #'
@@ -56,18 +45,27 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #'
 #' 1. Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 #' factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
-#' 2. Compute a series of truncation error estimates via third derivatives or Richardson extrapolation.
+#' 2. Estimate truncation errors using a higher-order derivative of accuracy order two.
 #' 3. Find the leftmost range of consecutive step sizes for which the slope of the truncation error
 #'    is approximately equal (within 10% tolerance) to the accuracy order and which is long enough
 #'    (e.g. at least length 5).
-#' 4. Use the leftmost point of this range as the uncorrected optimal step size, or correct it by shrinking
-#'    it by a small amount given in the article.
+#' 4. Select the smallest step in this range and, if \code{correction = TRUE}, adjust
+#'    it towards the predicted minimum of the combined rounding and truncation errors.
+#'
+#' The adjustment multiplies the selected step by
+#' \eqn{r[(1-r^{-a})/(1+r^d)]^{1/(a+d)}}, where \eqn{r} is
+#' \code{1/shrink.factor}, \eqn{d} is \code{deriv.order} and \eqn{a} is \code{acc.order}.
+#'
+#' Interpolation uses the existing derivative estimates and their leading dependence
+#' on \code{h^acc.order}, avoiding further function evaluations. For continuous
+#' functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
+#' Only the existing grid is used; no higher-accuracy retries or extra candidate steps are evaluated.
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
 #'     \item \code{par} – the optimal step size found.
-#'     \item \code{value} – the estimated numerical first derivative (using central differences).
-#'     \item \code{counts} – the number of grid points (each point includes two function evaluations).
+#'     \item \code{value} – the estimated numerical derivative (using central differences).
+#'     \item \code{counts} – the number of paired grid points, with one additional central evaluation for even derivative orders.
 #'     \item \code{abs.error} – an estimate of the truncation and rounding errors.
 #'     \item \code{exitcode} – an integer code indicating the termination status:
 #'       \itemize{
@@ -80,6 +78,12 @@ gridM <- function(x, range, shrink.factor = 0.5) {
 #'     \item \code{message} – A summary message of the exit status.
 #'     \item \code{iterations} – A list including the step and argument grids,
 #'       function values on those grids, estimated derivative values, and estimated error values.
+#'       \code{fallback} records the quantities used when the truncation branch cannot be found.
+#'       Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
+#'       It is \code{NA} when the estimates do not identify a finite minimum.
+#'       The calculation uses the median absolute higher-derivative estimate and the function values
+#'       at the smallest step for which all points in the difference formula are available.
+#'       \code{mean.sign} indicates whether rounding estimates tend to rise or fall as steps increase.
 #'   }
 #' @export
 #'
@@ -141,63 +145,28 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   exitcode <- 0L
 
   # Creating a sequence of step sizes for evaluation
-  g <- gridM(x = x, range = range, shrink.factor = shrink.factor)
+  g <- gridM(x = x, range = range, ratio = inv.sf)
   hgrid <- g$h
   xgrid <- g$x
   n <- length(hgrid)
-  tstar <- (1 + inv.sf) / (1 - shrink.factor^2)  # TODO: n = 2...
+  tstar <- (1 + inv.sf^deriv.order) / (1 - shrink.factor^acc.order)
 
-  fgrid <- getValsM(FUN = FUN, x = xgrid, cores = cores, cl = cl, preschedule = preschedule, ...)
-  fplus <- fgrid[, 2]
-  fminus <- fgrid[, 1]
-
-  # Stencil of powers of 1/shrink.factor because the step is shrunk in this manner
-  # Rounding near-integers to integers to handle cases such as sqrt(2)^2 - 2 = 2*MachEps
-  s2 <- inv.sf^(0:(acc.order/2 + 1))
-  near.int <- abs(s2/round(s2) - 1) < 16 * .Machine$double.eps
-  s2[near.int] <- round(s2[near.int])
-  s2 <- c(-rev(s2), s2)
-  s1 <- s2[2:(length(s2)-1)]
-  s0 <- s1[2:(length(s2)-1)]  # For actual first derivatives
-  # Standard + high accuracy for an alternative estimate of the truncation term
-  # because it is the next acc.order-th derivative in the Taylor expansion
-  stc0  <- fdCoef(deriv.order = deriv.order, acc.order = acc.order,   stencil = s0)
-  stc1  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order,   stencil = s1)
-  stc2  <- fdCoef(deriv.order = deriv.order+acc.order, acc.order = acc.order+2, stencil = s2)
-  K <- abs(attr(stc0, "remainder.coef"))  # Target coefficient |sum(w*b^(d+a))|/(d+a)!
-
-  stc.list <- list(stc0, stc1, stc2)
-  cds <- vector("list", 3)
-  for (i in 1:3) {
-    i.spos <- stc.list[[i]]$stencil > 0  # x+h, x+2h, ...
-    i.sneg <- stc.list[[i]]$stencil < 0
-    wpos  <-     stc.list[[i]]$weights[i.spos]  # Weights for f(...) starting at h: x+h, x+th, ...
-    wneg  <- rev(stc.list[[i]]$weights[i.sneg]) # Weights for f(...) starting at -h: x-h, x-th, ...
-    fpos <- sapply(1:sum(i.spos), function(j) c(fplus[j:n], rep(NA, j-1)))
-    fneg <- sapply(1:sum(i.sneg), function(j) c(fminus[j:n], rep(NA, j-1)))
-    # Estimated required and higher-order derivative times h^acc.order
-    cds[[i]] <- (colSums(t(fpos) * wpos) + colSums(t(fneg) * wneg)) / hgrid
-  }
-  # Both auxiliary formulae estimate the same target truncation term K*h^a*f^(d+a).
-  fhigher <- cds[[3]]
-  bad.etrunc <- (!is.finite(fhigher)) | (fhigher == 0)
-  fhigher[bad.etrunc] <- cds[[2]][bad.etrunc]
-  etrunc <- K * abs(fhigher)
-  # plot(abs(cds[[2]]), log = "y"); points(abs(cds[[3]]), col = 2)
+  estimates <- differencesM(FUN, x, g, deriv.order, acc.order, inv.sf, retry = FALSE,
+                            max.rel.error = max.rel.error, cores = cores, cl = cl,
+                            preschedule = preschedule, ...)
+  fgrid <- estimates$f
+  cds <- estimates$deriv
+  fhigher <- estimates$higher
+  K <- estimates$K
+  etrunc <- estimates$trunc
+  eround <- estimates$round
+  fallback <- NULL
 
   log2etrunc <- suppressWarnings(log2(etrunc))
   log2etrunc[!is.finite(log2etrunc)] <- NA
   dletrunc <- c(NA, diff(log2etrunc))
   dlh <- c(NA, diff(log2(hgrid)))
   slopes <- dletrunc / dlh
-
-  # Rounding error for later
-  stc <- fdCoef(deriv.order = deriv.order, acc.order = acc.order)
-  l <- length(stc$stencil) / 2
-  fmax <- apply(abs(cbind(fpos[, 1:l], fneg[, 1:l])), 1, max)
-  f.eps <- max.rel.error * sum(abs(stc$weights)) * fmax
-  f.delta <- 0.5 * .Machine$double.eps * fmax
-  eround <- (f.eps + f.delta) / hgrid^deriv.order
 
   # Prepaging an error message for the future
   sf.sugg <- max(0.5, round(sqrt(shrink.factor), 2))
@@ -210,8 +179,8 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   hopt0 <- NA  # Overwritten in case of a successful check
   i.hopt <- i.increasing <- i.okay <- i.good <- NULL  # Overwritten in case of a successful check
 
-  # Checking the closeness to the slope to the approximation order, e.g. n=2
-  good.slopes <- abs(slopes - acc.order) / acc.order <= seq.tol  # TODO: generalise with (d)
+  # Compare the observed slope with the target accuracy order
+  good.slopes <- abs(slopes - acc.order) / acc.order <= seq.tol
   okay.slopes <- abs(slopes - acc.order) / acc.order <= min(seq.tol * 3, 0.5)
   positive.slopes <- slopes > 0
 
@@ -248,11 +217,11 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
       hopt0 <- hgrid[i.hopt]
       exitcode <- 1L
       warning("The estimated truncation error has a slightly wrong reduction rate (~",
-              round(stats::median(slopes[positive.slopes], na.rm = TRUE), 2), ", but should be ~2). ", err1)
+              round(stats::median(slopes[positive.slopes], na.rm = TRUE), 2), ", but should be ~", acc.order, "). ", err1)
     } else {
       if (any(is.finite(slopes))) {
         warning("The estimated truncation error has a wrong reduction rate (~", round(stats::median(slopes), 2),
-                ", but should be ~2). ", err1)
+                ", but should be ~", acc.order, "). ", err1)
       }
     }
   }
@@ -262,27 +231,13 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   if (is.finite(hopt0)) {
     # Finding the smallest step size with a valid slope and correcting it
     i.hopt <- which(hgrid == hopt0)
-    hopt <- hopt0 * (1 / tstar)^(1/3)
+    # Mathur indexes the estimate at ratio*h, whereas our auxiliary stencil uses h
+    hopt <- hopt0 * inv.sf * tstar^(-1/(deriv.order + acc.order))
   } else {  # Fail-safe return for cases like x^2 at 0
-    # Two cases possible: f(x) = x^2 at x = 0 has eround increasing,
-    # which implies that a large fail-safe step can be chosen
-    f.er <- is.finite(eround)
-    mean.sign <- if (sum(f.er) > 1) mean(sign(diff(eround[f.er]))) else 1
-    # If the rounding error is growing, prefer a slightly larger step size
-    if (mean.sign > 0.5) {
-      hopt0 <- hopt <- 128*stepx(x = x, deriv.order = deriv.order, acc.order = acc.order,
-                                 zero.tol = .Machine$double.eps^(1/3))
-      i.hopt <- which.min(abs(log2(hgrid) - log2(hopt)))
-    } else {
-      # Otherwise, for an eround that does not grow convincingly,
-      # find the step yielding the theoretical expected round-off value
-      complete.rows <- apply(fgrid, 1, function(x) all(is.finite(x)))
-      f0 <- abs(max(abs(fgrid[which(complete.rows)[1], ])))
-      expected.eround <- (.Machine$double.eps^2 * f0^2 / 12)^(1/3)
-      # TODO: generalise
-      i.hopt <- which.min(abs(eround - expected.eround))
-      hopt0 <- hopt <- hgrid[i.hopt]
-    }
+    fallback <- fallbackM(hgrid, fhigher, K, estimates$round.coef, eround,
+                          x, deriv.order, acc.order)
+    hopt0 <- hopt <- fallback$par
+    i.hopt <- which.min(abs(log2(hgrid) - log2(hopt)))
 
     exitcode <- 2L
     if (sum(is.finite(fgrid)) < 3) exitcode <- 3L
@@ -301,6 +256,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
                      "not even yield a finite numerical derivative."))
   }
 
+  if (!correction) hopt <- hopt0
   # Final step size check
   if (hopt > 0.1*abs(x) && abs(x) > 4.71216091538e-7) {
     exitcode <- 4L
@@ -312,22 +268,27 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
   msg <- switch(exitcode + 1L,
                 "successfully found the optimal step size",  # 0
                 "successfully found the optimal step size but allowed inaccurate slopes",  # 1
-                "truncation error reduction rate is too wrong, returning the naive step",  # 2
-                "fewer than 3 finite function values on the grid, returning the naive step",  # 3
+                "truncation branch ill-behaved, using a rounding-error fallback",  # 2
+                "fewer than 3 finite function values on the grid, returning a rough step",  # 3
                 "step size too large relative to x, using |x|/10 instead")  # 4
 
-  diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cds[[1]],
+  diag.list <- list(h = hgrid, x = xgrid, f = fgrid, deriv = cds,
                     est.error = cbind(trunc = etrunc, round = eround),
-                    slopes = slopes, max.rel.error = max.rel.error)
+                    slopes = slopes, max.rel.error = max.rel.error,
+                    fhigher = fhigher, aprime = estimates$aprime,
+                    fallback = fallback, f0 = estimates$f0)
 
   himin <- suppressWarnings(min(i.hopt, i.good, i.okay, i.increasing))
   i.round <- if (is.finite(himin)) 1:himin else NULL
 
-  # TODO: remove the first NA from the output
-  ret <- list(par = if (correction) hopt else hopt0, value = cds[[1]][i.hopt], counts = n,
-              exitcode = exitcode, message = msg, abs.error = diag.list$est.error[i.hopt, ],
+  # Keep the undefined first slope aligned with the first grid point
+  ret <- list(par = hopt, value = interpolateM(hgrid, cds, hopt, acc.order), counts = n,
+              exitcode = exitcode, message = msg,
+              abs.error = c(trunc = interpolateM(hgrid, etrunc, hopt, acc.order),
+                            round = interpolateM(hgrid, eround, hopt, -deriv.order)),
               method = "Mathur", iterations = diag.list,
-              args = list(max.rel.error = max.rel.error, range = range, shrink.factor = shrink.factor,
+              args = list(deriv.order = deriv.order, acc.order = acc.order,
+                          max.rel.error = max.rel.error, range = range, shrink.factor = shrink.factor,
                           min.valid.slopes = min.valid.slopes, seq.tol = seq.tol, correction = correction,
                           i.good = i.good, i.okay = i.okay, i.increasing = i.increasing, i.round = i.round))
 

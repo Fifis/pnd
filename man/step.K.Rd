@@ -63,14 +63,15 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
-\item \code{value} – the estimated numerical first derivative (using central differences).
-\item \code{counts} – the number of grid points (each point includes two function evaluations).
-\item \code{abs.error} – an estimate of the truncation and rounding errors.
+\item \code{value} – the estimated numerical derivative (using central differences).
+\item \code{counts} – the number of paired grid points, with one additional central evaluation for even derivative orders.
+\item \code{abs.error} – separate fitted error components, or interpolated grid estimates on fallback;
+the estimated rounding component describes noise in the truncation-error estimates.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
-\item \code{0} – Optimal termination; a minimum of the V-shaped function was found.
-\item \code{1} – Third derivative is too small or noisy; a fail-safe value is returned.
-\item \code{2} – Third derivative is nearly zero; a fail-safe value is returned.
+\item \code{0} – A V-shaped curve was fitted without errors or sanity-check failures.
+\item \code{1} – The truncation branch is ill-behaved; a fail-safe value is returned.
+\item \code{2} – Too few positive finite estimates; a fail-safe value is returned.
 \item \code{3} – There is no left branch of the V shape; a fail-safe value is returned.
 \item \code{4} – Step trimmed to 0.1|x| when |x| is not tiny and within range.
 }
@@ -78,31 +79,42 @@ A list similar to the one returned by \code{optim()}:
 \item \code{iterations} – A list including the step and argument grids,
 function values on those grids, estimated derivative values, estimated error values,
 and predicted model-based errors. The \code{fhigher} column contains the higher-order
-auxiliary derivative that uses the longer stencil where available.
+auxiliary derivative; \code{aprime} records its selected accuracy order.
 \code{fit} contains the initial and fitted log-kink coordinates (\code{gamma}, \code{beta}),
 unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
 mean pseudo-Huber \code{loss} and optimiser \code{convergence}; a \code{NULL}
-is returned if fitting failed.
+is returned if no fit was attempted.
+\code{fallback} records the quantities used when the truncation branch cannot be found.
+Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
+It is \code{NA} when the estimates do not identify a finite minimum.
+The calculation uses the median absolute higher-derivative estimate and the function values
+at the smallest step for which all points in the difference formula are available.
+\code{mean.sign} indicates whether rounding estimates tend to rise or fall as steps increase.
 }
 }
 \description{
-Optimal step-size search using the full range of practical error estimates and
-numerical optimisation to find the spot where the theoretical total-error shape
-is best described by the data, and finds the step size where the ratio of
-rounding-to-truncation error is optimal.
+Optimal step-size search by fitting the rounding and truncation branches of
+observed error estimates and locating the transition between them.
 }
 \details{
-This function computes the optimal step size for central differences using the statistical
-kink-search approach.
-The optimal step size is determined as the minimiser of the total error, which for central
-differences is V-shaped with the left-branch slope equal to the negative derivative order
-and the right-branch slope equal to the accuracy order. For standard simple central
-differences, the slopes are -1 and 2, respectively. The algorithm uses the
-mean pseudo-Huber penalty and searches for the optimal position of the check
-that fits the data the best using unconstrained BFGS
-optimisation.
-Unlike other algorithms, if the estimated third derivative is too small, the function shape
-will be different, and two checks are made for the existence of two branches.
+This function estimates the optimal step size by fitting a V-shaped curve to error estimates on log--log axes,
+i.e. finding a regression kink, using
+unconstrained BFGS optimisation and a mean pseudo-Huber penalty, which limits
+the influence of irregular estimates. The rounding and truncation branches have
+slopes \code{-deriv.order} and \code{acc.order}; for two-point central differences,
+these are -1 and 2, respectively. The step at the fitted kink is multiplied by
+\eqn{(d/a)^{1/(d+a)}}, where \eqn{d} is \code{deriv.order} and \eqn{a} is
+\code{acc.order}, to estimate the minimum of the combined error.
+If too few estimates follow the expected truncation slope, a rounding-error
+fallback is used instead.
+
+The accuracy of the estimated higher-order derivatives starts at 2;
+only zero or non-finite estimates are retried at accuracy 4.
+All stencils reuse the evaluated grid; no extra steps are evaluated for retries.
+
+Interpolation uses the existing derivative estimates and their leading dependence
+on \code{h^acc.order}, avoiding further function evaluations. For continuous
+functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
 
 If only one neighbouring grid point has a finite derivative estimate, it is reused.
 If neither neighbour has a finite estimate, the finite derivative estimate closest

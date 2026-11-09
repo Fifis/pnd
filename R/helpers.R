@@ -1,5 +1,4 @@
 # Some of these internal functions are not exported
-
 safeF <- function(FUN, x, ...) tryCatch(FUN(x, ...), error = function(e) return(structure(NA, error = e)))
 
 # Keep derivative grids out of callbacks sent to workers; leave dots lazy.
@@ -354,3 +353,190 @@ dupRowInds <- function(m) {
   }
   return(ret)
 }
+
+
+################################################################################
+# The next block contains highly technical internal functions that exist only to
+# outsource common routines from step.M() and step.K() into a somewhat modular
+# code. Their outputs are most certainly not described in any of the
+# accompanying articles, so use/change with caution. Both step.K and step.M
+# attempt only one (preferably parallel) evaluation of the function on the
+# grid because evaluating FUN is assumed to be more expensive that the
+# overhead and the checks / algorithm themselves.
+
+# The following function produces a b[j] = (0, +-1, +-2, +-4, ...)-like stencil.
+# with weights w[j]. Exclude zero in case of symmetry (d+a-1 nodes suffice)
+# Powers of ratio let wider stencils reuse function values from neighbouring trial steps
+# offset records the shift: a node ratio^k*h_i uses the value at h_(i+k)
+# Finally append the list element:
+# $offset:  number k for which abs(b[j]) = r^k; NA for the centre b[j]=0.
+stencilM <- function(d, a, ratio) {
+  if (length(d) != 1L || !is.finite(d) || d < 1 || d != floor(d))
+    stop("'deriv.order' must be a positive integer.")
+  if (length(a) != 1L || !is.finite(a) || a < 2 || a %% 2L != 0)
+    stop("'acc.order' must be a positive even integer.")
+  positive <- ratio^(seq_len((d + a - 1L) %/% 2L) - 1L)
+  near.int <- abs(positive/round(positive) - 1) < 16 * .Machine$double.eps
+  positive[near.int] <- round(positive[near.int])
+  nodes <- c(-rev(positive), if (d %% 2L == 0L) 0 else NULL, positive)
+  stencil <- fdCoef(deriv.order = d, acc.order = a, stencil = nodes)
+  stencil$offset <- match(abs(stencil$stencil), positive) - 1L
+  stencil
+}
+
+
+# Construct the arguments at which FUN will be evaluated, once per grid point.
+# The same geometric ratio must be used for candidate steps and stencil nodes
+# This makes x +/- ratio^k*h_i available from the pair evaluated at h_(i+k)
+# Columns of x hold the left and right arguments, with h increasing down the rows.
+# Endpoints are rounded outward to powers of ratio; thus $h may extend beyond
+# the requested range
+gridM <- function(x, range, ratio = 2) {
+  h <- ratio^(floor(log(range[1], base = ratio)):ceiling(log(range[2], base = ratio)))
+  list(h = h, x = matrix(x + c(-h, h), ncol = 2L))
+}
+
+
+# Function-value look-up: construct a table of previously calculated function values,
+# arranging them in the order required by a finite-difference formula. One function
+# evaluation can belong to several stencils.
+# Each output row is a candidate step and each column corresponds to a node in stencil$stencil.
+# Leave NA beyond the grid boundary rather than silently use an incomplete difference formula
+stencilValuesM <- function(stencil, fgrid, f0, rows = seq_len(nrow(fgrid))) {
+  values <- matrix(NA_real_, length(rows), length(stencil$weights))
+  for (j in seq_along(stencil$weights)) {
+    if (stencil$stencil[j] == 0) {
+      values[, j] <- f0
+    } else {
+      # For the currently requested stencil position, find which row of the stored
+      # function values contains the corresponding evaluation
+      index <- rows + stencil$offset[j]
+      # Larger steps may require points outside our grid
+      inside <- index <= nrow(fgrid)
+      # Negative stencil positions use the left column (1); ppsitive ones use the right column (2)
+      values[inside, j] <- fgrid[cbind(index[inside], 1L + (stencil$stencil[j] > 0))]
+    }
+  }
+  values
+}
+
+# Combine the assembled values into the weighted numerator of a difference.
+# I.e. this function does NOT divide by h[i]^d; the caller does that.
+# A central stencil is symmetric. For odd d, weights on the +/- positions
+# have opposite signs, so use f(x+b*h)-f(x-b*h). For even d, weights have
+# the same sign, so use their sum. Pairing first also allows equal values
+# to cancel exactly for odd d, before multiplication by a weight.
+stencilSumM <- function(values, stencil, d) {
+  positive <- which(stencil$stencil > 0)
+  negative <- match(-stencil$stencil[positive], stencil$stencil)
+  if (d %% 2L == 1L) {
+    pairs <- values[, positive, drop = FALSE] - values[, negative, drop = FALSE]
+  } else {
+    pairs <- values[, positive, drop = FALSE] + values[, negative, drop = FALSE]
+  }
+  result <- drop(pairs %*% stencil$weights[positive])
+  centre <- which(stencil$stencil == 0)
+  if (length(centre)) result <- result + values[, centre] * stencil$weights[centre]
+  result
+}
+
+# Evaluate FUN once on a shared grid, then calculate derivatives and error
+# model components for ALL candidate steps without further function calls.
+# Estimating truncation error needs f^(d+a), whose stencil overlaps the target derivative's stencil
+# A single batch of evaluations serves both; a higher-accuracy retry only recombines stored values.
+# The key reuse idea: one stencil uses f(x +/- h[i]), another may use
+# f(x +/- ratio*h[i]) = f(x +/- h[i+1]), which is already in the same cache.
+differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
+                         cores, cl, preschedule, ...) {
+  target <- stencilM(d, a, ratio)
+  auxiliary <- stencilM(d + a, 2L, ratio)
+  K <- abs(attr(target, "remainder.coef"))
+  n <- length(grid$h)
+  centre <- d %% 2L == 0L
+  f <- getValsM(FUN, c(grid$x, if (centre) x), cores, cl, preschedule, ...)
+  fgrid <- matrix(f[seq_len(2L*n)], ncol = 2L)
+  f0 <- if (centre) f[2L*n + 1L] else NA_real_
+  values <- stencilValuesM(target, fgrid, f0)
+  derivative <- stencilSumM(values, target, d) / grid$h^d
+  fmax <- apply(abs(values), 1L, max)
+  values <- stencilValuesM(auxiliary, fgrid, f0)
+  # d+a has the same parity as d because a is even, so the same pairing applies
+  # Dividing by h^d leaves h^a*f^(d+a), the quantity needed for the truncation estimate
+  higher <- stencilSumM(values, auxiliary, d) / grid$h^d
+  aprime <- rep(2L, n)
+  if (retry) {
+    # A larger stencil cannot repair missing input values or fit beyond the evaluated grid
+    last.complete <- n - max(auxiliary$offset, na.rm = TRUE) - 1L
+    eligible <- rowSums(!is.finite(values)) == 0L & seq_len(n) <= last.complete
+    bad <- which((!is.finite(higher) | higher == 0) & eligible)
+    if (length(bad)) {
+      auxiliary <- stencilM(d + a, 4L, ratio)
+      values <- stencilValuesM(auxiliary, fgrid, f0, bad)
+      alternative <- stencilSumM(values, auxiliary, d) / grid$h[bad]^d
+      good <- is.finite(alternative) & alternative != 0
+      higher[bad[good]] <- alternative[good]
+      aprime[bad[good]] <- 4L
+    }
+  }
+  round.coef <- (max.rel.error * sum(abs(target$weights)) + 0.5 * .Machine$double.eps) * fmax
+  list(f = fgrid, f0 = f0, deriv = derivative, higher = higher / grid$h^a,
+       trunc = K * abs(higher), round = round.coef / grid$h^d,
+       K = K, aprime = aprime, round.coef = round.coef)
+}
+
+# For error A*h^a + B*h^(-d), the derivative of this expression gives an optimal rounding level
+# Match that level on the observed grid instead of estimating a new derivative or calling FUN again
+fallbackM <- function(h, higher, K, round.coef, eround, x, d, a) {
+  finite.higher <- abs(higher[is.finite(higher)])
+  # The median resists large noisy estimates at tiny steps; keep zeros rather than invent a positive coefficient
+  A <- if (length(finite.higher)) K * stats::median(finite.higher) else NA_real_
+  reference <- which(is.finite(round.coef) & round.coef > 0)
+  # The finest complete stencil keeps the function-value scale local to x
+  B <- if (length(reference)) round.coef[reference[1L]] else NA_real_
+  # R* = B^(a/(a+d)) * (a*A/d)^(d/(a+d)), evaluated in logarithms
+  target <- if (is.finite(A) && A > 0 && is.finite(B) && B > 0)
+    exp((a * log(B) + d * (log(a) + log(A) - log(d))) / (a + d)) else NA_real_
+  finite <- is.finite(eround)
+  mean.sign <- if (sum(finite) > 1L) mean(sign(diff(eround[finite]))) else 1
+  # Along increasing h, growth signals that the sampled function scale is not constant
+  # Without ties, this threshold requires more than three quarters of differences to rise
+  usable <- which(is.finite(eround) & eround > 0)
+  if (mean.sign > 0.5 || !is.finite(target) || target <= 0 || !length(usable)) {
+    # The factor 128 is an empirical escape from an unresolved constant-coefficient model
+    par <- 128 * stepx(x, deriv.order = d, acc.order = a, zero.tol = .Machine$double.eps^(1/3))
+  } else {
+    par <- h[usable[which.min(abs(log(eround[usable]) - log(target)))]]
+  }
+  list(par = par, trunc.coef = A, round.coef = B, target = target, mean.sign = mean.sign)
+}
+
+# Avoid more function calls after step selection: the leading error varies linearly in h^a
+# For the rounding bound use power=-d instead, preserving its expected inverse-power behaviour
+interpolateM <- function(h, value, hopt, power) {
+  closest <- sort(utils::head(order(abs(log(h) - log(hopt))), 2L))
+  finite <- is.finite(value[closest])
+  if (!any(finite)) {
+    available <- which(is.finite(value))
+    if (!length(available)) return(NA_real_)
+    # Avoid the most extreme steps when neither neighbour is usable
+    middle <- available[which.min(abs(available - length(h)/2))]
+    return(unname(value[middle]))
+  }
+  closest <- closest[finite]
+  if (length(closest) == 1L) return(unname(value[closest]))
+
+  near <- h[closest]
+  exact <- which(near == hopt)
+  if (length(exact)) return(unname(value[closest[exact[1L]]]))
+  # Reuse an endpoint instead of extrapolating beyond the two available steps
+  if (hopt < min(near) || hopt > max(near))
+    return(unname(value[closest[which.min(abs(log(near) - log(hopt)))]]))
+
+  # Normalise so the powered coordinates do not exceed one, avoiding overflow
+  scale <- if (power > 0) max(near) else min(near)
+  nodes <- (near/scale)^power
+  weight <- ((hopt/scale)^power - nodes[1L]) / diff(nodes)
+  unname(sum(value[closest] * c(1 - weight, weight)))
+}
+
+

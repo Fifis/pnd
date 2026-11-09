@@ -9,6 +9,31 @@ test_that("Mathur's step selection behaves reasonably", {
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-8)
 })
 
+test_that("Mathur's general-order estimates behave reasonably", {
+  s <- suppressWarnings(step.M(function(z) z^6, 0, deriv.order = 2, acc.order = 4))
+  h <- s$iterations$h
+  error <- s$iterations$est.error[, "trunc"]
+  expect_equal(mean(error/h^4, na.rm = TRUE), 8, tolerance = 1e-12)
+  expect_true(all(s$iterations$aprime == 2L))
+})
+
+test_that("Mathur interpolates the estimated d^2f/dx^2 without new evaluations", {
+  calls <- 0L
+  f <- function(z) { calls <<- calls + 1L; z^4 }
+  s <- step.M(f, 1, deriv.order = 2, cores = 1)
+  expect_equal(s$value, 12 + 2*s$par^2, tolerance = 1e-12)
+  expect_equal(calls, 2*s$counts + 1)
+})
+
+test_that("Mathur's fallback uses the correct rounding target", {
+  f <- function(z) ifelse(z == 0 | abs(z) %in% c(1/4, 1/2, 1, 2), 1 + z^6, NA_real_)
+  p <- 1e-8
+  s <- suppressWarnings(step.M(f, 0, deriv.order = 2, acc.order = 4, max.rel.error = p))
+  # K*|f^(6)|=8, |weights| sum to 16/3, and the local function maximum is 65/64
+  B <- (16*p/3 + .Machine$double.eps/2) * 65/64
+  expect_equal(s$iterations$fallback$target, (16*B^2)^(1/3), tolerance = 1e-12)
+})
+
 test_that("Mathur's step selection respects non-integer stencil offsets", {
   expect_equal(step.M(exp, 1, shrink.factor = 0.6, cores = 1)$value, exp(1), tolerance = 1e-7)
   expect_equal(step.M(exp, 1, shrink.factor = 0.8, cores = 1)$value, exp(1), tolerance = 1e-7)

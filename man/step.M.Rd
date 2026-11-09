@@ -50,11 +50,8 @@ If \code{shrink.factor} is small (< 0.33), consider reducing this to 4.}
 \item{seq.tol}{Numeric scalar: maximum relative deviation of truncation-error
 slopes from \code{acc.order}.}
 
-\item{correction}{Logical: if \code{TRUE}, returns the corrected step size (first
-point in the sequence times a less-than-1 number to account for the possible
-continuation of the downwards slope of the total error); otherwise, returns
-the grid point that is lowest in the increasing sequence of valid error
-estimates.}
+\item{correction}{Logical: if \code{TRUE}, adjust the selected grid step to achieve the
+optimal truncation-to-rounding-error ratio (see Details); otherwise return the selected grid step.}
 
 \item{max.rel.error}{Error bound for the relative function-evaluation error
 (\eqn{\frac{\hat f(\hat x) - f(x)}{f(x)}}{(^f(^x) - f(x))/f(x)}). Measures how noisy a function is.
@@ -79,8 +76,8 @@ is \code{TRUE}) or \code{parLapplyLB()} on that cluster on all platforms.}
 A list similar to the one returned by \code{optim()}:
 \itemize{
 \item \code{par} – the optimal step size found.
-\item \code{value} – the estimated numerical first derivative (using central differences).
-\item \code{counts} – the number of grid points (each point includes two function evaluations).
+\item \code{value} – the estimated numerical derivative (using central differences).
+\item \code{counts} – the number of paired grid points, with one additional central evaluation for even derivative orders.
 \item \code{abs.error} – an estimate of the truncation and rounding errors.
 \item \code{exitcode} – an integer code indicating the termination status:
 \itemize{
@@ -93,6 +90,12 @@ A list similar to the one returned by \code{optim()}:
 \item \code{message} – A summary message of the exit status.
 \item \code{iterations} – A list including the step and argument grids,
 function values on those grids, estimated derivative values, and estimated error values.
+\code{fallback} records the quantities used when the truncation branch cannot be found.
+Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
+It is \code{NA} when the estimates do not identify a finite minimum.
+The calculation uses the median absolute higher-derivative estimate and the function values
+at the smallest step for which all points in the difference formula are available.
+\code{mean.sign} indicates whether rounding estimates tend to rise or fall as steps increase.
 }
 }
 \description{
@@ -104,13 +107,22 @@ This function computes the optimal step size for central differences using the
 \enumerate{
 \item Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
-\item Compute a series of truncation error estimates via third derivatives or Richardson extrapolation.
+\item Estimate truncation errors using a higher-order derivative of accuracy order two.
 \item Find the leftmost range of consecutive step sizes for which the slope of the truncation error
 is approximately equal (within 10\% tolerance) to the accuracy order and which is long enough
 (e.g. at least length 5).
-\item Use the leftmost point of this range as the uncorrected optimal step size, or correct it by shrinking
-it by a small amount given in the article.
+\item Select the smallest step in this range and, if \code{correction = TRUE}, adjust
+it towards the predicted minimum of the combined rounding and truncation errors.
 }
+
+The adjustment multiplies the selected step by
+\eqn{r[(1-r^{-a})/(1+r^d)]^{1/(a+d)}}, where \eqn{r} is
+\code{1/shrink.factor}, \eqn{d} is \code{deriv.order} and \eqn{a} is \code{acc.order}.
+
+Interpolation uses the existing derivative estimates and their leading dependence
+on \code{h^acc.order}, avoiding further function evaluations. For continuous
+functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
+Only the existing grid is used; no higher-accuracy retries or extra candidate steps are evaluated.
 }
 \examples{
 f <- function(x) x^4  # The derivative at 1 is 4

@@ -9,6 +9,49 @@ test_that("Kostyrka's step selection behaves reasonably", {
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-10)
 })
 
+test_that("Kostyrka's truncation estimates reproduce the cubic error", {
+  s <- step.K(function(z) z^3, 0)
+  h <- s$iterations$h
+  error <- s$iterations$est.error[, "trunc"]
+  expect_equal(mean(error/h^2, na.rm = TRUE), 1, tolerance = 1e-10)
+})
+
+test_that("Kostyrka's higher-order estimates reproduce the polynomial error", {
+  s <- step.K(function(z) z^7, 0, deriv.order = 3, acc.order = 4)
+  h <- s$iterations$h
+  error <- s$iterations$est.error[, "trunc"]
+  # The six-node target has K=1/10 and f^(7)=5040
+  expect_equal(mean(error/h^4, na.rm = TRUE), 504, tolerance = 1e-10)
+})
+
+test_that("Kostyrka's method retries only unresolved auxiliary estimates", {
+  calls <- 0L
+  f <- function(z) { calls <<- calls + 1L; z^5 - 5*z^3 }
+  k <- step.K(f, 0, cores = 1)
+  m <- step.M(function(z) z^5 - 5*z^3, 0, cores = 1)
+  kt <- k$iterations$est.error[, "trunc"]
+  mt <- m$iterations$est.error[, "trunc"]
+  good <- is.finite(mt) & mt > 0
+  expect_equal(kt[good], mt[good], tolerance = 1e-12)
+  # At h=1 the accuracy-two auxiliary estimate cancels exactly; accuracy four resolves it
+  expect_equal(c(mt[m$iterations$h == 1], kt[k$iterations$h == 1]), c(0, 5))
+  expect_equal(calls, 2*k$counts)
+})
+
+test_that("Kostyrka interpolates the leading error at the returned step", {
+  s <- step.K(function(z) z^3, 1)
+  expect_equal(s$value, 3 + s$par^2, tolerance = 1e-12)
+})
+
+test_that("Kostyrka's fallback uses the model rounding target", {
+  f <- function(z) ifelse(abs(z) %in% c(1/4, 1/2, 1), 1 + z^3, NA_real_)
+  p <- 1e-8
+  s <- suppressWarnings(step.K(f, 0, max.rel.error = p))
+  # K*|f'''|=1 and the finest complete target stencil has maximum 65/64
+  B <- (p + .Machine$double.eps/2) * 65/64
+  expect_equal(s$iterations$fallback$target, (2*B^2)^(1/3), tolerance = 1e-12)
+})
+
 test_that("Kostyrka's step selection respects non-integer stencil offsets", {
   expect_equal(step.K(exp, 1, shrink.factor = 0.6, cores = 1)$value, exp(1), tolerance = 1e-7)
   expect_equal(step.K(exp, 1, shrink.factor = 0.8, cores = 1)$value, exp(1), tolerance = 1e-7)
@@ -36,16 +79,18 @@ test_that("Kostyrka's method returns reasonable values with unfortunate inputs",
 test_that("Kostyrka's method returns reasonable values with tricky functions", {
   s <- step.K(function(x) x^3+1/x, 1)
   expect_identical(s$exitcode, 0L)
-  s <- step.K(function(x) 6*x^5 - 56*x^3 + 1/x^2, 1)
-  expect_identical(s$exitcode, 0L)
+  # The leading third and fifth derivatives vanish, so a fallback is legitimate
+  s <- suppressWarnings(step.K(function(x) 6*x^5 - 56*x^3 + 1/x^2, 1))
   expect_equal(s$value, -140, tolerance = 1e-10)
 })
 
-test_that("Mathur's algorithm returns expected non-zero exit codes", {
+test_that("Kostyrka's algorithm returns expected non-zero exit codes", {
   # Very noisy right branch
   expect_identical(suppressWarnings(step.K(function(x) x^2, x = 1e-8)$exitcode), 1L)
   # No right branch at all
-  expect_identical(suppressWarnings(step.K(function(x) x^2, x = 0)$exitcode), 2L)
+  s <- suppressWarnings(step.K(function(x) x^2, x = 0))
+  expect_identical(s$exitcode, 2L)
+  expect_null(s$iterations$fit)
 })
 
 test_that("Kostyrka's fallback uses a finite upper neighbour", {
