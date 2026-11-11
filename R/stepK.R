@@ -24,6 +24,8 @@
 #'
 #' The accuracy of the estimated higher-order derivatives starts at 2;
 #' only zero or non-finite estimates are retried at accuracy 4.
+#' Auxiliary weighted sums within their arithmetic rounding bound are treated as
+#' unresolved rather than positive observations in the fit.
 #' All stencils reuse the evaluated grid; no extra steps are evaluated for retries.
 #'
 #' Interpolation uses the existing derivative estimates and their leading dependence
@@ -141,7 +143,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
   estimates <- differencesM(FUN, x, g, deriv.order, acc.order, inv.sf, retry = TRUE,
                             max.rel.error = max.rel.error, cores = cores, cl = cl,
-                            preschedule = preschedule, ...)
+                            preschedule = preschedule, check.zero = TRUE, ...)
   fgrid <- estimates$f
   cds <- estimates$deriv
   fhigher <- estimates$higher
@@ -252,8 +254,11 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # A finite cached stencil above hopt encloses its target nodes on an interval domain
   # Reject coincident or infinite arguments even if FUN happens to return a finite number there
   target.x <- x + outer(hgrid, estimates$stencil)
-  valid.target <- which(is.finite(cds) &
-                          apply(target.x, 1L, function(z) all(is.finite(z)) && !anyDuplicated(z)))
+  finite.args <- rowSums(!is.finite(target.x)) == 0L
+  # Nodes are ordered, so any arguments that coincide must be adjacent
+  distinct.args <- rowSums(target.x[, -1L, drop = FALSE] ==
+                             target.x[, -ncol(target.x), drop = FALSE]) == 0L
+  valid.target <- which(is.finite(cds) & finite.args & distinct.args)
   available <- valid.target[hgrid[valid.target] >= range[1] & hgrid[valid.target] <= upper]
   if (!length(available)) stop("Could not compute a finite derivative on the permitted grid.")
   neighbours <- if (is.finite(hopt) && hopt > 0)

@@ -432,7 +432,7 @@ stencilValuesM <- function(stencil, fgrid, f0, rows = seq_len(nrow(fgrid))) {
 # have opposite signs, so use f(x+b*h)-f(x-b*h). For even d, weights have
 # the same sign, so use their sum. Pairing first also allows equal values
 # to cancel exactly for odd d, before multiplication by a weight.
-stencilSumM <- function(values, stencil, d) {
+stencilSumM <- function(values, stencil, d, check.zero = FALSE) {
   positive <- which(stencil$stencil > 0)
   negative <- match(-stencil$stencil[positive], stencil$stencil)
   if (d %% 2L == 1L) {
@@ -443,6 +443,17 @@ stencilSumM <- function(values, stencil, d) {
   result <- drop(pairs %*% stencil$weights[positive])
   centre <- which(stencil$stencil == 0)
   if (length(centre)) result <- result + values[, centre] * stencil$weights[centre]
+  if (check.zero) {
+    # A cancelled auxiliary sum can leave a tiny positive residue from fractional weights
+    # Treat sums below their arithmetic resolution as unresolved, not as evidence for the fit
+    # This checks the weighted sum of stored pairs, not the unknown error in FUN
+    magnitude <- drop(abs(pairs) %*% abs(stencil$weights[positive]))
+    if (length(centre)) magnitude <- magnitude + abs(values[, centre] * stencil$weights[centre])
+    k <- 2L * length(positive) + length(centre)
+    ku <- k * .Machine$double.eps/2
+    unresolved <- is.finite(result) & abs(result) <= ku/(1-ku) * magnitude
+    result[unresolved] <- 0
+  }
   result
 }
 
@@ -453,7 +464,7 @@ stencilSumM <- function(values, stencil, d) {
 # The key reuse idea: one stencil uses f(x +/- h[i]), another may use
 # f(x +/- ratio*h[i]) = f(x +/- h[i+1]), which is already in the same cache.
 differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
-                         cores, cl, preschedule, ...) {
+                         cores, cl, preschedule, check.zero = FALSE, ...) {
   target <- stencilM(d, a, ratio)
   auxiliary <- stencilM(d + a, 2L, ratio)
   K <- abs(attr(target, "remainder.coef"))
@@ -468,7 +479,7 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   values <- stencilValuesM(auxiliary, fgrid, f0)
   # d+a has the same parity as d because a is even, so the same pairing applies
   # Dividing by h^d leaves h^a*f^(d+a), the quantity needed for the truncation estimate
-  higher <- stencilSumM(values, auxiliary, d) / grid$h^d
+  higher <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h^d
   aprime <- rep(2L, n)
   if (retry) {
     # A larger stencil cannot repair missing input values or fit beyond the evaluated grid
@@ -478,7 +489,7 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
     if (length(bad)) {
       auxiliary <- stencilM(d + a, 4L, ratio)
       values <- stencilValuesM(auxiliary, fgrid, f0, bad)
-      alternative <- stencilSumM(values, auxiliary, d) / grid$h[bad]^d
+      alternative <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h[bad]^d
       good <- is.finite(alternative) & alternative != 0
       higher[bad[good]] <- alternative[good]
       aprime[bad[good]] <- 4L

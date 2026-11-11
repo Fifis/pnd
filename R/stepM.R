@@ -62,6 +62,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #' on \code{h^acc.order}, avoiding further function evaluations. For continuous
 #' functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
 #' Only the existing grid is used; no higher-accuracy retries or extra candidate steps are evaluated.
+#' Positive near-zero error estimates are retained, as in the original algorithm.
 #'
 #' @return A list similar to the one returned by \code{optim()}:
 #'   \itemize{
@@ -153,7 +154,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
 
   estimates <- differencesM(FUN, x, g, deriv.order, acc.order, inv.sf, retry = FALSE,
                             max.rel.error = max.rel.error, cores = cores, cl = cl,
-                            preschedule = preschedule, ...)
+                            preschedule = preschedule, check.zero = FALSE, ...)
   fgrid <- estimates$f
   cds <- estimates$deriv
   fhigher <- estimates$higher

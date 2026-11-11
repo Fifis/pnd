@@ -117,6 +117,8 @@ A failed fit or a kink with observations on only one side invokes the fallback.
 
 The accuracy of the estimated higher-order derivatives starts at 2;
 only zero or non-finite estimates are retried at accuracy 4.
+Auxiliary weighted sums within their arithmetic rounding bound are treated as
+unresolved rather than positive observations in the fit.
 All stencils reuse the evaluated grid; no extra steps are evaluated for retries.
 
 Interpolation uses the existing derivative estimates and their leading dependence

@@ -125,6 +125,7 @@ Interpolation uses the existing derivative estimates and their leading dependenc
 on \code{h^acc.order}, avoiding further function evaluations. For continuous
 functions, \eqn{f(x+\delta)\approx f(x)} for small \eqn{\delta}.
 Only the existing grid is used; no higher-accuracy retries or extra candidate steps are evaluated.
+Positive near-zero error estimates are retained, as in the original algorithm.
 }
 \examples{
 f <- function(x) x^4  # The derivative at 1 is 4
