@@ -93,6 +93,8 @@ It is \code{NA} when the estimates do not identify a finite minimum.
 The calculation uses the median absolute higher-derivative estimate and the function values
 at the smallest step for which all points in the difference formula are available.
 \code{mean.sign} indicates whether rounding estimates tend to rise or fall as steps increase.
+\code{stable.step} is the evaluated step supported by agreement with finer estimates,
+or \code{NA} if that check found no suitable step; \code{par} retains the model's initial proposal.
 }
 }
 \description{
@@ -115,11 +117,16 @@ of \code{acc.order}, without bridging missing estimates. The fit uses all finite
 estimates up to the end of the longest such run.
 A failed fit or a kink with observations on only one side invokes the fallback.
 
-The accuracy of the estimated higher-order derivatives starts at 2;
-only zero or non-finite estimates are retried at accuracy 4.
+The accuracy of the estimated higher-order derivatives starts at 4;
+zero or non-finite estimates are retried at accuracy 2 using the inner nodes.
 Auxiliary weighted sums within their arithmetic rounding bound are treated as
 unresolved rather than positive observations in the fit.
 All stencils reuse the evaluated grid; no extra steps are evaluated for retries.
+On fallback, choose the widest evaluated step for which the rounding intervals
+of all finer usable derivatives have a common intersection, with three consecutive
+truncation estimates no greater than their rounding bounds. Changes between adjacent
+target derivatives must also meet that condition, to detect higher-order truncation.
+If none exists, keep the rounding-error fallback.
 
 Interpolation uses the existing derivative estimates and their leading dependence
 on \code{h^acc.order}, avoiding further function evaluations. For continuous

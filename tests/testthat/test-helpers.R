@@ -80,3 +80,9 @@ test_that("A wide finite interval does not truncate the step grid", {
   h <- gridM(0, c(2^-600, 2^600))$h
   expect_true(all(is.finite(h)) && min(h) == 2^-600 && max(h) > 2^500 && max(h) <= 2^600)
 })
+
+test_that("Interpolation preserves constants and handles large opposite values", {
+  expect_identical(interpolateM(h = c(1, 2), value = c(pi, pi), hopt = sqrt(2), power = 2), pi)
+  expect_true(is.finite(interpolateM(c(1, 2), c(-1e308, 1e308), sqrt(2), 2)))
+})
+

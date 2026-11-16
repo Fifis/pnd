@@ -464,9 +464,9 @@ stencilSumM <- function(values, stencil, d, check.zero = FALSE) {
 # The key reuse idea: one stencil uses f(x +/- h[i]), another may use
 # f(x +/- ratio*h[i]) = f(x +/- h[i+1]), which is already in the same cache.
 differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
-                         cores, cl, preschedule, check.zero = FALSE, ...) {
+                         cores, cl, preschedule, check.zero = FALSE, aprime = 2L, ...) {
   target <- stencilM(d, a, ratio)
-  auxiliary <- stencilM(d + a, 2L, ratio)
+  auxiliary <- stencilM(d + a, aprime, ratio)
   K <- abs(attr(target, "remainder.coef"))
   n <- length(grid$h)
   centre <- d %% 2L == 0L
@@ -480,25 +480,25 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   # d+a has the same parity as d because a is even, so the same pairing applies
   # Dividing by h^d leaves h^a*f^(d+a), the quantity needed for the truncation estimate
   higher <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h^d
-  aprime <- rep(2L, n)
+  accuracy <- rep(aprime, n)
   if (retry) {
-    # A larger stencil cannot repair missing input values or fit beyond the evaluated grid
-    last.complete <- n - max(auxiliary$offset, na.rm = TRUE) - 1L
-    eligible <- rowSums(!is.finite(values)) == 0L & seq_len(n) <= last.complete
-    bad <- which((!is.finite(higher) | higher == 0) & eligible)
+    # The shorter formula can still use inner values when an outer node is unavailable
+    # Both formulae reuse the grid, so retrying adds no evaluations of FUN
+    bad <- which(!is.finite(higher) | higher == 0)
     if (length(bad)) {
-      auxiliary <- stencilM(d + a, 4L, ratio)
+      alternative.accuracy <- if (aprime == 2L) 4L else 2L
+      auxiliary <- stencilM(d + a, alternative.accuracy, ratio)
       values <- stencilValuesM(auxiliary, fgrid, f0, bad)
       alternative <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h[bad]^d
       good <- is.finite(alternative) & alternative != 0
       higher[bad[good]] <- alternative[good]
-      aprime[bad[good]] <- 4L
+      accuracy[bad[good]] <- alternative.accuracy
     }
   }
   round.coef <- (max.rel.error * sum(abs(target$weights)) + 0.5 * .Machine$double.eps) * fmax
   list(f = fgrid, f0 = f0, deriv = derivative, higher = higher / grid$h^a,
        trunc = K * abs(higher), round = round.coef / grid$h^d,
-       K = K, aprime = aprime, round.coef = round.coef, stencil = target$stencil)
+       K = K, aprime = accuracy, round.coef = round.coef, stencil = target$stencil)
 }
 
 # For error A*h^a + B*h^(-d), the derivative of this expression gives an optimal rounding level
@@ -527,6 +527,30 @@ fallbackM <- function(h, higher, K, round.coef, eround, x, d, a) {
   list(par = par, trunc.coef = A, round.coef = B, target = target, mean.sign = mean.sign)
 }
 
+# TODO: rewrite the following explanation in a less technical manner.
+# When the truncation branch is ill-behaved, a larger step can reduce cancellation.
+# Accept it only while the rounding intervals of all finer usable derivatives overlap.
+# Three consecutive truncation estimates below their rounding bounds = choose the step
+# using this rule. Also,
+# compare all finer steps so an isolated coarse plateau is not accepted on its own.
+stableStepM <- function(h, derivative, trunc, round, valid, upper, a) {
+  if (is.complex(derivative)) return(integer(0))
+  usable <- seq_along(h) %in% valid & is.finite(round)
+  lower <- derivative - round
+  higher <- derivative + round
+  lower[!usable] <- -Inf
+  higher[!usable] <- Inf
+  compatible <- cummax(lower) <= cummin(higher)
+  # A zero leading higher derivative can hide the next truncation term
+  # Changes in target derivatives also estimate truncation, without extra function calls
+  change <- c(abs(diff(derivative))/((h[-1L]/h[-length(h)])^a - 1), NA_real_)
+  quiet <- usable & is.finite(trunc) & trunc >= 0 & trunc <= round & is.finite(change) & change <= round
+  end <- seq_along(h)
+  end <- end[end >= 3L]
+  choices <- end[h[end] <= upper & compatible[end] & quiet[end-2L] & quiet[end-1L] & quiet[end]]
+  if (length(choices)) choices[length(choices)] else integer(0)
+}
+
 # Avoid more function calls after step selection: the leading error varies linearly in h^a
 # For the rounding bound use power=-d instead, preserving its expected inverse-power behaviour
 interpolateM <- function(h, value, hopt, power) {
@@ -553,6 +577,10 @@ interpolateM <- function(h, value, hopt, power) {
   scale <- if (power > 0) max(near) else min(near)
   nodes <- (near/scale)^power
   weight <- ((hopt/scale)^power - nodes[1L]) / diff(nodes)
+  # Preserve equal derivatives exactly, rather than round two weighted copies separately
+  difference <- value[closest[2L]] - value[closest[1L]]
+  if (is.finite(difference)) return(unname(value[closest[1L]] + weight * difference))
+  # Opposite large values can overflow their difference even when the weighted sum is finite
   unname(sum(value[closest] * c(1 - weight, weight)))
 }
 

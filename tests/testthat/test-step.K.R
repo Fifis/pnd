@@ -9,6 +9,21 @@ test_that("Kostyrka's step selection behaves reasonably", {
   expect_equal(s$value, sqrt(2)/2, tolerance = 1e-10)
 })
 
+test_that("Unresolved affine estimates cannot create a rounding branch", {
+  calls <- 0L
+  f <- function(z) { calls <<- calls + 1L; z }
+  s <- step.K(f, 1, cores = 1)
+  error <- s$iterations$est.error[, "trunc"]
+  expect_equal(c(s$value, calls, sum(is.finite(error) & error > 0)), c(1, 2*s$counts, 0))
+})
+
+test_that("Changing function units preserves unresolved estimates", {
+  base <- step.K(sin, 1, cores = 1)
+  scaled <- step.K(function(z) 2^40*sin(z), 1, cores = 1)
+  expect_identical(base$iterations$est.error[, "trunc"] == 0,
+                   scaled$iterations$est.error[, "trunc"] == 0)
+})
+
 test_that("Kostyrka's truncation estimates reproduce the cubic error", {
   s <- step.K(function(z) z^3, 0)
   h <- s$iterations$h
@@ -24,18 +39,43 @@ test_that("Kostyrka's higher-order estimates reproduce the polynomial error", {
   expect_equal(mean(error/h^4, na.rm = TRUE), 504, tolerance = 1e-10)
 })
 
-test_that("Kostyrka's method retries only unresolved auxiliary estimates", {
-  calls <- 0L
-  f <- function(z) { calls <<- calls + 1L; z^5 - 5*z^3 }
-  k <- step.K(f, 0, cores = 1)
+test_that("Kostyrka's method prefers the wider auxiliary stencil", {
+  k <- step.K(function(z) z^5 - 5*z^3, 0, cores = 1)
   m <- step.M(function(z) z^5 - 5*z^3, 0, cores = 1)
-  kt <- k$iterations$est.error[, "trunc"]
-  mt <- m$iterations$est.error[, "trunc"]
-  good <- is.finite(mt) & mt > 0
-  expect_equal(kt[good], mt[good], tolerance = 1e-12)
-  # At h=1 the accuracy-two auxiliary estimate cancels exactly; accuracy four resolves it
-  expect_equal(c(mt[m$iterations$h == 1], kt[k$iterations$h == 1]), c(0, 5))
+  # The third derivative at zero is -30; the shorter formula cancels at h=1
+  expect_equal(unname(k$iterations$est.error[k$iterations$h == 1, "trunc"]), 5)
+  expect_identical(k$iterations$aprime[k$iterations$h == 1], 4L)
+  expect_equal(unname(m$iterations$est.error[m$iterations$h == 1, "trunc"]), 0)
+})
+
+test_that("Kostyrka's algorithm retries unresolved wider estimates without new calls", {
+  calls <- 0L
+  # At h=1 the wider third-derivative formula cancels for this polynomial
+  f <- function(z) { calls <<- calls + 1L; z^7 + 84*z^3 }
+  k <- step.K(f, 0, cores = 1)
+  expect_identical(k$iterations$aprime[k$iterations$h == 1], 2L)
+  expect_gt(k$iterations$est.error[k$iterations$h == 1, "trunc"], 0)
   expect_equal(calls, 2*k$counts)
+})
+
+test_that("Kostyrka's method reduces cancellation when the truncation branch vanishes", {
+  s <- suppressWarnings(step.K(function(z) pi*z + 2, 1, max.rel.error = .Machine$double.eps/2))
+  expect_lt(abs(s$value/pi - 1), 16*.Machine$double.eps)
+  expect_equal(s$par, s$iterations$fallback$stable.step)
+})
+
+test_that("Kostyrka checks finer estimates before trusting a coarse plateau", {
+  f <- function(z) z + (z-1)*(1-exp(-((z-1)/.003)^4))
+  s <- suppressWarnings(step.K(f, 1))
+  # The derivative is 1 at the centre and approaches 2 outside the narrow transition
+  expect_equal(s$value, 1, tolerance = 1e-7)
+})
+
+test_that("Kostyrka checks higher-order error when the third derivative vanishes", {
+  f <- function(z) 1e6 + .125*(z-12) + .001*(z-12)^5
+  s <- suppressWarnings(step.K(f, 12))
+  # A zero third derivative still leaves an h^4 error in the target formula
+  expect_lt(abs(s$value - .125), 1e-7)
 })
 
 test_that("Kostyrka interpolates the leading error at the returned step", {
@@ -79,7 +119,8 @@ test_that("Kostyrka's method returns reasonable values with unfortunate inputs",
 
 test_that("Kostyrka's method returns reasonable values with tricky functions", {
   s <- step.K(function(x) x^3+1/x, 1)
-  expect_identical(s$exitcode, 0L)
+  # The third derivative vanishes, so a fallback is legitimate here too
+  expect_equal(s$value, 2, tolerance = 1e-10)
   # The leading third and fifth derivatives vanish, so a fallback is legitimate
   s <- suppressWarnings(step.K(function(x) 6*x^5 - 56*x^3 + 1/x^2, 1))
   expect_equal(s$value, -140, tolerance = 1e-10)
@@ -152,5 +193,5 @@ test_that("Parallelisation in Kostyrka's algorithm works", {
   # Testing a slow function
   # f <- function(x) {Sys.sleep(0.1); sin(x)}
   # system.time(step.K(f, 1))
-  # system.time(step.K(f, 1, cores = 12))
+  # system.time(step.K(f, 1, cores = 4))
 })

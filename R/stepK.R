@@ -22,11 +22,16 @@
 #' estimates up to the end of the longest such run.
 #' A failed fit or a kink with observations on only one side invokes the fallback.
 #'
-#' The accuracy of the estimated higher-order derivatives starts at 2;
-#' only zero or non-finite estimates are retried at accuracy 4.
+#' The accuracy of the estimated higher-order derivatives starts at 4;
+#' zero or non-finite estimates are retried at accuracy 2 using the inner nodes.
 #' Auxiliary weighted sums within their arithmetic rounding bound are treated as
 #' unresolved rather than positive observations in the fit.
 #' All stencils reuse the evaluated grid; no extra steps are evaluated for retries.
+#' On fallback, choose the widest evaluated step for which the rounding intervals
+#' of all finer usable derivatives have a common intersection, with three consecutive
+#' truncation estimates no greater than their rounding bounds. Changes between adjacent
+#' target derivatives must also meet that condition, to detect higher-order truncation.
+#' If none exists, keep the rounding-error fallback.
 #'
 #' Interpolation uses the existing derivative estimates and their leading dependence
 #' on \code{h^acc.order}, avoiding further function evaluations. For continuous
@@ -69,6 +74,8 @@
 #'       The calculation uses the median absolute higher-derivative estimate and the function values
 #'       at the smallest step for which all points in the difference formula are available.
 #'       \code{mean.sign} indicates whether rounding estimates tend to rise or fall as steps increase.
+#'       \code{stable.step} is the evaluated step supported by agreement with finer estimates,
+#'       or \code{NA} if that check found no suitable step; \code{par} retains the model's initial proposal.
 #'   }
 #' @export
 #'
@@ -143,7 +150,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
 
   estimates <- differencesM(FUN, x, g, deriv.order, acc.order, inv.sf, retry = TRUE,
                             max.rel.error = max.rel.error, cores = cores, cl = cl,
-                            preschedule = preschedule, check.zero = TRUE, ...)
+                            preschedule = preschedule, check.zero = TRUE, aprime = 4L, ...)
   fgrid <- estimates$f
   cds <- estimates$deriv
   fhigher <- estimates$higher
@@ -243,13 +250,8 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   # Keep the existing local-step cap only when it belongs to the permitted interval
   upper <- range[2]
   cap <- 0.1 * abs(x)
-  if (abs(x) > 4.71216091538e-7 && cap >= range[1] && cap <= upper) {
-    upper <- cap
-    if (is.finite(hopt) && hopt > cap) {
-      exitcode <- 4L
-      hopt <- cap
-    }
-  }
+  use.cap <- abs(x) > 4.71216091538e-7 && cap >= range[1] && cap <= upper
+  if (use.cap) upper <- cap
 
   # A finite cached stencil above hopt encloses its target nodes on an interval domain
   # Reject coincident or infinite arguments even if FUN happens to return a finite number there
@@ -261,6 +263,15 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   valid.target <- which(is.finite(cds) & finite.args & distinct.args)
   available <- valid.target[hgrid[valid.target] >= range[1] & hgrid[valid.target] <= upper]
   if (!length(available)) stop("Could not compute a finite derivative on the permitted grid.")
+  if (!is.null(fallback)) {
+    stable <- stableStepM(hgrid, cds, etrunc, eround, valid.target, upper, acc.order)
+    fallback$stable.step <- if (length(stable)) hgrid[stable] else NA_real_
+    if (length(stable)) hopt <- fallback$stable.step
+  }
+  if (use.cap && is.finite(hopt) && hopt > cap) {
+    exitcode <- 4L
+    hopt <- cap
+  }
   neighbours <- if (is.finite(hopt) && hopt > 0)
     utils::head(order(abs(log2h - log2(hopt))), 2L) else integer(0)
   exact <- which(hgrid == hopt)
