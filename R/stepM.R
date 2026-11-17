@@ -1,7 +1,7 @@
 # Generator for Mathur's and Kostyrka's methods that evaluates the shared function grid
 # once so all difference formulae reuse the same values
 getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  FUNsafe <- bindSafeFunction(bindFunctionArgs(FUN, list(...)))
   fp <- runParallel(FUN = FUNsafe, x = x, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {

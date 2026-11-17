@@ -4,7 +4,7 @@ getValsSW <- function(FUN, x, h, do.f0 = FALSE, ratio.last = NULL,
                       cores, cl, preschedule, ...) {
   xgrid <- if (do.f0) x + c(-h, 0, h) else x + c(-h, h)
 
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  FUNsafe <- bindSafeFunction(bindFunctionArgs(FUN, list(...)))
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {

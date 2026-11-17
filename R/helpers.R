@@ -7,7 +7,8 @@ bindSafeFunction <- function(FUN, ...) {
   function(y) safeF(FUN, y, ...)
 }
 
-# Bind arguments without retaining the caller's evaluation grid on cluster workers.
+# Resolve the function and arguments here, since socket workers have separate global environments
+# A separate closure also avoids sending the caller's evaluation grid
 bindFunctionArgs <- function(FUN, args) {
   force(FUN)
   force(args)
@@ -473,7 +474,7 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   # Use the primary auxiliary formula because it supplies the fitted rounding branch
   positive <- target$weights[target$stencil > 0]
   noise <- c(ratio = K * sqrt(sum(auxiliary$weights^2) / sum(target$weights^2)),
-             overlap = (2 * sum(head(positive, -1L) * tail(positive, -1L)) +
+             overlap = (2 * sum(utils::head(positive, -1L) * utils::tail(positive, -1L)) +
                           sum(target$weights[target$stencil == 0]^2)) / sum(target$weights^2))
   n <- length(grid$h)
   centre <- d %% 2L == 0L
@@ -487,6 +488,7 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   if (richardson) {
     # Mathur subtracts the (already) rounded derivatives rather than regrouping their function values
     # The estimate belongs to the larger step of each adjacent pair
+    # TODO: find page reference
     error <- c(NA_real_, diff(derivative)) / (1-ratio^(-a))
     higher <- error / attr(target, "remainder.coef")
     trunc <- abs(error)
@@ -538,7 +540,7 @@ interpolationStepK <- function(h, usable, upper, gamma, d, a, noise) {
     2*covariance*weight*(1-weight)
   # Different pairs have different variance scales; logarithms avoid overflow at distant steps
   loss <- log2(loss) - 2*d*(log2(lower)-gamma)
-  complete <- head(usable, -1L) & tail(usable, -1L) & lower <= upper & is.finite(step) & step <= upper & is.finite(loss)
+  complete <- utils::head(usable, -1L) & utils::tail(usable, -1L) & lower <= upper & is.finite(step) & step <= upper & is.finite(loss)
   if (!any(complete)) return(NA_real_)
   loss[!complete] <- Inf
   unname(step[which.min(loss)])

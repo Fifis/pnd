@@ -6,7 +6,7 @@ getValsPlugin <- function(FUN, x, h, stage, cores, cl, preschedule, ...) {
   if (stage == 1) h <- h * .Machine$double.eps^(-2/15)
   xgrid <- x + s$stencil * h
 
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  FUNsafe <- bindSafeFunction(bindFunctionArgs(FUN, list(...)))
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {

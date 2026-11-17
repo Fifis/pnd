@@ -10,7 +10,7 @@ getValsCR <- function(FUN, x, h, deriv.order, acc.order, max.rel.error, cores, c
   }
 
   xgrid <- x + stc2$stencil * h
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  FUNsafe <- bindSafeFunction(bindFunctionArgs(FUN, list(...)))
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {

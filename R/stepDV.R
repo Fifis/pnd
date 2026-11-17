@@ -1,7 +1,7 @@
 # Generator for Dumontet--Vignes
 getValsDV <- function(FUN, x, k, max.rel.error, cores, cl, preschedule, ...) {
   xgrid <- x + c(-2*k, -k, k, 2*k)
-  FUNsafe <- function(z) safeF(FUN, z, ...)
+  FUNsafe <- bindSafeFunction(bindFunctionArgs(FUN, list(...)))
   fp <- runParallel(FUN = FUNsafe, x = xgrid, cores = cores, cl = cl, preschedule = preschedule)
   has.errors <- any(e <- sapply(fp, function(y) inherits(attr(y, "error"), "error")))
   if (has.errors) {
