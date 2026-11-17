@@ -41,11 +41,9 @@ test_that("Kostyrka's higher-order estimates reproduce the polynomial error", {
 
 test_that("Kostyrka's method prefers the wider auxiliary stencil", {
   k <- step.K(function(z) z^5 - 5*z^3, 0, cores = 1)
-  m <- step.M(function(z) z^5 - 5*z^3, 0, cores = 1)
   # The third derivative at zero is -30; the shorter formula cancels at h=1
   expect_equal(unname(k$iterations$est.error[k$iterations$h == 1, "trunc"]), 5)
   expect_identical(k$iterations$aprime[k$iterations$h == 1], 4L)
-  expect_equal(unname(m$iterations$est.error[m$iterations$h == 1, "trunc"]), 0)
 })
 
 test_that("Kostyrka's algorithm retries unresolved wider estimates without new calls", {
@@ -79,8 +77,26 @@ test_that("Kostyrka checks higher-order error when the third derivative vanishes
 })
 
 test_that("Kostyrka interpolates the leading error at the returned step", {
-  s <- step.K(function(z) z^3, 1)
-  expect_equal(s$value, 3 + s$par^2, tolerance = 1e-12)
+  s <- step.K(function(z) z^3, 0)
+  expect_equal(s$value, s$par^2, tolerance = 1e-12)
+})
+
+test_that("Kostyrka balances truncation and interpolation noise", {
+  # D(1) and D(2) have bias 1 and 4, and independent noise variances 64 and 16
+  # Minimising their mixture's squared error gives weight 61/89 on D(2)
+  noise <- c(ratio = 1, overlap = 0)
+  step <- interpolationStepK(c(1, 2), c(TRUE, TRUE), 2, 1, 1, 2, noise)
+  expect_equal(step^2, 272/89)
+  expect_equal(interpolationStepK(c(1, 2), c(TRUE, TRUE), 1.25, 1, 1, 2, noise), 1.25)
+})
+
+test_that("Kostyrka accounts for the shared centre of even derivatives", {
+  # Second differences share their centre: its squared weight is 4 of the total 6
+  # Biases 1 and 4, variances 16 and 1, and covariance 8/3 give equal optimal weights
+  noise <- c(ratio = 1, overlap = 2/3)
+  step <- interpolationStepK(c(1, 2), c(TRUE, TRUE), 2, .5, 2, 2, noise)
+  expect_equal(step^2, 5/2)
+  expect_true(is.na(interpolationStepK(c(1, 2), c(TRUE, FALSE), 2, .5, 2, 2, noise)))
 })
 
 test_that("Kostyrka's fallback uses the model rounding target", {

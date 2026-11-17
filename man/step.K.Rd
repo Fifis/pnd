@@ -87,6 +87,9 @@ auxiliary derivative; \code{aprime} records its selected accuracy order.
 unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
 mean pseudo-Huber \code{loss}, optimiser \code{convergence} and whether the fit was \code{accepted}; a \code{NULL}
 is returned if no fit was attempted.
+\code{noise} records the auxiliary-to-target noise ratio and the overlap of
+neighbouring target stencils; \code{calibrated} indicates whether these
+were used to select the step for interpolation.
 \code{fallback} records the quantities used when the truncation branch cannot be found.
 Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
 It is \code{NA} when the estimates do not identify a finite minimum.
@@ -107,9 +110,11 @@ i.e. finding a regression kink, using
 unconstrained BFGS optimisation and a mean pseudo-Huber penalty, which limits
 the influence of irregular estimates. The rounding and truncation branches have
 slopes \code{-deriv.order} and \code{acc.order}; for two-point central differences,
-these are -1 and 2, respectively. The step at the fitted kink is multiplied by
-\eqn{(d/a)^{1/(d+a)}}, where \eqn{d} is \code{deriv.order} and \eqn{a} is
-\code{acc.order}, to estimate the minimum of the combined error.
+these are -1 and 2, respectively. The fitted branches are then used to minimise
+the estimated squared error of the interpolated derivative. This accounts for
+the different noise amplification of the target and auxiliary formulae, and
+for function values shared by neighbouring stencils. The calculation assumes
+independent evaluation errors with similar variances near \code{x}.
 If too few estimates follow the expected truncation slope, a rounding-error
 fallback is used instead.
 A valid truncation branch requires 3 consecutive centred slopes within 10\%

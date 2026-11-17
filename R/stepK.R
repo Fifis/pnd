@@ -12,9 +12,11 @@
 #' unconstrained BFGS optimisation and a mean pseudo-Huber penalty, which limits
 #' the influence of irregular estimates. The rounding and truncation branches have
 #' slopes \code{-deriv.order} and \code{acc.order}; for two-point central differences,
-#' these are -1 and 2, respectively. The step at the fitted kink is multiplied by
-#' \eqn{(d/a)^{1/(d+a)}}, where \eqn{d} is \code{deriv.order} and \eqn{a} is
-#' \code{acc.order}, to estimate the minimum of the combined error.
+#' these are -1 and 2, respectively. The fitted branches are then used to minimise
+#' the estimated squared error of the interpolated derivative. This accounts for
+#' the different noise amplification of the target and auxiliary formulae, and
+#' for function values shared by neighbouring stencils. The calculation assumes
+#' independent evaluation errors with similar variances near \code{x}.
 #' If too few estimates follow the expected truncation slope, a rounding-error
 #' fallback is used instead.
 #' A valid truncation branch requires 3 consecutive centred slopes within 10%
@@ -68,6 +70,9 @@
 #'       unscaled initial residual \code{mad}, fixed knee \code{rho} (at least one binary-logarithm unit), fitting \code{subset},
 #'       mean pseudo-Huber \code{loss}, optimiser \code{convergence} and whether the fit was \code{accepted}; a \code{NULL}
 #'       is returned if no fit was attempted.
+#'       \code{noise} records the auxiliary-to-target noise ratio and the overlap of
+#'       neighbouring target stencils; \code{calibrated} indicates whether these
+#'       were used to select the step for interpolation.
 #'       \code{fallback} records the quantities used when the truncation branch cannot be found.
 #'       Its \code{target} is the rounding error predicted at the minimum of the combined-error model.
 #'       It is \code{NA} when the estimates do not identify a finite minimum.
@@ -218,7 +223,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
                   mad = rmad, rho = rho, subset = sbst,
                   loss = if (is.null(opt)) NA_real_ else opt$value,
                   convergence = if (is.null(opt)) NA_integer_ else opt$convergence,
-                  accepted = FALSE)
+                  accepted = FALSE, noise = estimates$noise, calibrated = FALSE)
 
       if (is.null(opt) || opt$convergence != 0L ||
           any(!is.finite(opt$par)) || !is.finite(opt$value)) {
@@ -228,8 +233,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
         exitcode <- 3L
       } else {
         # The two-branch model has T/R = d/a at its minimum, giving h* = hcross*(d/a)^(1/(d+a))
-        # TODO: calibrate this heuristic for the auxiliary/target rounding-bound ratio lambda
-        # (11/16 for the 6-point stencil, 1/2 for 4 points at d=1, a=2)
+        # Retain the combined-error proposal if no complete pair supports noise calibration
         hopt <- 2^opt$par[1] * (deriv.order/acc.order)^(1/(deriv.order + acc.order))
         if (!is.finite(hopt) || hopt < range[1] || hopt > range[2]) {
           exitcode <- 5L
@@ -263,6 +267,14 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   valid.target <- which(is.finite(cds) & finite.args & distinct.args)
   available <- valid.target[hgrid[valid.target] >= range[1] & hgrid[valid.target] <= upper]
   if (!length(available)) stop("Could not compute a finite derivative on the permitted grid.")
+  if (!is.null(fit) && isTRUE(fit$accepted)) {
+    calibrated <- interpolationStepK(hgrid, seq_len(n) %in% valid.target, upper,
+                                     fit$par[["gamma"]], deriv.order, acc.order, estimates$noise)
+    if (is.finite(calibrated)) {
+      hopt <- calibrated
+      fit$calibrated <- TRUE
+    }
+  }
   if (!is.null(fallback)) {
     stable <- stableStepM(hgrid, cds, etrunc, eround, valid.target, upper, acc.order)
     fallback$stable.step <- if (length(stable)) hgrid[stable] else NA_real_
@@ -291,7 +303,7 @@ step.K <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2,
   cd <- interpolateM(hgrid, cds, hopt, acc.order)
   if (!is.finite(cd)) stop("Could not compute a finite derivative on the grid.")
   if (!is.null(fit) && isTRUE(fit$accepted)) {
-    # These are the separate empirical branches, without the deferred lambda calibration
+    # Keep the fitted empirical branches as diagnostics, in the same units as the plotted estimates
     et <- 2^(opt$par[2] + acc.order * (log2hopt - opt$par[1]))
     er <- 2^(opt$par[2] - deriv.order * (log2hopt - opt$par[1]))
   } else {

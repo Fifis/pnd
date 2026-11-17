@@ -464,10 +464,17 @@ stencilSumM <- function(values, stencil, d, check.zero = FALSE) {
 # The key reuse idea: one stencil uses f(x +/- h[i]), another may use
 # f(x +/- ratio*h[i]) = f(x +/- h[i+1]), which is already in the same cache.
 differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
-                         cores, cl, preschedule, check.zero = FALSE, aprime = 2L, ...) {
+                         cores, cl, preschedule, check.zero = FALSE, aprime = 2L,
+                         richardson = FALSE, ...) {
   target <- stencilM(d, a, ratio)
   auxiliary <- stencilM(d + a, aprime, ratio)
   K <- abs(attr(target, "remainder.coef"))
+  # Squared weights describe noise variance; shared nodes correlate adjacent derivatives
+  # Use the primary auxiliary formula because it supplies the fitted rounding branch
+  positive <- target$weights[target$stencil > 0]
+  noise <- c(ratio = K * sqrt(sum(auxiliary$weights^2) / sum(target$weights^2)),
+             overlap = (2 * sum(head(positive, -1L) * tail(positive, -1L)) +
+                          sum(target$weights[target$stencil == 0]^2)) / sum(target$weights^2))
   n <- length(grid$h)
   centre <- d %% 2L == 0L
   f <- getValsM(FUN, c(grid$x, if (centre) x), cores, cl, preschedule, ...)
@@ -476,12 +483,20 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   values <- stencilValuesM(target, fgrid, f0)
   derivative <- stencilSumM(values, target, d) / grid$h^d
   fmax <- apply(abs(values), 1L, max)
-  values <- stencilValuesM(auxiliary, fgrid, f0)
-  # d+a has the same parity as d because a is even, so the same pairing applies
-  # Dividing by h^d leaves h^a*f^(d+a), the quantity needed for the truncation estimate
-  higher <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h^d
   accuracy <- rep(aprime, n)
-  if (retry) {
+  if (richardson) {
+    # Mathur subtracts the (already) rounded derivatives rather than regrouping their function values
+    # The estimate belongs to the larger step of each adjacent pair
+    error <- c(NA_real_, diff(derivative)) / (1-ratio^(-a))
+    higher <- error / attr(target, "remainder.coef")
+    trunc <- abs(error)
+  } else {
+    values <- stencilValuesM(auxiliary, fgrid, f0)
+    # d+a has the same parity as d because a is even, so the same pairing applies
+    # Dividing by h^d leaves h^a*f^(d+a), the quantity needed for the truncation estimate
+    higher <- stencilSumM(values, auxiliary, d, check.zero = check.zero) / grid$h^d
+  }
+  if (retry && !richardson) {
     # The shorter formula can still use inner values when an outer node is unavailable
     # Both formulae reuse the grid, so retrying adds no evaluations of FUN
     bad <- which(!is.finite(higher) | higher == 0)
@@ -495,10 +510,38 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
       accuracy[bad[good]] <- alternative.accuracy
     }
   }
+  if (!richardson) trunc <- K * abs(higher)
   round.coef <- (max.rel.error * sum(abs(target$weights)) + 0.5 * .Machine$double.eps) * fmax
   list(f = fgrid, f0 = f0, deriv = derivative, higher = higher / grid$h^a,
-       trunc = K * abs(higher), round = round.coef / grid$h^d,
-       K = K, aprime = accuracy, round.coef = round.coef, stencil = target$stencil)
+       trunc = trunc, round = round.coef / grid$h^d,
+       K = K, aprime = accuracy, round.coef = round.coef, stencil = target$stencil, noise = noise)
+}
+
+# Choose the step for the interpolated derivative whose noise differs from a fresh stencil
+# Assume independent errors of similar size in nearby function values
+# The fitted branches give squared bias/variance; reused nodes supply their covariance
+interpolationStepK <- function(h, usable, upper, gamma, d, a, noise) {
+  lower <- utils::head(h, -1L)
+  higher <- utils::tail(h, -1L)
+  ratio <- higher/lower
+  t <- ratio^a - 1
+  variance <- ratio^(-2*d)
+  covariance <- noise[["overlap"]] * ratio^(-d)
+  # Divide squared bias by the variance at the lower step
+  signal <- (noise[["ratio"]] * 2^((a+d)*(log2(lower)-gamma)))^2
+  weight <- (1-covariance-signal*t) / (1+variance-2*covariance+signal*t^2)
+  # Bound the interpolation weight before comparing pairs, including a partial pair at the cap
+  maximum <- pmin(1, pmax(0, ((upper/lower)^a-1)/t))
+  weight <- pmax(0, pmin(maximum, weight))
+  step <- pmin(upper, lower * (1+t*weight)^(1/a))
+  loss <- signal*(1+t*weight)^2 + (1-weight)^2 + variance*weight^2 +
+    2*covariance*weight*(1-weight)
+  # Different pairs have different variance scales; logarithms avoid overflow at distant steps
+  loss <- log2(loss) - 2*d*(log2(lower)-gamma)
+  complete <- head(usable, -1L) & tail(usable, -1L) & lower <= upper & is.finite(step) & step <= upper & is.finite(loss)
+  if (!any(complete)) return(NA_real_)
+  loss[!complete] <- Inf
+  unname(step[which.min(loss)])
 }
 
 # For error A*h^a + B*h^(-d), the derivative of this expression gives an optimal rounding level
