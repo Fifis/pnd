@@ -486,10 +486,9 @@ differencesM <- function(FUN, x, grid, d, a, ratio, retry, max.rel.error,
   fmax <- apply(abs(values), 1L, max)
   accuracy <- rep(aprime, n)
   if (richardson) {
-    # Mathur subtracts the (already) rounded derivatives rather than regrouping their function values
-    # The estimate belongs to the larger step of each adjacent pair
-    # TODO: find page reference
-    error <- c(NA_real_, diff(derivative)) / (1-ratio^(-a))
+    # Subtract the computed derivatives rather than regrouping their function values
+    # Keep the estimate at the smaller step, matching the auxiliary formula's indexing
+    error <- c(diff(derivative) / (ratio^a - 1), NA_real_)
     higher <- error / attr(target, "remainder.coef")
     trunc <- abs(error)
   } else {

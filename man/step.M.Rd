@@ -109,7 +109,7 @@ This function computes the optimal step size for central differences using the
 \enumerate{
 \item Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
-\item Estimate truncation errors using a higher-order derivative of accuracy order two.
+\item Estimate truncation errors by subtracting derivatives at neighbouring grid steps.
 \item Find the leftmost range of consecutive step sizes for which the slope of the truncation error
 is approximately equal (within 10\% tolerance) to the accuracy order and which is long enough
 (e.g. at least length 5).

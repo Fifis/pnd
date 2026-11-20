@@ -47,7 +47,7 @@ getValsM <- function(FUN, x, cores, cl, preschedule, ...) {
 #'
 #' 1. Choose a reasonably large (but not too large) initial step size \eqn{h_0}{h0} and a reduction
 #' factor (1/2 for fast, 1/4 for slow functions is a reasonable choice).
-#' 2. Estimate truncation errors using a higher-order derivative of accuracy order two.
+#' 2. Estimate truncation errors by subtracting derivatives at neighbouring grid steps.
 #' 3. Find the leftmost range of consecutive step sizes for which the slope of the truncation error
 #'    is approximately equal (within 10% tolerance) to the accuracy order and which is long enough
 #'    (e.g. at least length 5).
@@ -154,7 +154,7 @@ step.M <- function(FUN, x, h0 = NULL, deriv.order = 1, acc.order = 2, range = NU
 
   estimates <- differencesM(FUN, x, g, deriv.order, acc.order, inv.sf, retry = FALSE,
                             max.rel.error = max.rel.error, cores = cores, cl = cl,
-                            preschedule = preschedule, check.zero = FALSE, ...)
+                            preschedule = preschedule, check.zero = FALSE, richardson = TRUE, ...)
   fgrid <- estimates$f
   cds <- estimates$deriv
   fhigher <- estimates$higher
