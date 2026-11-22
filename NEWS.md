@@ -17,7 +17,9 @@
 - DEV: Check correspondence between functions and their documentation (which might be lagging behind the developments)
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp(checks = all_checks()[!grepl("^lintr", all_checks())])`
 
-# pnd 0.1.4 (2026-11-XX)
+
+# pnd 0.2.0 (2026-11-23)
+
 - Fix: `Hessian()` returned wrong results with additional function arguments
 - Fix: custom stencils now respect different derivative orders across coordinates
 - Fix: non-finite values remain visible when formatting and printing derivatives
@@ -31,28 +33,44 @@
 - Fix: follow the Stepleman--Winarsky zero-endpoint branch and explain undefined cancellation tests
 - Fix: record the accepted finite evaluation in Curtis--Reid recovery history
 - Fix: handle singleton Vandermonde systems and exact interpolation on integer zero stencils
-- Improvement: automatically reuse PSOCK workers on Windows
+- Fix: corrected truncation-error scaling and higher-order derivative calculations in `step.M()` and `step.K()`
+- Fix: keep Mathur and kink-based evaluation grids within the search interval
+- Fix: resolve function arguments before sending step-selection evaluations to PSOCK workers
+- Improvement: automatically reuse PSOCK workers on Windows, release workers with `stopParallel()`
 - Improvement: ~10% faster evaluation for long input point vectors owing to fewer temporary grid matrices
 - Improvement: 3--5x speed-up owing to batching for vectorised element-wise functions on long inputs
 - Improvement: 1.5--2.5x speed up with shared-stencil aggregation fast path on long inputs
 - Improvement: ~2--30% speed-up through vectorised element-wise grid arithmetic
-- Improvement: added timing to measure overhead and function performance separately (global option)
+- Improvement: added `timing` and `function.calls` attributes to measure preparation and evaluation (off: `options(pnd.timing = FALSE)`)
 - Improvement: `Hessian()` now returns the same optional timing and call-count attributes as `Grad()`
+- Improvement: stabilised kink fitting and fallbacks with a fixed robust-loss scale and checks for unresolved cancellation estimates
+- Improvement: calibrated kink-based interpolation for rounding noise and shared function evaluations
+- Improvement: added kink-fit and fallback diagnostics, and marked unavailable error estimates in plots
+- Misc: shared common stencil, interpolation and fall-back calculations between `step.M()` and `step.K()`
+- Misc: corrected help, examples and vignettes, and standardised derivative-order notation
+
 
 # pnd 0.1.3 (2026-05-26)
+
 - Fix: GitHub issue #5 -- simplified the dimension check for Jacobians
 - Fix: eliminated a typo in the documentation
 
+
 # pnd 0.1.2 (2026-02-12)
+
 - Fix: relaxed tolerances in some tests
 - Fix: made a better default zero tolerance for generic derivative and accuracy orders
 
+
 # pnd 0.1.1 (2025-09-04)
+
 - Fix: added a simpler and more reliable fall-back option for `step.M`
 - Feature: added plotting methods for `step...` functions
 - Feature: added arbitrary derivation and accuracy order to Curtis--Reid method
 
+
 # pnd 0.1.0 (2025-05-20)
+
 - Feature: original kink-based algorithm for step size selection `step.K()`
 - Feature: added safety shrinking if `FUN(x)` is finite but `FUN(x+h)` is not in all SSS routines
 - Feature: added S3 printing methods for derivatives and step sizes
@@ -63,46 +81,62 @@
 - Fix: now 1x1 Hessians can be computed (why, though, if second derivatives exist?)
 - Fix: added the `v` argument for `numDeriv` compatibility
 
+
 # pnd 0.0.10 (2025-04-02)
+
 - Fix: GitHub issue #2 -- `checkDimensions` could not handle character `h` passed for auto-selection
 - Fix: GitHub issue #1 -- function arguments in `...` did not propagate properly to `step...` functions
 
+
 # pnd 0.0.9 (2025-03-10)
+
 - Fix: fixed a regression with the default step size
 - Fix: parallelised Hessians in the same manner as gradients
 - Feature: compatibility of `Hessian()` with the arguments for methods `"Richardson"` and `"simple"` from `numDeriv`
 
+
 # pnd 0.0.8 (2025-03-05)
+
 - Fix: sped up CPU core request diagnostics for 1-core operations
 - Fix: Using full paths on Macs
 
+
 # pnd 0.0.7 (2025-03-01)
+
 - Fix: removed obsolete environment creation for cluster export
 - Fix: changed physical core detection on Macs
 - Misc: the package has been added to CRAN, fewer syntax changes are expected
 
+
 # pnd 0.0.6 (2025-01-25)
+
 - Fix: Derivatives of vectorised functions are working. Example: `Grad(sin, 1:4)`
 - Feature: Auto-detecting the number of cores available on multi-core machines to speed up computations
 - Feature: Added plug-in step size selection with an estimated `f'''` with a rule of thumb
 - Feature: Auto-detection of parallel type
 - Feature: Added zero tolerance to the default step for a fixed step
 
+
 # pnd 0.0.5 (2025-01-14)
+
 - Feature: Extended the step-selection routines to gradients (vector input `x`)
 - Feature: Parallelisation of step selection in all algorithms
 - Feature: Mathur's AutoDX algorithm for step size selection `step.M()`
 - Feature: Added `Hessian()` that supports central differences (for the moment) and arbitrary accuracy
 - Feature: Separate `Grad()` and `Jacobian()` that call the workhorse, `GenD()`, for compatibility with `numDeriv`
 
+
 # pnd 0.0.4 (2024-06-10)
+
 - Feature: Stepleman--Winarsky algorithm for step size selection `step.SW()`
 - Feature: Automated wrapper for step size selection `gradstep()`
 - Improvement: Safe handling of function errors and non-finite returns in step-size selection procedures
 - Improvement: Finite-difference coefficients gained attributes: Taylor expansion, coefficient on the largest truncated term, and effective accuracy (useful for custom stencils)
 - Improvement: added unit tests for core features
 
+
 # pnd 0.0.3 (2024-06-01)
+
 - Feature: `solveVandermonde()` to solve ill-conditioned problems that arise in weight calculation
 - Feature: Dumontet--Vignes algorithm for step size selection `step.DV()`
 - Feature: Curtis--Reid algorithm for step size selection `step.CR()` and its modification
@@ -110,10 +144,14 @@
 - Fix: If the user supplies a short custom stencil and requests a high accuracy order, it will provide the best available order and produce a warning
 - Fix: The output of `Grad()` preserves the names of `x` and `FUN(x)`, which prevents errors in cases where names are required
 
+
 # pnd 0.0.2 (2023-12-06)
+
 - Fix: bug in stencil calculation
 
+
 # pnd 0.0.1 (2023-09-01)
+
 - Initial release
 - Computing finite-difference coefficients on arbitrary stencils
 - Computing numerical gradients with reasonable default step sizes
