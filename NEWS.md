@@ -8,6 +8,8 @@
 - FEATURE: if any algorithm returns a step size larger than `|x| / max(stencil)`, throw a warning
 - FEATURE: Create `control` or `method.args` for `Grad` with automatic step selection
 - FEATURE: Arbitrary mixed orders
+- FEATURE: Implement analytical gradients for pseudo-Huber's loss in `step.K`
+- FEATURE: Update `step.K` plots with raw, adjusted, and calibrated values!
 - MISC: Write the list of controls on the help page of `gradstep()` explicitly!
 - MISC: Check which packages depend on `numDeriv` and check compatibility with 10 top!
 - MISC: Add links to documentation and tutorials onto the GitHub page.
